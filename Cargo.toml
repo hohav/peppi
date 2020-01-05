@@ -1,0 +1,17 @@
+[package]
+name = "slippi"
+version = "0.1.0"
+authors = ["hohav <hohav@fastmail.com>"]
+edition = "2018"
+
+[dependencies]
+byteorder = "1"
+num_enum = "0.4.2"
+
+[lib]
+name = "slippi"
+path = "src/lib.rs"
+
+[[bin]]
+name = "slippi-inspect"
+path = "src/bin.rs"
