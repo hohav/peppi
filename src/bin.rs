@@ -5,7 +5,7 @@ fn main() {
 	let game = slippi::parse(&args[1]).unwrap();
 	println!("{:#?}", game);
 
-	if args.len() > 1 {
+	if args.len() > 2 {
 		let port = args[2].parse::<usize>().unwrap();
 		let frame = args[3].parse::<usize>().unwrap();
 		if let Some(port) = &game.ports[port] {
