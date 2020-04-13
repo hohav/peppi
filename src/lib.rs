@@ -1,6 +1,16 @@
+// #![feature(bool_to_option)]
+
 mod parse;
-mod game;
+mod pseudo_bitmask;
+mod pseudo_enum;
 mod ubjson;
+
+pub mod action_state;
+pub mod attack;
+pub mod character;
+pub mod frame;
+pub mod game;
+pub mod stage;
 
 use std::{error, fmt, fs, io};
 use std::io::{Seek};

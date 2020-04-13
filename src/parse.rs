@@ -1,5 +1,4 @@
 use std::io::{Read, Seek, Result, Error, ErrorKind};
-
 use std::collections::HashMap;
 
 extern crate byteorder;
@@ -8,8 +7,19 @@ use byteorder::{BigEndian, ReadBytesExt};
 extern crate num_enum;
 use std::convert::TryFrom;
 
-use super::game::{Frames, FramePre, FramePreV1_2, FramePreV1_4, FramePost, FramePostV0_2, FramePostV2_0, FramePostV2_1, Game, GameStart, GameEnd, Player, Port, Slippi};
+extern crate encoding_rs;
+use encoding_rs::SHIFT_JIS;
 
+use super::action_state;
+use super::action_state::{ActionState};
+use super::attack::{Attack};
+use super::character;
+use super::character::{Character};
+use super::frame;
+use super::frame::{Frames, FramePre, FramePost, Direction, Position};
+use super::game;
+use super::game::{Game, GameStart, GameEnd, Player, PlayerType, Port, Slippi};
+use super::stage;
 use super::ubjson;
 
 const FIRST_FRAME_INDEX:i32 = -123;
@@ -68,14 +78,14 @@ fn parse_event_payloads<R:Read>(r:&mut R) -> Result<HashMap<u8, u16>> {
 }
 
 fn parse_player<R:Read>(mut r:R) -> Result<Option<Player>> {
-	let character = r.read_u8()?;
-	let r#type = r.read_u8()?;
+	let character = character::CSSCharacter { value: r.read_u8()? };
+	let r#type = game::PlayerType { value: r.read_u8()? };
 	let stocks = r.read_u8()?;
 	let costume = r.read_u8()?;
 	r.read_exact(&mut [0; 3])?; // ???
-	let team_shade = r.read_u8()?;
+	let team_shade = game::TeamShade { value: r.read_u8()? };
 	let handicap = r.read_u8()?;
-	let team = r.read_u8()?;
+	let team = game::Team { value: r.read_u8()? };
 	r.read_u16::<BigEndian>()?; // ???
 	let bitfield = r.read_u8()?;
 	r.read_u16::<BigEndian>()?; // ???
@@ -85,8 +95,9 @@ fn parse_player<R:Read>(mut r:R) -> Result<Option<Player>> {
 	let defense_ratio = r.read_f32::<BigEndian>()?;
 	let model_scale = r.read_f32::<BigEndian>()?;
 	r.read_u32::<BigEndian>()?; // ???
+	// total bytes: 0x24
 	Ok(match r#type {
-		0 | 1 | 2 => Some(Player {
+		PlayerType::HUMAN | PlayerType::CPU | PlayerType::DEMO => Some(Player {
 			character: character,
 			r#type: r#type,
 			stocks: stocks,
@@ -99,12 +110,15 @@ fn parse_player<R:Read>(mut r:R) -> Result<Option<Player>> {
 			offense_ratio: offense_ratio,
 			defense_ratio: defense_ratio,
 			model_scale: model_scale,
+			dash_back: None,
+			shield_drop: None,
+			name_tag: None,
 		}),
 		_ => None
 	})
 }
 
-fn parse_game_start<R:Read>(mut r:R) -> Result<GameStart> {
+fn parse_game_start(mut r:&[u8]) -> Result<GameStart> {
 	let slippi = Slippi {version: (r.read_u8()?, r.read_u8()?, r.read_u8()?)};
 	r.read_u8()?; // unused (build number)
 	r.read_u8()?; // bitfield 1
@@ -117,7 +131,7 @@ fn parse_game_start<R:Read>(mut r:R) -> Result<GameStart> {
 	let item_spawn_frequency = r.read_i8()?;
 	let self_destruct_score = r.read_i8()?;
 	r.read_u8()?; // ???
-	let stage = r.read_u16::<BigEndian>()?;
+	let stage = stage::Stage { value: r.read_u16::<BigEndian>()? };
 	let game_timer = r.read_u32::<BigEndian>()?;
 	r.read_exact(&mut [0; 15])?; // ???
 	let item_spawn_bitfield = {
@@ -127,8 +141,44 @@ fn parse_game_start<R:Read>(mut r:R) -> Result<GameStart> {
 	};
 	r.read_u64::<BigEndian>()?; // ???
 	let damage_ratio = r.read_f32::<BigEndian>()?;
-	r.read_exact(&mut [0; 44])?;
-	let players = [parse_player(&mut r)?, parse_player(&mut r)?, parse_player(&mut r)?, parse_player(&mut r)?];
+	r.read_exact(&mut [0; 44])?; // ???
+	// @0x65
+	let mut players = [parse_player(&mut r)?, parse_player(&mut r)?, parse_player(&mut r)?, parse_player(&mut r)?];
+	// @0xf5
+	r.read_exact(&mut [0; 72])?; // ???
+	// @0x13d
+	let random_seed = r.read_u32::<BigEndian>()?;
+
+	let mut is_pal = None;
+	let mut is_frozen_ps = None;
+	if !r.is_empty() { // v1.0
+		for p in &mut players {
+			let dash_back = Some(game::DashBack { value: r.read_u32::<BigEndian>()? });
+			let shield_drop = Some(game::ShieldDrop { value: r.read_u32::<BigEndian>()? });
+			if let Some(p) = p {
+				p.dash_back = dash_back;
+				p.shield_drop = shield_drop;
+			}
+		}
+		if !r.is_empty() { // v1.3
+			for p in &mut players {
+				let mut name_tag = [0; 16];
+				r.read_exact(&mut name_tag)?;
+				if let Some(p) = p {
+					let first_null = name_tag.iter().position(|&x| x == 0).unwrap_or(16);
+					let (name_tag, _) = SHIFT_JIS.decode_without_bom_handling(&name_tag[0..first_null]);
+					p.name_tag = Some(name_tag.to_string());
+				}
+			}
+			if !r.is_empty() { // v1.5
+				is_pal = Some(r.read_u8()? != 0);
+				if !r.is_empty() { // v2.0
+					is_frozen_ps = Some(r.read_u8()? != 0);
+				}
+			}
+		}
+	}
+
 	Ok(GameStart {
 		slippi: slippi,
 		is_teams: is_teams,
@@ -139,6 +189,9 @@ fn parse_game_start<R:Read>(mut r:R) -> Result<GameStart> {
 		item_spawn_bitfield: item_spawn_bitfield,
 		damage_ratio: damage_ratio,
 		players: players,
+		random_seed: random_seed,
+		is_pal: is_pal,
+		is_frozen_ps: is_frozen_ps,
 	})
 }
 
@@ -149,91 +202,121 @@ fn parse_game_end<R:Read>(mut r:R) -> Result<GameEnd> {
 	})
 }
 
+fn direction(value:f32) -> Result<Direction> {
+	match value {
+		v if v < 0.0 => Ok(Direction::LEFT),
+		v if v > 0.0 => Ok(Direction::RIGHT),
+		_ => Err(err!("direction == 0")),
+	}
+}
+
 fn parse_frame_pre(mut r:&[u8]) -> Result<FrameEvent<FramePre>> {
-	Ok(FrameEvent {
-		id: FrameId {
-			index: r.read_i32::<BigEndian>()?,
-			port: r.read_u8()?,
-			is_follower: r.read_u8()? != 0,
+	let id = FrameId {
+		index: r.read_i32::<BigEndian>()?,
+		port: r.read_u8()?,
+		is_follower: r.read_u8()? != 0,
+	};
+
+	let random_seed = r.read_u32::<BigEndian>()?;
+	let state = ActionState::Common(action_state::Common { value: r.read_u16::<BigEndian>()? });
+	let position = Position {
+		x: r.read_f32::<BigEndian>()?,
+		y: r.read_f32::<BigEndian>()?,
+	};
+	let direction = direction(r.read_f32::<BigEndian>()?)?;
+	let joystick = Position {
+		x: r.read_f32::<BigEndian>()?,
+		y: r.read_f32::<BigEndian>()?,
+	};
+	let cstick = Position {
+		x: r.read_f32::<BigEndian>()?,
+		y: r.read_f32::<BigEndian>()?,
+	};
+	let trigger_logical = r.read_f32::<BigEndian>()?;
+	let buttons = frame::Buttons {
+		logical: frame::ButtonsLogical { value: r.read_u32::<BigEndian>()? },
+		physical: frame::ButtonsPhysical { value: r.read_u16::<BigEndian>()? },
+	};
+	let triggers = frame::Triggers {
+		logical: trigger_logical,
+		physical: frame::TriggersPhysical {
+			l: r.read_f32::<BigEndian>()?,
+			r: r.read_f32::<BigEndian>()?,
 		},
+	};
+
+	// v1.2
+	let raw_analog_x = r.read_u8().ok();
+
+	// v1.4
+	let damage = r.read_f32::<BigEndian>().ok();
+
+	Ok(FrameEvent {
+		id: id,
 		event: FramePre {
-			random_seed: r.read_u32::<BigEndian>()?,
-			state: r.read_u16::<BigEndian>()?,
-			position_x: r.read_f32::<BigEndian>()?,
-			position_y: r.read_f32::<BigEndian>()?,
-			direction: r.read_f32::<BigEndian>()?,
-			joystick_x: r.read_f32::<BigEndian>()?,
-			joystick_y: r.read_f32::<BigEndian>()?,
-			cstick_x: r.read_f32::<BigEndian>()?,
-			cstick_y: r.read_f32::<BigEndian>()?,
-			trigger_logical: r.read_f32::<BigEndian>()?,
-			buttons_logical: r.read_u32::<BigEndian>()?,
-			buttons_physical: r.read_u16::<BigEndian>()?,
-			trigger_physical_l: r.read_f32::<BigEndian>()?,
-			trigger_physical_r: r.read_f32::<BigEndian>()?,
-			v1_2: if r.is_empty() {
-				None
-			} else {
-				Some(FramePreV1_2 {
-					raw_analog_x: r.read_u8()?,
-				})
-			},
-			v1_4: if r.is_empty() {
-				None
-			} else {
-				Some(FramePreV1_4 {
-					damage: r.read_f32::<BigEndian>()?,
-				})
-			},
+			random_seed: random_seed,
+			state: state,
+			position: position,
+			direction: direction,
+			joystick: joystick,
+			cstick: cstick,
+			triggers: triggers,
+			buttons: buttons,
+			raw_analog_x: raw_analog_x,
+			damage: damage,
 		}
 	})
 }
 
+fn flags(buf:&[u8; 5]) -> frame::StateFlags {
+	frame::StateFlags { value:
+		((buf[0] as u64) << 00) +
+		((buf[1] as u64) << 08) +
+		((buf[2] as u64) << 16) +
+		((buf[3] as u64) << 24) +
+		((buf[4] as u64) << 32)
+	}
+}
+
 fn parse_frame_post(mut r:&[u8]) -> Result<FrameEvent<FramePost>> {
+	let index = r.read_i32::<BigEndian>()?;
 	Ok(FrameEvent {
 		id: FrameId {
-			index: r.read_i32::<BigEndian>()?,
+			index: index, //r.read_i32::<BigEndian>()?,
 			port: r.read_u8()?,
 			is_follower: r.read_u8()? != 0,
 		},
 		event: FramePost {
-			character: r.read_u8()?,
-			state: r.read_u16::<BigEndian>()?,
-			position_x: r.read_f32::<BigEndian>()?,
-			position_y: r.read_f32::<BigEndian>()?,
-			direction: r.read_f32::<BigEndian>()?,
+			character: Character { value: r.read_u8()? },
+			state: ActionState::Common(action_state::Common { value: r.read_u16::<BigEndian>()? }),
+			position: Position {
+				x: r.read_f32::<BigEndian>()?,
+				y: r.read_f32::<BigEndian>()?,
+			},
+			direction: direction(r.read_f32::<BigEndian>()?)?,
 			damage: r.read_f32::<BigEndian>()?,
 			shield: r.read_f32::<BigEndian>()?,
-			last_attack_landed: r.read_u8()?,
+			last_attack_landed: Attack { value: r.read_u8()? },
 			combo_count: r.read_u8()?,
 			last_hit_by: r.read_u8()?,
 			stocks: r.read_u8()?,
-			v0_2: if r.is_empty() {
-				None
-			} else {
-				Some(FramePostV0_2 {
-					state_age: r.read_f32::<BigEndian>()?,
-				})
+
+			// v0.2
+			state_age: r.read_f32::<BigEndian>().ok(),
+
+			// v2.0
+			flags: {
+				let mut buf = [0; 5];
+				r.read_exact(&mut buf).ok().map(|_| flags(&buf))
 			},
-			v2_0: if r.is_empty() {
-				None
-			} else {
-				Some(FramePostV2_0 {
-					misc_as: r.read_f32::<BigEndian>()?,
-					ground: r.read_u16::<BigEndian>()?,
-					jumps: r.read_u8()?,
-					l_cancel: r.read_u8()?,
-					airborne: r.read_u8()? != 0,
-					flags:{let mut buf = [0; 5]; r.read_exact(&mut buf)?; buf},
-				})
-			},
-			v2_1: if r.is_empty() {
-				None
-			} else {
-				Some(FramePostV2_1 {
-					hurtbox_state: r.read_u8()?,
-				})
-			},
+			misc_as: r.read_f32::<BigEndian>().ok(),
+			ground: r.read_u16::<BigEndian>().ok(),
+			jumps: r.read_u8().ok(),
+			l_cancel: r.read_u8().ok().map(|x| frame::LCancel { value: x }),
+			airborne: r.read_u8().ok().map(|x| x != 0),
+
+			// v2.1
+			hurtbox_state: r.read_u8().ok().map(|x| frame::HurtboxState { value: x }),
 		}
 	})
 }
@@ -351,7 +434,19 @@ impl Handlers for GameParser {
 		};
 
 		assert_eq!((id.index - FIRST_FRAME_INDEX) as usize, frames.len());
+		let character = e.event.character;
 		frames.push(e.event);
+
+		let frames_pre = if id.is_follower {
+			&mut port.leader.pre
+		} else {
+			&mut port.leader.pre
+		};
+
+		assert_eq!(frames_pre.len(), frames.len());
+		if let ActionState::Common(pre_state) = frames_pre[frames.len() - 1].state {
+			frames_pre[frames.len() - 1].state = ActionState::from(pre_state.value, character);
+		}
 	}
 }
 
