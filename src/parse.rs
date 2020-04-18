@@ -279,45 +279,65 @@ fn flags(buf:&[u8; 5]) -> frame::StateFlags {
 }
 
 fn parse_frame_post(mut r:&[u8]) -> Result<FrameEvent<FramePost>> {
-	let index = r.read_i32::<BigEndian>()?;
+	let id = FrameId {
+		index: r.read_i32::<BigEndian>()?,
+		port: r.read_u8()?,
+		is_follower: r.read_u8()? != 0,
+	};
+
+	let character = Character { value: r.read_u8()? };
+	let state = ActionState::from(r.read_u16::<BigEndian>()?, character);
+	let position = Position {
+		x: r.read_f32::<BigEndian>()?,
+		y: r.read_f32::<BigEndian>()?,
+	};
+	let direction = direction(r.read_f32::<BigEndian>()?)?;
+	let damage = r.read_f32::<BigEndian>()?;
+	let shield = r.read_f32::<BigEndian>()?;
+	let last_attack_landed = Attack { value: r.read_u8()? };
+	let combo_count = r.read_u8()?;
+	let last_hit_by = r.read_u8()?;
+	let stocks = r.read_u8()?;
+
+	// v0.2
+	let state_age = r.read_f32::<BigEndian>().ok();
+
+	// v2.0
+	let flags = {
+		let mut buf = [0; 5];
+		r.read_exact(&mut buf).ok().map(|_| flags(&buf))
+	};
+	let misc_as = r.read_f32::<BigEndian>().ok();
+	let ground = r.read_u16::<BigEndian>().ok();
+	let jumps = r.read_u8().ok();
+	let l_cancel = r.read_u8().ok().map(|x| frame::LCancel { value: x });
+	let airborne = r.read_u8().ok().map(|x| x != 0);
+
+	// v2.1
+	let hurtbox_state =  r.read_u8().ok().map(|x| frame::HurtboxState { value: x });
+
 	Ok(FrameEvent {
-		id: FrameId {
-			index: index, //r.read_i32::<BigEndian>()?,
-			port: r.read_u8()?,
-			is_follower: r.read_u8()? != 0,
-		},
+		id: id,
 		event: FramePost {
-			character: Character { value: r.read_u8()? },
-			state: ActionState::Common(action_state::Common { value: r.read_u16::<BigEndian>()? }),
-			position: Position {
-				x: r.read_f32::<BigEndian>()?,
-				y: r.read_f32::<BigEndian>()?,
-			},
-			direction: direction(r.read_f32::<BigEndian>()?)?,
-			damage: r.read_f32::<BigEndian>()?,
-			shield: r.read_f32::<BigEndian>()?,
-			last_attack_landed: Attack { value: r.read_u8()? },
-			combo_count: r.read_u8()?,
-			last_hit_by: r.read_u8()?,
-			stocks: r.read_u8()?,
-
-			// v0.2
-			state_age: r.read_f32::<BigEndian>().ok(),
-
-			// v2.0
-			flags: {
-				let mut buf = [0; 5];
-				r.read_exact(&mut buf).ok().map(|_| flags(&buf))
-			},
-			misc_as: r.read_f32::<BigEndian>().ok(),
-			ground: r.read_u16::<BigEndian>().ok(),
-			jumps: r.read_u8().ok(),
-			l_cancel: r.read_u8().ok().map(|x| frame::LCancel { value: x }),
-			airborne: r.read_u8().ok().map(|x| x != 0),
-
-			// v2.1
-			hurtbox_state: r.read_u8().ok().map(|x| frame::HurtboxState { value: x }),
-		}
+			character: character,
+			state: state,
+			position: position,
+			direction: direction,
+			damage: damage,
+			shield: shield,
+			last_attack_landed: last_attack_landed,
+			combo_count: combo_count,
+			last_hit_by: last_hit_by,
+			stocks: stocks,
+			state_age: state_age,
+			flags: flags,
+			misc_as: misc_as,
+			ground: ground,
+			jumps: jumps,
+			l_cancel: l_cancel,
+			airborne: airborne,
+			hurtbox_state: hurtbox_state,
+		},
 	})
 }
 
