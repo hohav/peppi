@@ -27,11 +27,11 @@ const FIRST_FRAME_INDEX:i32 = -123;
 #[derive(Debug, PartialEq, num_enum::TryFromPrimitive)]
 #[repr(u8)]
 pub enum Event {
-    Payloads = 0x35,
-    GameStart = 0x36,
-    FramePre = 0x37,
-    FramePost = 0x38,
-    GameEnd = 0x39,
+	Payloads = 0x35,
+	GameStart = 0x36,
+	FramePre = 0x37,
+	FramePost = 0x38,
+	GameEnd = 0x39,
 }
 
 #[derive(Debug)]

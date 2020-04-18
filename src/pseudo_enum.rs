@@ -1,11 +1,11 @@
 #[macro_export]
 macro_rules! pseudo_enum {
-    ($name:ident : $type:ty { $( $value:expr => $variant:ident ),* $(,)? }) => {
-        #[derive(PartialEq, Eq, Copy, Clone)]
+	($name:ident : $type:ty { $( $value:expr => $variant:ident ),* $(,)? }) => {
+		#[derive(PartialEq, Eq, Copy, Clone)]
 		pub struct $name { pub value:$type }
 
-        impl $name {
-        	$( pub const $variant:$name = $name { value:$value }; )*
+		impl $name {
+			$( pub const $variant:$name = $name { value:$value }; )*
 		}
 
 		impl std::fmt::Debug for $name {
@@ -15,6 +15,6 @@ macro_rules! pseudo_enum {
 					_ => write!(f, "{}", self.value),
 				}
 			}
-        }
+		}
 	}
 }
