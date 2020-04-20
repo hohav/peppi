@@ -10,11 +10,11 @@ macro_rules! pseudo_bitmask {
 
 		impl std::fmt::Debug for $name {
 			fn fmt(&self, f:&mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-				let mut foo:Vec<&str> = Vec::new();
+				let mut named_values: Vec<&str> = Vec::new();
 				$( if (self.value & $value) > 0 {
-					foo.push(stringify!($variant));
+					named_values.push(stringify!($variant));
 				} )*
-				write!(f, "{} => {:?}", self.value, foo)
+				write!(f, "{} {:?}", self.value, named_values)
 			}
 		}
 	}

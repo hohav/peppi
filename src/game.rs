@@ -9,7 +9,7 @@ use super::ubjson;
 
 #[derive(Debug)]
 pub struct Slippi {
-	pub version:(u8, u8, u8),
+	pub version: (u8, u8, u8),
 }
 
 pseudo_enum!(PlayerType:u8 {
@@ -44,55 +44,61 @@ pseudo_enum!(ShieldDrop:u32 {
 
 #[derive(Debug)]
 pub struct Player {
-	pub character:CSSCharacter,
-	pub r#type:PlayerType,
-	pub stocks:u8,
-	pub costume:u8,
-	pub team_shade:TeamShade,
-	pub handicap:u8,
-	pub team:Team,
-	pub bitfield:u8,
-	pub cpu_level:u8,
-	pub offense_ratio:f32,
-	pub defense_ratio:f32,
-	pub model_scale:f32,
-	pub dash_back:Option<DashBack>,
-	pub shield_drop:Option<ShieldDrop>,
-	pub name_tag:Option<String>,
+	pub character: CSSCharacter,
+	pub r#type: PlayerType,
+	pub stocks: u8,
+	pub costume: u8,
+	pub team_shade: TeamShade,
+	pub handicap: u8,
+	pub team: Team,
+	pub bitfield: u8,
+	pub cpu_level: u8,
+	pub offense_ratio: f32,
+	pub defense_ratio: f32,
+	pub model_scale: f32,
+	pub dash_back: Option<DashBack>,
+	pub shield_drop: Option<ShieldDrop>,
+	pub name_tag: Option<String>,
 }
 
 #[derive(Debug)]
 pub struct GameStart {
-	pub slippi:Slippi,
-	pub is_teams:bool,
-	pub item_spawn_frequency:i8,
-	pub self_destruct_score:i8,
-	pub stage:Stage,
-	pub game_timer:u32,
-	pub item_spawn_bitfield:[u8; 5],
-	pub damage_ratio:f32,
-	pub players:[Option<Player>; 4],
-	pub random_seed:u32,
-	pub is_pal:Option<bool>,
-	pub is_frozen_ps:Option<bool>,
+	pub slippi: Slippi,
+	pub is_teams: bool,
+	pub item_spawn_frequency: i8,
+	pub self_destruct_score: i8,
+	pub stage: Stage,
+	pub game_timer: u32,
+	pub item_spawn_bitfield: [u8; 5],
+	pub damage_ratio: f32,
+	pub players: [Option<Player>; 4],
+	pub random_seed: u32,
+
+	// v1.5.0
+	pub is_pal: Option<bool>,
+
+	// v2.0.0
+	pub is_frozen_ps: Option<bool>,
 }
 
 #[derive(Debug)]
 pub struct GameEnd {
-	pub method:u8,
-	pub lras_initiator:i8,
+	pub method: u8,
+
+	// v2.0.0
+	pub lras_initiator: Option<i8>,
 }
 
 #[derive(Debug)]
 pub struct Port {
-	pub leader:Frames,
-	pub follower:Option<Frames>,
+	pub leader: Frames,
+	pub follower: Option<Frames>,
 }
 
 #[derive(Debug)]
 pub struct Game {
-	pub start:GameStart,
-	pub end:GameEnd,
-	pub ports:[Option<Port>; 4],
-	pub metadata:HashMap<String, ubjson::Object>,
+	pub start: GameStart,
+	pub end: GameEnd,
+	pub ports: [Option<Port>; 4],
+	pub metadata: HashMap<String, ubjson::Object>,
 }

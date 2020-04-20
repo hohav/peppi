@@ -11,7 +11,7 @@ macro_rules! pseudo_enum {
 		impl std::fmt::Debug for $name {
 			fn fmt(&self, f:&mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 				match self.value {
-					$( $value => write!(f, stringify!($value => $variant)), )*
+					$( $value => write!(f, "{}:{}", stringify!($value), stringify!($variant)), )*
 					_ => write!(f, "{}", self.value),
 				}
 			}

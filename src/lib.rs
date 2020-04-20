@@ -14,6 +14,7 @@ pub mod stage;
 
 use std::{error, fmt, fs, io};
 use std::io::{Seek};
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct ParseError {
@@ -33,7 +34,8 @@ impl error::Error for ParseError {
 	}
 }
 
-pub fn parse(path:&str) -> Result<game::Game, ParseError> {
+/// Parses the Slippi replay file at `path`, returning a `game::Game` object.
+pub fn parse(path:&Path) -> Result<game::Game, ParseError> {
 	let f = fs::File::open(path).map_err(|e| ParseError {line:0, error:e})?;
 	let mut r = io::BufReader::new(f);
 	parse::parse(&mut r)

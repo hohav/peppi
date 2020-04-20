@@ -20,14 +20,14 @@ pseudo_enum!(Direction:u8 {
 
 #[derive(Debug)]
 pub struct Position {
-	pub x:f32,
-	pub y:f32,
+	pub x: f32,
+	pub y: f32,
 }
 
 #[derive(Debug)]
 pub struct Buttons {
-	pub logical:ButtonsLogical,
-	pub physical:ButtonsPhysical,
+	pub logical: ButtonsLogical,
+	pub physical: ButtonsPhysical,
 }
 
 pseudo_bitmask!(ButtonsPhysical:u16 {
@@ -71,14 +71,14 @@ pseudo_bitmask!(ButtonsLogical:u32 {
 
 #[derive(Debug)]
 pub struct Triggers {
-	pub logical:f32,
-	pub physical:TriggersPhysical,
+	pub logical: f32,
+	pub physical: TriggersPhysical,
 }
 
 #[derive(Debug)]
 pub struct TriggersPhysical {
-	pub l:f32,
-	pub r:f32,
+	pub l: f32,
+	pub r: f32,
 }
 
 pseudo_bitmask!(StateFlags:u64 {
@@ -102,55 +102,75 @@ pseudo_enum!(HurtboxState:u8 {
 	2 => INTANGIBLE,
 });
 
+pub trait Indexed {
+	fn index(&self) -> i32;
+}
+
 #[derive(Debug)]
 pub struct FramePre {
-	pub position:Position,
-	pub direction:Direction,
-	pub joystick:Position,
-	pub cstick:Position,
-	pub triggers:Triggers,
-	pub random_seed:u32,
-	pub buttons:Buttons,
-	pub state:ActionState,
+	pub index: i32,
+
+	pub position: Position,
+	pub direction: Direction,
+	pub joystick: Position,
+	pub cstick: Position,
+	pub triggers: Triggers,
+	pub random_seed: u32,
+	pub buttons: Buttons,
+	pub state: ActionState,
 
 	// v1.2
-	pub raw_analog_x:Option<u8>,
+	pub raw_analog_x: Option<u8>,
 
 	// v1.4
-	pub damage:Option<f32>,
+	pub damage: Option<f32>,
+}
+
+impl Indexed for FramePre {
+	fn index(&self) -> i32 {
+		self.index
+	}
 }
 
 #[derive(Debug)]
 pub struct FramePost {
-	pub position:Position,
-	pub direction:Direction,
-	pub damage:f32,
-	pub shield:f32,
-	pub state:ActionState,
-	pub character:Character,
-	pub last_attack_landed:Attack,
-	pub combo_count:u8,
-	pub last_hit_by:u8,
-	pub stocks:u8,
+	pub index: i32,
+
+	pub position: Position,
+	pub direction: Direction,
+	pub damage: f32,
+	pub shield: f32,
+	pub state: ActionState,
+	pub character: Character,
+	pub last_attack_landed: Attack,
+	pub combo_count: u8,
+	pub last_hit_by: u8,
+	pub stocks: u8,
 
 	// v0.2
-	pub state_age:Option<f32>,
+	pub state_age: Option<f32>,
 
 	// v2.0
-	pub flags:Option<StateFlags>,
-	pub misc_as:Option<f32>,
-	pub ground:Option<u16>,
-	pub jumps:Option<u8>,
-	pub l_cancel:Option<LCancel>,
-	pub airborne:Option<bool>,
+	pub flags: Option<StateFlags>,
+	pub misc_as: Option<f32>,
+	pub ground: Option<u16>,
+	pub jumps: Option<u8>,
+	pub l_cancel: Option<LCancel>,
+	pub airborne: Option<bool>,
 
 	// v2.1
-	pub hurtbox_state:Option<HurtboxState>,
+	pub hurtbox_state: Option<HurtboxState>,
+}
+
+impl Indexed for FramePost {
+	fn index(&self) -> i32 {
+		self.index
+	}
 }
 
 pub struct Frames {
-	pub pre:Vec<FramePre>,
-	pub post:Vec<FramePost>,
+	pub pre: Vec<FramePre>,
+	pub post: Vec<FramePost>,
 }
 
 impl fmt::Debug for Frames {

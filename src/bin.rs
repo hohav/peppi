@@ -1,16 +1,21 @@
 use std::env;
+use std::path::Path;
+
+extern crate pretty_env_logger;
+use log::{error};
 
 fn main() {
-	let args: Vec<String> = env::args().collect();
-	let game = slippi::parse(&args[1]).unwrap();
-	println!("{:#?}", game);
+	pretty_env_logger::init();
 
-	if args.len() > 2 {
-		let port = args[2].parse::<usize>().unwrap();
-		let frame = args[3].parse::<usize>().unwrap();
-		if let Some(port) = &game.ports[port] {
-			println!("{:#?}", &port.leader.pre[frame]);
-			println!("{:#?}", &port.leader.post[frame]);
+	let args: Vec<String> = env::args().collect();
+
+	if args.len() < 2 {
+		println!("usage: {} REPLAY.slp", Path::new(&args[0]).file_name().and_then(|s| s.to_str()).unwrap_or(""));
+	} else {
+		let path = Path::new(&args[1]);
+		match slippi::parse(&path) {
+			Ok(game) => println!("{:#?}", game),
+			Err(err) => error!("{}", err),
 		}
 	}
 }

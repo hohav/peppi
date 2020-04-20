@@ -1,7 +1,7 @@
 use super::pseudo_enum;
 use super::character::{Character};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum ActionState {
 	Common(Common),
 	Bowser(Bowser),
@@ -1290,5 +1290,5 @@ pseudo_enum!(Zelda:u16 {
 	355 => TRANSFORM_GROUND,
 	356 => TRANSFORM_GROUND_ENDING,
 	357 => TRANSFORM_AIR,
-	358 => TRANSFORMAIRENDING,
+	358 => TRANSFORM_AIR_ENDING,
 });

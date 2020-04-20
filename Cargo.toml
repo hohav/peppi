@@ -6,8 +6,10 @@ edition = "2018"
 
 [dependencies]
 byteorder = "1"
-num_enum = "0.4.2"
 encoding_rs = "0.8.22"
+log = "0.4"
+num_enum = "0.4.2"
+pretty_env_logger = "0.4"
 
 [lib]
 name = "slippi"
