@@ -1,25 +1,18 @@
 use std::cmp::{min};
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::io::{Read, Seek, Result, Error, ErrorKind};
+use std::io::{Read, Seek, Result};
 
 use byteorder::{BigEndian, ReadBytesExt};
 use encoding_rs::SHIFT_JIS;
-use log::{debug, warn};
+use log::{debug};
 
-use super::action_state;
+use super::{action_state, character, frame, game, stage, ubjson};
 use super::action_state::{ActionState, Common};
 use super::attack::{Attack};
-use super::character;
 use super::character::{Character};
-use super::frame;
-use super::frame::{Frames, FramePre, FramePost, Direction, Position};
-use super::game;
-use super::game::{Game, GameStart, GameEnd, Player, PlayerType, Port, Slippi};
-use super::stage;
-use super::ubjson;
-
-const FIRST_FRAME_INDEX:i32 = -123;
+use super::frame::{FramePre, FramePost, Direction, Position};
+use super::game::{GameStart, GameEnd, Player, PlayerType, Slippi};
 
 const ZELDA_TRANSFORM_FRAME:u32 = 43;
 const SHEIK_TRANSFORM_FRAME:u32 = 36;
@@ -55,29 +48,22 @@ pub enum Event {
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
-struct FrameId {
-	index: i32,
-	port: u8,
-	is_follower: bool,
+pub struct FrameId {
+	pub index: i32,
+	pub port: u8,
+	pub is_follower: bool,
 }
 
 #[derive(Debug)]
-struct FrameEvent<F> {
-	id: FrameId,
-	event: F,
+pub struct FrameEvent<F> {
+	pub id: FrameId,
+	pub event: F,
 }
 
-#[derive(Debug)]
-struct GameParser {
-	start: Option<GameStart>,
-	end: Option<GameEnd>,
-	ports: [Option<Port>; 4],
-	metadata: Option<HashMap<String, ubjson::Object>>,
-}
-
+#[macro_export]
 macro_rules! err {
 	($( $arg:expr ),*) => {
-		Error::new(ErrorKind::InvalidData, format!($( $arg ),*))
+		std::io::Error::new(std::io::ErrorKind::InvalidData, format!($( $arg ),*))
 	}
 }
 
@@ -100,7 +86,7 @@ fn parse_event_payloads<R:Read>(r:&mut R) -> Result<HashMap<u8, u16>> {
 	Ok(payload_sizes)
 }
 
-fn parse_player<R:Read>(mut r:R) -> Result<Option<Player>> {
+fn parse_player<R:Read>(r:&mut R) -> Result<Option<Player>> {
 	let character = character::CSSCharacter { value: r.read_u8()? };
 	let r#type = game::PlayerType { value: r.read_u8()? };
 	let stocks = r.read_u8()?;
@@ -440,14 +426,15 @@ fn parse_frame_post(mut r:&[u8]) -> Result<FrameEvent<FramePost>> {
 	})
 }
 
-trait Handlers {
-	fn game_start(&mut self, _:GameStart) {}
-	fn game_end(&mut self, _:GameEnd) {}
-	fn frame_pre(&mut self, _:FrameEvent<FramePre>) {}
-	fn frame_post(&mut self, _:FrameEvent<FramePost>) {}
+pub trait Handlers {
+	fn game_start(&mut self, _:GameStart) -> Result<()> { Ok(()) }
+	fn game_end(&mut self, _:GameEnd) -> Result<()> { Ok(()) }
+	fn frame_pre(&mut self, _:FrameEvent<FramePre>) -> Result<()> { Ok(()) }
+	fn frame_post(&mut self, _:FrameEvent<FramePost>) -> Result<()> { Ok(()) }
+	fn metadata(&mut self, _:HashMap<String, ubjson::Object>) -> Result<()> { Ok(()) }
 }
 
-fn expect_bytes<R:Read>(mut r:R, expected:&[u8]) -> Result<()> {
+fn expect_bytes<R:Read>(r:&mut R, expected:&[u8]) -> Result<()> {
 	let mut actual = vec![0; expected.len()];
 	r.read_exact(&mut actual)?;
 	if expected == actual.as_slice() {
@@ -468,19 +455,19 @@ fn parse_event<R:Read, H:Handlers>(mut r:R, payload_sizes:&HashMap<u8, u16>, han
 		Ok(event) => match event {
 			Event::Payloads => Err(err!("unexpected event: {}", code)),
 			Event::GameStart => {
-				handlers.game_start(parse_game_start(&*buf)?);
+				handlers.game_start(parse_game_start(&*buf)?)?;
 				Ok(Some(event))
 			},
 			Event::GameEnd => {
-				handlers.game_end(parse_game_end(&*buf)?);
+				handlers.game_end(parse_game_end(&*buf)?)?;
 				Ok(Some(event))
 			},
 			Event::FramePre => {
-				handlers.frame_pre(parse_frame_pre(&*buf)?);
+				handlers.frame_pre(parse_frame_pre(&*buf)?)?;
 				Ok(Some(event))
 			},
 			Event::FramePost => {
-				handlers.frame_post(parse_frame_post(&*buf)?);
+				handlers.frame_post(parse_frame_post(&*buf)?)?;
 				Ok(Some(event))
 			},
 		},
@@ -488,105 +475,13 @@ fn parse_event<R:Read, H:Handlers>(mut r:R, payload_sizes:&HashMap<u8, u16>, han
 	}
 }
 
-impl GameParser {
-	fn into_game(self) -> Result<Game> {
-		Ok(Game {
-			start: self.start.ok_or_else(|| err!("missing start event"))?,
-			end: self.end.ok_or_else(|| err!("missing end event"))?,
-			ports: self.ports,
-			metadata: self.metadata.unwrap_or_default(),
-		})
-	}
-}
-
-fn warn_ooo_frames<F:frame::Indexed>(cur:&F, prev:Option<&F>) {
-	if let Some(prev) = prev {
-		if prev.index() > cur.index() {
-			warn!("out-of-order frame: {} -> {}", prev.index(), cur.index());
-		}
-	} else {
-		if cur.index() != FIRST_FRAME_INDEX {
-			warn!("unexpected first frame index: {}", cur.index());
-		}
-	}
-}
-
-impl Handlers for GameParser {
-	fn game_start(&mut self, s:GameStart) {
-		self.start = Some(s);
-	}
-
-	fn game_end(&mut self, s:GameEnd) {
-		self.end = Some(s);
-	}
-
-	fn frame_pre(&mut self, e:FrameEvent<FramePre>) {
-		let id = e.id;
-
-		if self.ports[id.port as usize].is_none() {
-			self.ports[id.port as usize] = Some(Port {
-				leader: Frames { pre: Vec::new(), post: Vec::new() },
-				follower: None,
-			});
-		}
-
-		let port = self.ports[id.port as usize].as_mut().unwrap();
-
-		let frames = if id.is_follower {
-			if port.follower.is_none() {
-				port.follower = Some(Frames { pre: Vec::new(), post: Vec::new() });
-			}
-			&mut port.follower.as_mut().unwrap().pre
-		} else {
-			&mut port.leader.pre
-		};
-
-		warn_ooo_frames(&e.event, frames.last());
-		frames.push(e.event);
-	}
-
-	fn frame_post(&mut self, e:FrameEvent<FramePost>) {
-		let id = e.id;
-
-		if self.ports[id.port as usize].is_none() {
-			self.ports[id.port as usize] = Some(
-				Port {
-					leader: Frames { pre: Vec::new(), post: Vec::new() },
-					follower: None
-				}
-			);
-		}
-
-		let port = self.ports[id.port as usize].as_mut().unwrap();
-
-		let frames = if id.is_follower {
-			if port.follower.is_none() {
-				port.follower = Some(Frames { pre: Vec::new(), post: Vec::new() });
-			}
-			&mut port.follower.as_mut().unwrap().post
-		} else {
-			&mut port.leader.post
-		};
-
-		warn_ooo_frames(&e.event, frames.last());
-		frames.push(e.event);
-	}
-}
-
-pub fn parse<R:Read + Seek>(mut r:R) -> Result<Game> {
+pub fn parse<R:Read + Seek, H:Handlers>(mut r:R, handlers:&mut H) -> Result<()> {
 	// header ("{U\x03raw[$U#l")
-	expect_bytes(r.by_ref(), &[0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c])?;
+	expect_bytes(&mut r, &[0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c])?;
 
 	r.read_u32::<BigEndian>()?; // length of "raw" element (currently unused)
 
 	let payload_sizes = parse_event_payloads(&mut r)?;
-
-	let mut game_parser = GameParser {
-		start: None,
-		end: None,
-		ports: [None, None, None, None],
-		metadata: None,
-	};
 
 	unsafe {
 		LAST_CHAR_STATES = [
@@ -597,16 +492,15 @@ pub fn parse<R:Read + Seek>(mut r:R) -> Result<Game> {
 		];
 	}
 
-	while parse_event(r.by_ref(), &payload_sizes, &mut game_parser)? != Some(Event::GameEnd) {
-	}
+	while parse_event(r.by_ref(), &payload_sizes, handlers)? != Some(Event::GameEnd) {}
 
 	// metadata key & start ("U\x08metadata{")
-	expect_bytes(r.by_ref(), &[0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b])?;
+	expect_bytes(&mut r, &[0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b])?;
 
-	game_parser.metadata = Some(ubjson::parse_map(&mut r)?);
+	handlers.metadata(ubjson::parse_map(&mut r)?)?;
 
 	// closing UBJSON brace & end of file ("}")
-	expect_bytes(r.by_ref(), &[0x7d])?;
+	expect_bytes(&mut r, &[0x7d])?;
 
-	game_parser.into_game()
+	Ok(())
 }

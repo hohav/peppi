@@ -1,8 +1,8 @@
-// #![feature(bool_to_option)]
+#[macro_use] mod parse;
+#[macro_use] mod pseudo_bitmask;
+#[macro_use] mod pseudo_enum;
 
-mod parse;
-mod pseudo_bitmask;
-mod pseudo_enum;
+mod game_parser;
 mod ubjson;
 
 pub mod action_state;
@@ -12,19 +12,21 @@ pub mod frame;
 pub mod game;
 pub mod stage;
 
-use std::{error, fmt, fs, io};
-use std::io::{Seek};
-use std::path::Path;
+use std::{error, fmt, fs, io, path};
 
 #[derive(Debug)]
 pub struct ParseError {
-	pub line:u64,
-	pub error:io::Error,
+	pub pos: Option<u64>,
+	pub error: io::Error,
 }
 
 impl fmt::Display for ParseError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "error parsing game: line {}: {}", self.line, self.error)
+		if let Some(pos) = self.pos {
+			write!(f, "error parsing game ({}): {}", pos, self.error)
+		} else {
+			write!(f, "error parsing game: {}", self.error)
+		}
 	}
 }
 
@@ -34,10 +36,24 @@ impl error::Error for ParseError {
 	}
 }
 
+pub fn parse<R:io::Read + io::Seek, H:parse::Handlers>(mut r:R, handlers:&mut H) -> std::result::Result<(), ParseError> {
+	parse::parse(r.by_ref(), handlers)
+		.map_err(|e| ParseError { pos: r.seek(io::SeekFrom::Current(0)).ok(), error: e})?;
+	Ok(())
+}
+
 /// Parses the Slippi replay file at `path`, returning a `game::Game` object.
-pub fn parse(path:&Path) -> Result<game::Game, ParseError> {
-	let f = fs::File::open(path).map_err(|e| ParseError {line:0, error:e})?;
+pub fn game(path:&path::Path) -> std::result::Result<game::Game, ParseError> {
+	let f = fs::File::open(path).map_err(|e| ParseError { pos: None, error: e })?;
 	let mut r = io::BufReader::new(f);
-	parse::parse(&mut r)
-		.map_err(|e| ParseError {line:r.seek(io::SeekFrom::Current(0)).unwrap_or(0), error:e})
+
+	let mut game_parser = game_parser::GameParser {
+		start: None,
+		end: None,
+		ports: [None, None, None, None],
+		metadata: None,
+	};
+
+	parse(&mut r, &mut game_parser)
+		.and_then(|_| game_parser.into_game().map_err(|e| ParseError { pos: None, error: e }))
 }
