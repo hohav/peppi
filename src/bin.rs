@@ -1,5 +1,5 @@
 use std::env;
-use std::path::Path;
+use std::path;
 
 extern crate pretty_env_logger;
 use log::{error};
@@ -10,7 +10,7 @@ fn main() {
 	let args: Vec<String> = env::args().collect();
 
 	for path in &args[1..] {
-		let path = Path::new(&path);
+		let path = path::Path::new(&path);
 		match slippi::game(&path) {
 			Ok(game) => println!("{:#?}", game),
 			Err(err) => error!("{}", err),

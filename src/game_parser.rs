@@ -1,15 +1,13 @@
 use std::io::Result;
 use std::collections::HashMap;
 
-use super::{frame, game, parse, ubjson};
-
-const FIRST_FRAME_INDEX:i32 = -123;
+use super::{frame, game, metadata, parse, ubjson};
 
 #[derive(Debug)]
 pub struct GameParser {
-	pub start: Option<game::GameStart>,
-	pub end: Option<game::GameEnd>,
-	pub ports: [Option<game::Port>; 4],
+	pub start: Option<game::Start>,
+	pub end: Option<game::End>,
+	pub ports: [Option<game::Port>; game::NUM_PORTS],
 	pub metadata: Option<HashMap<String, ubjson::Object>>,
 }
 
@@ -19,7 +17,7 @@ impl GameParser {
 			start: self.start.ok_or_else(|| err!("missing start event"))?,
 			end: self.end.ok_or_else(|| err!("missing end event"))?,
 			ports: self.ports,
-			metadata: self.metadata.unwrap_or_default(),
+			metadata: metadata::parse(&self.metadata.unwrap_or_default()),
 		})
 	}
 }
@@ -32,7 +30,7 @@ fn check_ooo_frames<F:frame::Indexed>(cur:&F, prev:Option<&F>) -> Result<()> {
 			Ok(())
 		}
 	} else {
-		if cur.index() != FIRST_FRAME_INDEX {
+		if cur.index() != game::FIRST_FRAME_INDEX {
 			Err(err!("unexpected first frame index: {}", cur.index()))
 		} else {
 			Ok(())
@@ -41,22 +39,22 @@ fn check_ooo_frames<F:frame::Indexed>(cur:&F, prev:Option<&F>) -> Result<()> {
 }
 
 impl parse::Handlers for GameParser {
-	fn game_start(&mut self, s:game::GameStart) -> Result<()> {
+	fn game_start(&mut self, s:game::Start) -> Result<()> {
 		self.start = Some(s);
 		Ok(())
 	}
 
-	fn game_end(&mut self, s:game::GameEnd) -> Result<()> {
+	fn game_end(&mut self, s:game::End) -> Result<()> {
 		self.end = Some(s);
 		Ok(())
 	}
 
-	fn frame_pre(&mut self, e:parse::FrameEvent<frame::FramePre>) -> Result<()> {
+	fn frame_pre(&mut self, e:parse::FrameEvent<frame::Pre>) -> Result<()> {
 		let id = e.id;
 
 		if self.ports[id.port as usize].is_none() {
 			self.ports[id.port as usize] = Some(game::Port {
-				leader: frame::Frames { pre: Vec::new(), post: Vec::new() },
+				leader: game::Frames { pre: Vec::new(), post: Vec::new() },
 				follower: None,
 			});
 		}
@@ -65,7 +63,7 @@ impl parse::Handlers for GameParser {
 
 		let frames = if id.is_follower {
 			if port.follower.is_none() {
-				port.follower = Some(frame::Frames { pre: Vec::new(), post: Vec::new() });
+				port.follower = Some(game::Frames { pre: Vec::new(), post: Vec::new() });
 			}
 			&mut port.follower.as_mut().unwrap().pre
 		} else {
@@ -78,13 +76,13 @@ impl parse::Handlers for GameParser {
 		Ok(())
 	}
 
-	fn frame_post(&mut self, e:parse::FrameEvent<frame::FramePost>) -> Result<()> {
+	fn frame_post(&mut self, e:parse::FrameEvent<frame::Post>) -> Result<()> {
 		let id = e.id;
 
 		if self.ports[id.port as usize].is_none() {
 			self.ports[id.port as usize] = Some(
 				game::Port {
-					leader: frame::Frames { pre: Vec::new(), post: Vec::new() },
+					leader: game::Frames { pre: Vec::new(), post: Vec::new() },
 					follower: None
 				}
 			);
@@ -94,7 +92,7 @@ impl parse::Handlers for GameParser {
 
 		let frames = if id.is_follower {
 			if port.follower.is_none() {
-				port.follower = Some(frame::Frames { pre: Vec::new(), post: Vec::new() });
+				port.follower = Some(game::Frames { pre: Vec::new(), post: Vec::new() });
 			}
 			&mut port.follower.as_mut().unwrap().post
 		} else {

@@ -1,8 +1,7 @@
-use super::pseudo_enum;
-use super::character::{Character};
+use super::character::{Internal};
 
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub enum ActionState {
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum State {
 	Common(Common),
 	Bowser(Bowser),
 	CaptainFalcon(CaptainFalcon),
@@ -34,41 +33,41 @@ pub enum ActionState {
 	Unknown(u16),
 }
 
-impl ActionState {
-	pub fn from(value:u16, character:Character) -> ActionState {
+impl State {
+	pub fn from(value:u16, character:Internal) -> State {
 		if value <= 340 {
-			ActionState::Common(Common { value: value })
+			State::Common(Common(value))
 		} else {
 			match character {
-				Character::BOWSER => ActionState::Bowser(Bowser { value: value }),
-				Character::CAPTAIN_FALCON => ActionState::CaptainFalcon(CaptainFalcon { value: value }),
-				Character::DONKEY_KONG => ActionState::DonkeyKong(DonkeyKong { value: value }),
-				Character::DR_MARIO => ActionState::DrMario(DrMario { value: value }),
-				Character::FALCO => ActionState::Falco(Falco { value: value }),
-				Character::FOX => ActionState::Fox(Fox { value: value }),
-				Character::GAME_AND_WATCH => ActionState::GameAndWatch(GameAndWatch { value: value }),
-				Character::GANONDORF => ActionState::Ganondorf(Ganondorf { value: value }),
-				Character::JIGGLYPUFF => ActionState::Jigglypuff(Jigglypuff { value: value }),
-				Character::KIRBY => ActionState::Kirby(Kirby { value: value }),
-				Character::LINK => ActionState::Link(Link { value: value }),
-				Character::LUIGI => ActionState::Luigi(Luigi { value: value }),
-				Character::MARIO => ActionState::Mario(Mario { value: value }),
-				Character::MARTH => ActionState::Marth(Marth { value: value }),
-				Character::MEWTWO => ActionState::Mewtwo(Mewtwo { value: value }),
-				Character::NANA => ActionState::Nana(Nana { value: value }),
-				Character::NESS => ActionState::Ness(Ness { value: value }),
-				Character::PEACH => ActionState::Peach(Peach { value: value }),
-				Character::PICHU => ActionState::Pichu(Pichu { value: value }),
-				Character::PIKACHU => ActionState::Pikachu(Pikachu { value: value }),
-				Character::POPO => ActionState::Popo(Popo { value: value }),
-				Character::ROY => ActionState::Roy(Roy { value: value }),
-				Character::SAMUS => ActionState::Samus(Samus { value: value }),
-				Character::SHEIK => ActionState::Sheik(Sheik { value: value }),
-				Character::YOSHI => ActionState::Yoshi(Yoshi { value: value }),
-				Character::YOUNG_LINK => ActionState::YoungLink(YoungLink { value: value }),
-				Character::ZELDA => ActionState::Zelda(Zelda { value: value }),
+				Internal::BOWSER => State::Bowser(Bowser(value)),
+				Internal::CAPTAIN_FALCON => State::CaptainFalcon(CaptainFalcon(value)),
+				Internal::DONKEY_KONG => State::DonkeyKong(DonkeyKong(value)),
+				Internal::DR_MARIO => State::DrMario(DrMario(value)),
+				Internal::FALCO => State::Falco(Falco(value)),
+				Internal::FOX => State::Fox(Fox(value)),
+				Internal::GAME_AND_WATCH => State::GameAndWatch(GameAndWatch(value)),
+				Internal::GANONDORF => State::Ganondorf(Ganondorf(value)),
+				Internal::JIGGLYPUFF => State::Jigglypuff(Jigglypuff(value)),
+				Internal::KIRBY => State::Kirby(Kirby(value)),
+				Internal::LINK => State::Link(Link(value)),
+				Internal::LUIGI => State::Luigi(Luigi(value)),
+				Internal::MARIO => State::Mario(Mario(value)),
+				Internal::MARTH => State::Marth(Marth(value)),
+				Internal::MEWTWO => State::Mewtwo(Mewtwo(value)),
+				Internal::NANA => State::Nana(Nana(value)),
+				Internal::NESS => State::Ness(Ness(value)),
+				Internal::PEACH => State::Peach(Peach(value)),
+				Internal::PICHU => State::Pichu(Pichu(value)),
+				Internal::PIKACHU => State::Pikachu(Pikachu(value)),
+				Internal::POPO => State::Popo(Popo(value)),
+				Internal::ROY => State::Roy(Roy(value)),
+				Internal::SAMUS => State::Samus(Samus(value)),
+				Internal::SHEIK => State::Sheik(Sheik(value)),
+				Internal::YOSHI => State::Yoshi(Yoshi(value)),
+				Internal::YOUNG_LINK => State::YoungLink(YoungLink(value)),
+				Internal::ZELDA => State::Zelda(Zelda(value)),
 
-				_ => ActionState::Unknown(value),
+				_ => State::Unknown(value),
 			}
 		}
 	}

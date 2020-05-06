@@ -1,5 +1,3 @@
-use super::pseudo_enum;
-
 pseudo_enum!(Stage:u16 {
 	02 => FOUNTAIN_OF_DREAMS,
 	03 => POKEMON_STADIUM,

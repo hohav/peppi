@@ -1,16 +1,26 @@
-#[macro_use] mod parse;
+#[macro_export]
+macro_rules! err {
+	($( $arg:expr ),*) => {
+		std::io::Error::new(std::io::ErrorKind::InvalidData, format!($( $arg ),*))
+	}
+}
+
 #[macro_use] mod pseudo_bitmask;
 #[macro_use] mod pseudo_enum;
 
 mod game_parser;
-mod ubjson;
+mod parse;
 
 pub mod action_state;
 pub mod attack;
+pub mod buttons;
 pub mod character;
 pub mod frame;
 pub mod game;
+pub mod metadata;
 pub mod stage;
+pub mod triggers;
+pub mod ubjson;
 
 use std::{error, fmt, fs, io, path};
 

@@ -1,6 +1,4 @@
-use super::pseudo_enum;
-
-pseudo_enum!(Character:u8 {
+pseudo_enum!(Internal:u8 {
 	00 => MARIO,
 	01 => FOX,
 	02 => CAPTAIN_FALCON,
@@ -36,7 +34,7 @@ pseudo_enum!(Character:u8 {
 	32 => SANDBAG,
 });
 
-pseudo_enum!(CSSCharacter:u8 {
+pseudo_enum!(External:u8 {
 	00 => CAPTAIN_FALCON,
 	01 => DONKEY_KONG,
 	02 => FOX,

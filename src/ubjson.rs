@@ -4,11 +4,39 @@ use std::collections::HashMap;
 extern crate byteorder;
 use byteorder::{BigEndian, ReadBytesExt};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Object {
 	Int(i64),
 	Map(HashMap<String, Object>),
 	Str(String),
+}
+
+pub trait ToObject {
+	fn to_object(self) -> Object;
+}
+
+impl ToObject for i64 {
+	fn to_object(self) -> Object {
+		Object::Int(self)
+	}
+}
+
+impl ToObject for String {
+	fn to_object(self) -> Object {
+		Object::Str(self)
+	}
+}
+
+impl ToObject for &str {
+	fn to_object(self) -> Object {
+		Object::Str(self.to_string())
+	}
+}
+
+impl ToObject for HashMap<String, Object> {
+	fn to_object(self) -> Object {
+		Object::Map(self)
+	}
 }
 
 fn parse_utf8<R:Read>(r:&mut R) -> Result<String> {

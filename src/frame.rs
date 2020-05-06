@@ -1,14 +1,6 @@
-use std::fmt;
-
-use super::action_state::{ActionState};
-use super::attack::{Attack};
-use super::character::{Character};
-
-use super::pseudo_bitmask;
-use super::pseudo_enum;
+use super::{action_state, attack, buttons, character, triggers};
 
 pseudo_enum!(LCancel:u8 {
-	0 => NONE,
 	1 => SUCCESSFUL,
 	2 => UNSUCCESSFUL,
 });
@@ -18,67 +10,22 @@ pseudo_enum!(Direction:u8 {
 	1 => RIGHT,
 });
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Position {
 	pub x: f32,
 	pub y: f32,
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Buttons {
-	pub logical: ButtonsLogical,
-	pub physical: ButtonsPhysical,
+	pub logical: buttons::Logical,
+	pub physical: buttons::Physical,
 }
 
-pseudo_bitmask!(ButtonsPhysical:u16 {
-	1u16 << 12 => START,
-	1u16 << 11 => Y,
-	1u16 << 10 => X,
-	1u16 << 09 => B,
-	1u16 << 08 => A,
-	1u16 << 06 => L,
-	1u16 << 05 => R,
-	1u16 << 04 => Z,
-	1u16 << 03 => DPAD_UP,
-	1u16 << 02 => DPAD_DOWN,
-	1u16 << 01 => DPAD_RIGHT,
-	1u16 << 00 => DPAD_LEFT,
-});
-
-pseudo_bitmask!(ButtonsLogical:u32 {
-	1u32 << 31 => TRIGGER_ANALOG,
-	1u32 << 23 => CSTICK_RIGHT,
-	1u32 << 22 => CSTICK_LEFT,
-	1u32 << 21 => CSTICK_DOWN,
-	1u32 << 20 => CSTICK_UP,
-	1u32 << 19 => JOYSTICK_RIGHT,
-	1u32 << 18 => JOYSTICK_LEFT,
-	1u32 << 17 => JOYSTICK_DOWN,
-	1u32 << 16 => JOYSTICK_UP,
-	1u32 << 12 => START,
-	1u32 << 11 => Y,
-	1u32 << 10 => X,
-	1u32 << 09 => B,
-	1u32 << 08 => A,
-	1u32 << 06 => L,
-	1u32 << 05 => R,
-	1u32 << 04 => Z,
-	1u32 << 03 => DPAD_UP,
-	1u32 << 02 => DPAD_DOWN,
-	1u32 << 01 => DPAD_RIGHT,
-	1u32 << 00 => DPAD_LEFT,
-});
-
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Triggers {
-	pub logical: f32,
-	pub physical: TriggersPhysical,
-}
-
-#[derive(Debug)]
-pub struct TriggersPhysical {
-	pub l: f32,
-	pub r: f32,
+	pub logical: triggers::Logical,
+	pub physical: triggers::Physical,
 }
 
 pseudo_bitmask!(StateFlags:u64 {
@@ -107,7 +54,7 @@ pub trait Indexed {
 }
 
 #[derive(Debug)]
-pub struct FramePre {
+pub struct Pre {
 	pub index: i32,
 
 	pub position: Position,
@@ -117,7 +64,7 @@ pub struct FramePre {
 	pub triggers: Triggers,
 	pub random_seed: u32,
 	pub buttons: Buttons,
-	pub state: ActionState,
+	pub state: action_state::State,
 
 	// v1.2
 	pub raw_analog_x: Option<u8>,
@@ -126,23 +73,23 @@ pub struct FramePre {
 	pub damage: Option<f32>,
 }
 
-impl Indexed for FramePre {
+impl Indexed for Pre {
 	fn index(&self) -> i32 {
 		self.index
 	}
 }
 
 #[derive(Debug)]
-pub struct FramePost {
+pub struct Post {
 	pub index: i32,
 
 	pub position: Position,
 	pub direction: Direction,
 	pub damage: f32,
 	pub shield: f32,
-	pub state: ActionState,
-	pub character: Character,
-	pub last_attack_landed: Attack,
+	pub state: action_state::State,
+	pub character: character::Internal,
+	pub last_attack_landed: Option<attack::Attack>,
 	pub combo_count: u8,
 	pub last_hit_by: u8,
 	pub stocks: u8,
@@ -155,26 +102,15 @@ pub struct FramePost {
 	pub misc_as: Option<f32>,
 	pub ground: Option<u16>,
 	pub jumps: Option<u8>,
-	pub l_cancel: Option<LCancel>,
+	pub l_cancel: Option<Option<LCancel>>,
 	pub airborne: Option<bool>,
 
 	// v2.1
 	pub hurtbox_state: Option<HurtboxState>,
 }
 
-impl Indexed for FramePost {
+impl Indexed for Post {
 	fn index(&self) -> i32 {
 		self.index
-	}
-}
-
-pub struct Frames {
-	pub pre: Vec<FramePre>,
-	pub post: Vec<FramePost>,
-}
-
-impl fmt::Debug for Frames {
-	fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "Frames {{ pre: [...]({}), post: [...]({}) }}", self.pre.len(), self.post.len())
 	}
 }

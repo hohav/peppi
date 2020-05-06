@@ -1,7 +1,4 @@
-use super::pseudo_enum;
-
 pseudo_enum!(Attack:u8 {
-	00 => NONE,
 	01 => NON_STALING,
 	02 => JAB_1,
 	03 => JAB_2,
