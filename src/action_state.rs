@@ -1,6 +1,7 @@
 use super::character::{Internal};
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, serde::Serialize)]
+#[serde(untagged)]
 pub enum State {
 	Common(Common),
 	Bowser(Bowser),

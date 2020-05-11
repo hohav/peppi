@@ -4,7 +4,8 @@ use std::collections::HashMap;
 extern crate byteorder;
 use byteorder::{BigEndian, ReadBytesExt};
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, serde::Serialize)]
+#[serde(untagged)]
 pub enum Object {
 	Int(i64),
 	Map(HashMap<String, Object>),

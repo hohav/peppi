@@ -2,24 +2,26 @@ use std::error::{Error};
 use std::collections::{HashMap};
 use std::convert::{TryFrom};
 
-use log::{warn};
 use chrono::{DateTime, Utc};
+use log::{warn};
+use serde::{Serialize};
 
 use super::character;
 use super::game::{NUM_PORTS, FIRST_FRAME_INDEX};
 use super::ubjson::{Object};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Metadata {
-	pub json: HashMap<String, Object>,
-	pub date: Option<DateTime<Utc>>,
-	pub duration: Option<u32>,
-	pub platform: Option<String>,
-	pub players: Option<[Option<MetadataPlayer>; NUM_PORTS]>,
-	pub console_name: Option<String>,
+	#[serde(flatten)] pub json: HashMap<String, Object>,
+
+	#[serde(skip)] pub date: Option<DateTime<Utc>>,
+	#[serde(skip)] pub duration: Option<u32>,
+	#[serde(skip)] pub platform: Option<String>,
+	#[serde(skip)] pub players: Option<[Option<MetadataPlayer>; NUM_PORTS]>,
+	#[serde(skip)] pub console_name: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct MetadataPlayer {
 	pub characters: Option<HashMap<character::Internal, u32>>,
 	pub netplay_name: Option<String>,

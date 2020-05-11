@@ -1,14 +1,18 @@
 use std::fmt;
+use serde::{Serialize};
 
 use super::{character, frame, metadata, stage};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Slippi {
 	pub version: (u8, u8, u8),
 }
 
 pub const NUM_PORTS:usize = 4;
 pub const FIRST_FRAME_INDEX:i32 = -123;
+
+// TODO: use serde_state to pass this to the serializers?
+pub static mut SERIALIZE_FRAMES:bool = false;
 
 pseudo_enum!(PlayerType:u8 {
 	0 => HUMAN,
@@ -28,7 +32,7 @@ pseudo_enum!(TeamShade:u8 {
 	2 => DARK,
 });
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Team {
 	pub color: TeamColor,
 	pub shade: TeamShade,
@@ -44,13 +48,13 @@ pseudo_enum!(ShieldDrop:u32 {
 	2 => ARDUINO,
 });
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Ucf {
 	pub dash_back: Option<DashBack>,
 	pub shield_drop: Option<ShieldDrop>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Player {
 	pub character: character::External,
 	pub r#type: PlayerType,
@@ -63,11 +67,17 @@ pub struct Player {
 	pub offense_ratio: f32,
 	pub defense_ratio: f32,
 	pub model_scale: f32,
+
+	// v1.0
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub ucf: Option<Ucf>,
+
+	// v1.3
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub name_tag: Option<String>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Start {
 	pub slippi: Slippi,
 	pub is_teams: bool,
@@ -80,10 +90,12 @@ pub struct Start {
 	pub players: [Option<Player>; NUM_PORTS],
 	pub random_seed: u32,
 
-	// v1.5.0
+	// v1.5
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_pal: Option<bool>,
 
-	// v2.0.0
+	// v2.0
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_frozen_ps: Option<bool>,
 }
 
@@ -95,16 +107,24 @@ pseudo_enum!(EndMethod:u8 {
 	7 => NO_CONTEST,
 });
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct End {
 	pub method: EndMethod,
 
-	// v2.0.0
+	// v2.0
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub lras_initiator: Option<i8>,
 }
 
+fn skip_frames<T>(_:&T) -> bool {
+	!unsafe { SERIALIZE_FRAMES }
+}
+
+#[derive(PartialEq, Serialize)]
 pub struct Frames {
+	#[serde(skip_serializing_if = "skip_frames")]
 	pub pre: Vec<frame::Pre>,
+	#[serde(skip_serializing_if = "skip_frames")]
 	pub post: Vec<frame::Post>,
 }
 
@@ -114,13 +134,14 @@ impl fmt::Debug for Frames {
 	}
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Port {
 	pub leader: Frames,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub follower: Option<Frames>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Game {
 	pub start: Start,
 	pub end: End,

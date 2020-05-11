@@ -1,3 +1,5 @@
+use serde::{Serialize};
+
 use super::{action_state, attack, buttons, character, triggers};
 
 pseudo_enum!(LCancel:u8 {
@@ -10,19 +12,19 @@ pseudo_enum!(Direction:u8 {
 	1 => RIGHT,
 });
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Position {
 	pub x: f32,
 	pub y: f32,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Buttons {
 	pub logical: buttons::Logical,
 	pub physical: buttons::Physical,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Triggers {
 	pub logical: triggers::Logical,
 	pub physical: triggers::Physical,
@@ -53,7 +55,7 @@ pub trait Indexed {
 	fn index(&self) -> i32;
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Pre {
 	pub index: i32,
 
@@ -67,9 +69,11 @@ pub struct Pre {
 	pub state: action_state::State,
 
 	// v1.2
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub raw_analog_x: Option<u8>,
 
 	// v1.4
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub damage: Option<f32>,
 }
 
@@ -79,7 +83,7 @@ impl Indexed for Pre {
 	}
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Post {
 	pub index: i32,
 
@@ -95,17 +99,25 @@ pub struct Post {
 	pub stocks: u8,
 
 	// v0.2
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub state_age: Option<f32>,
 
 	// v2.0
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub flags: Option<StateFlags>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub misc_as: Option<f32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub ground: Option<u16>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub jumps: Option<u8>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub l_cancel: Option<Option<LCancel>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub airborne: Option<bool>,
 
 	// v2.1
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub hurtbox_state: Option<HurtboxState>,
 }
 
