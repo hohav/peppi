@@ -11,9 +11,6 @@ pub struct Slippi {
 pub const NUM_PORTS:usize = 4;
 pub const FIRST_FRAME_INDEX:i32 = -123;
 
-// TODO: use serde_state to pass this to the serializers?
-pub static mut SERIALIZE_FRAMES:bool = false;
-
 pseudo_enum!(PlayerType:u8 {
 	0 => HUMAN,
 	1 => CPU,
@@ -117,7 +114,7 @@ pub struct End {
 }
 
 fn skip_frames<T>(_:&T) -> bool {
-	!unsafe { SERIALIZE_FRAMES }
+	!unsafe { super::SERIALIZE_FRAMES }
 }
 
 #[derive(PartialEq, Serialize)]

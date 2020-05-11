@@ -32,6 +32,10 @@ fn main() {
 			.help("Output frame data")
 			.short("f")
 			.long("frames"))
+		.arg(Arg::with_name("names")
+			.help("Append names for known constants")
+			.short("n")
+			.long("names"))
 		.arg(Arg::with_name("FILE")
 			.help("Replay file to parse")
 			.required(true)
@@ -42,7 +46,8 @@ fn main() {
 	let as_json = matches.is_present("json");
 
 	unsafe {
-		peppi::game::SERIALIZE_FRAMES = matches.is_present("frames");
+		peppi::SERIALIZE_FRAMES = matches.is_present("frames");
+		peppi::SERIALIZE_ENUMS_WITH_NAMES = matches.is_present("names");
 	}
 
 	if let Err(e) = inspect(&[&path], as_json) {

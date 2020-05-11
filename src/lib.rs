@@ -5,6 +5,10 @@ macro_rules! err {
 	}
 }
 
+// TODO: use serde_state to pass this config to the serializers?
+pub static mut SERIALIZE_FRAMES:bool = false;
+pub static mut SERIALIZE_ENUMS_WITH_NAMES:bool = false;
+
 #[macro_use] mod pseudo_bitmask;
 #[macro_use] mod pseudo_enum;
 
