@@ -8,7 +8,7 @@ use log::{error};
 fn inspect(paths:&[&str], as_json:bool) -> Result<(), String> {
 	for path in paths {
 		let path = path::Path::new(path);
-		let game = slippi::game(path).map_err(|e| format!("{:?}", e))?;
+		let game = peppi::game(path).map_err(|e| format!("{:?}", e))?;
 		match as_json {
 			true => println!("{}", serde_json::to_string(&game).map_err(|e| format!("{:?}", e))?),
 			_ => println!("{:#?}", game),
@@ -42,7 +42,7 @@ fn main() {
 	let as_json = matches.is_present("json");
 
 	unsafe {
-		slippi::game::SERIALIZE_FRAMES = matches.is_present("frames");
+		peppi::game::SERIALIZE_FRAMES = matches.is_present("frames");
 	}
 
 	if let Err(e) = inspect(&[&path], as_json) {

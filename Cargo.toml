@@ -1,5 +1,5 @@
 [package]
-name = "slippi"
+name = "peppi"
 version = "0.1.0"
 authors = ["melkor <hohav@fastmail.com>"]
 edition = "2018"
@@ -16,9 +16,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 [lib]
-name = "slippi"
+name = "peppi"
 path = "src/lib.rs"
 
 [[bin]]
-name = "slippi-inspect"
+name = "slp"
 path = "src/bin.rs"
