@@ -52,6 +52,25 @@ pub struct Ucf {
 }
 
 #[derive(Debug, PartialEq, Serialize)]
+pub struct PlayerV1_3 {
+	pub name_tag: String,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+pub struct PlayerV1_0 {
+	pub ucf: Ucf,
+
+	#[cfg(v1_3)]
+	#[serde(flatten)]
+	pub v1_3: PlayerV1_3,
+
+	#[cfg(not(v1_3))]
+	#[serde(flatten)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub v1_3: Option<PlayerV1_3>,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Player {
 	pub character: character::External,
 	pub r#type: PlayerType,
@@ -65,13 +84,29 @@ pub struct Player {
 	pub defense_ratio: f32,
 	pub model_scale: f32,
 
-	// v1.0
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub ucf: Option<Ucf>,
+	#[cfg(v1_0)] #[serde(flatten)]
+	pub v1_0: PlayerV1_0,
 
-	// v1.3
+	#[cfg(not(v1_0))] #[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub name_tag: Option<String>,
+	pub v1_0: Option<PlayerV1_0>,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+pub struct StartV2_0 {
+	pub is_frozen_ps: bool,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+pub struct StartV1_5 {
+	pub is_pal: bool,
+
+	#[cfg(v2_0)] #[serde(flatten)]
+	pub v2_0: StartV2_0,
+
+	#[cfg(not(v2_0))] #[serde(flatten)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub v2_0: Option<StartV2_0>,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -87,13 +122,12 @@ pub struct Start {
 	pub players: [Option<Player>; NUM_PORTS],
 	pub random_seed: u32,
 
-	// v1.5
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub is_pal: Option<bool>,
+	#[cfg(v1_5)] #[serde(flatten)]
+	pub v1_5: StartV1_5,
 
-	// v2.0
+	#[cfg(not(v1_5))] #[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub is_frozen_ps: Option<bool>,
+	pub v1_5: Option<StartV1_5>,
 }
 
 pseudo_enum!(EndMethod:u8 {
@@ -105,12 +139,20 @@ pseudo_enum!(EndMethod:u8 {
 });
 
 #[derive(Debug, PartialEq, Serialize)]
+pub struct EndV2_0 {
+	pub lras_initiator: i8,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
 pub struct End {
 	pub method: EndMethod,
 
-	// v2.0
+	#[cfg(v2_0)] #[serde(flatten)]
+	pub v2_0: EndV2_0,
+
+	#[cfg(not(v2_0))] #[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub lras_initiator: Option<i8>,
+	pub v2_0: Option<EndV2_0>,
 }
 
 fn skip_frames<T>(_:&T) -> bool {

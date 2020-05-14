@@ -55,7 +55,7 @@ pub struct FrameEvent<F> {
 	pub event: F,
 }
 
-fn parse_event_payloads<R:Read>(r:&mut R) -> Result<HashMap<u8, u16>> {
+fn event_payloads<R:Read>(r:&mut R) -> Result<HashMap<u8, u16>> {
 	let code = r.read_u8()?;
 	if code != Event::Payloads as u8 {
 		Err(err!("expected event payloads, but got: {}", code))?;
@@ -74,7 +74,37 @@ fn parse_event_payloads<R:Read>(r:&mut R) -> Result<HashMap<u8, u16>> {
 	Ok(payload_sizes)
 }
 
-fn parse_player<R:Read>(r:&mut R, is_teams:bool) -> Result<Option<Player>> {
+fn player_v1_3(r:[u8; 16]) -> Result<game::PlayerV1_3> {
+	let first_null = r.iter().position(|&x| x == 0).unwrap_or(16);
+	let (name_tag, _) = SHIFT_JIS.decode_without_bom_handling(&r[0..first_null]);
+	Ok(game::PlayerV1_3 {
+		name_tag: name_tag.to_string(),
+	})
+}
+
+fn player_v1_0(r:[u8; 8], v1_3:Option<[u8; 16]>) -> Result<game::PlayerV1_0> {
+	let mut r = &r[..];
+	Ok(game::PlayerV1_0 {
+		ucf: game::Ucf {
+			dash_back: match r.read_u32::<BigEndian>()? {
+				0 => None,
+				db => Some(game::DashBack(db)),
+			},
+			shield_drop: match r.read_u32::<BigEndian>()? {
+				0 => None,
+				sd => Some(game::ShieldDrop(sd)),
+			},
+		},
+		#[cfg(v1_3)] v1_3: player_v1_3(v1_3.unwrap())?,
+		#[cfg(not(v1_3))] v1_3: match v1_3 {
+			Some(v1_3) => Some(player_v1_3(v1_3)?),
+			None => None,
+		},
+	})
+}
+
+fn player(v0:&[u8; 36], is_teams:bool, v1_0:Option<[u8; 8]>, v1_3:Option<[u8; 16]>) -> Result<Option<Player>> {
+	let mut r = &v0[..];
 	let character = character::External(r.read_u8()?);
 	let r#type = game::PlayerType(r.read_u8()?);
 	let stocks = r.read_u8()?;
@@ -108,6 +138,13 @@ fn parse_player<R:Read>(r:&mut R, is_teams:bool) -> Result<Option<Player>> {
 	let model_scale = r.read_f32::<BigEndian>()?;
 	r.read_u32::<BigEndian>()?; // ???
 	// total bytes: 0x24
+
+	#[cfg(v1_0)] let v1_0 = player_v1_0(v1_0.unwrap(), v1_3)?;
+	#[cfg(not(v1_0))] let v1_0 = match v1_0 {
+		Some(v1_0) => Some(player_v1_0(v1_0, v1_3)?),
+		None => None,
+	};
+
 	Ok(match r#type {
 		PlayerType::HUMAN | PlayerType::CPU | PlayerType::DEMO => Some(Player {
 			character: character,
@@ -121,14 +158,42 @@ fn parse_player<R:Read>(r:&mut R, is_teams:bool) -> Result<Option<Player>> {
 			offense_ratio: offense_ratio,
 			defense_ratio: defense_ratio,
 			model_scale: model_scale,
-			ucf: None,
-			name_tag: None,
+			v1_0: v1_0,
 		}),
 		_ => None
 	})
 }
 
-fn parse_game_start(mut r:&[u8]) -> Result<Start> {
+fn player_bytes_v1_3(r:&mut &[u8]) -> Result<[u8; 16]> {
+	let mut buf = [0; 16];
+	r.read_exact(&mut buf)?;
+	Ok(buf)
+}
+
+fn player_bytes_v1_0(r:&mut &[u8]) -> Result<[u8; 8]> {
+	let mut buf = [0; 8];
+	r.read_exact(&mut buf)?;
+	Ok(buf)
+}
+
+fn game_start_v2_0(r:&mut &[u8]) -> Result<game::StartV2_0> {
+	Ok(game::StartV2_0 {
+		is_frozen_ps: r.read_u8()? != 0,
+	})
+}
+
+fn game_start_v1_5(r:&mut &[u8]) -> Result<game::StartV1_5> {
+	Ok(game::StartV1_5 {
+		is_pal: r.read_u8()? != 0,
+		#[cfg(v2_0)] v2_0: game_start_v2_0()?,
+		#[cfg(not(v2_0))] v2_0: match r.is_empty() {
+			true => None,
+			_ => Some(game_start_v2_0(r)?),
+		},
+	})
+}
+
+fn game_start(mut r:&mut &[u8]) -> Result<Start> {
 	let slippi = Slippi {version: (r.read_u8()?, r.read_u8()?, r.read_u8()?)};
 	debug!("game::Start: {:?}", slippi);
 
@@ -155,49 +220,37 @@ fn parse_game_start(mut r:&[u8]) -> Result<Start> {
 	let damage_ratio = r.read_f32::<BigEndian>()?;
 	r.read_exact(&mut [0; 44])?; // ???
 	// @0x65
-	let mut players = [parse_player(&mut r, is_teams)?, parse_player(&mut r, is_teams)?, parse_player(&mut r, is_teams)?, parse_player(&mut r, is_teams)?];
+	let mut players_v0 = [[0; 36]; 4];
+	for p in &mut players_v0 {
+		r.read_exact(p)?;
+	}
 	// @0xf5
 	r.read_exact(&mut [0; 72])?; // ???
 	// @0x13d
 	let random_seed = r.read_u32::<BigEndian>()?;
 
-	let mut is_pal = None;
-	let mut is_frozen_ps = None;
-	if !r.is_empty() { // v1.0
-		for p in &mut players {
-			let dash_back = r.read_u32::<BigEndian>()?;
-			let shield_drop = r.read_u32::<BigEndian>()?;
-			if let Some(p) = p {
-				p.ucf = Some(game::Ucf {
-					dash_back: match dash_back {
-						0 => None,
-						dash_back => Some(game::DashBack(dash_back)),
-					},
-					shield_drop: match shield_drop {
-						0 => None,
-						shield_drop => Some(game::ShieldDrop(shield_drop)),
-					},
-				});
-			}
-		}
-		if !r.is_empty() { // v1.3
-			for p in &mut players {
-				let mut name_tag = [0; 16];
-				r.read_exact(&mut name_tag)?;
-				if let Some(p) = p {
-					let first_null = name_tag.iter().position(|&x| x == 0).unwrap_or(16);
-					let (name_tag, _) = SHIFT_JIS.decode_without_bom_handling(&name_tag[0..first_null]);
-					p.name_tag = Some(name_tag.to_string());
-				}
-			}
-			if !r.is_empty() { // v1.5
-				is_pal = Some(r.read_u8()? != 0);
-				if !r.is_empty() { // v2.0
-					is_frozen_ps = Some(r.read_u8()? != 0);
-				}
-			}
-		}
-	}
+	let players_v1_0 = match !cfg!(v1_0) && r.is_empty() {
+		true => [None, None, None, None],
+		_ => [Some(player_bytes_v1_0(&mut r)?), Some(player_bytes_v1_0(&mut r)?), Some(player_bytes_v1_0(&mut r)?), Some(player_bytes_v1_0(&mut r)?)],
+	};
+
+	let players_v1_3 = match !cfg!(v1_3) && r.is_empty() {
+		true => [None, None, None, None],
+		_ => [Some(player_bytes_v1_3(&mut r)?), Some(player_bytes_v1_3(&mut r)?), Some(player_bytes_v1_3(&mut r)?), Some(player_bytes_v1_3(&mut r)?)],
+	};
+
+	let players = [
+		player(&players_v0[0], is_teams, players_v1_0[0], players_v1_3[0])?,
+		player(&players_v0[1], is_teams, players_v1_0[1], players_v1_3[1])?,
+		player(&players_v0[2], is_teams, players_v1_0[2], players_v1_3[2])?,
+		player(&players_v0[3], is_teams, players_v1_0[3], players_v1_3[3])?,
+	];
+
+	#[cfg(v1_5)] let v1_5 = game_start_v1_5(r)?;
+	#[cfg(not(v1_5))] let v1_5 = match r.is_empty() {
+		true => None,
+		_ => Some(game_start_v1_5(r)?),
+	};
 
 	Ok(Start {
 		slippi: slippi,
@@ -210,16 +263,25 @@ fn parse_game_start(mut r:&[u8]) -> Result<Start> {
 		damage_ratio: damage_ratio,
 		players: players,
 		random_seed: random_seed,
-		is_pal: is_pal,
-		is_frozen_ps: is_frozen_ps,
+		v1_5: v1_5,
 	})
 }
 
-fn parse_game_end<R:Read>(mut r:R) -> Result<End> {
+fn game_end_v2_0(r:&mut &[u8]) -> Result<game::EndV2_0> {
+	Ok(game::EndV2_0 {
+		lras_initiator: r.read_i8()?,
+	})
+}
+
+fn game_end(r:&mut &[u8]) -> Result<End> {
 	debug!("game::End");
 	Ok(End {
 		method: game::EndMethod(r.read_u8()?),
-		lras_initiator: r.read_i8().ok(),
+		#[cfg(v2_0)] v2_0: game_end_v2_0(r)?,
+		#[cfg(not(v2_0))] v2_0: match r.is_empty() {
+			true => None,
+			_ => Some(game_end_v2_0(r)?),
+		},
 	})
 }
 
@@ -244,7 +306,24 @@ fn predict_character(id:FrameId, last_char_states:&[CharState; NUM_PORTS]) -> In
 	}
 }
 
-fn parse_frame_pre(mut r:&[u8], last_char_states:&[CharState; NUM_PORTS]) -> Result<FrameEvent<Pre>> {
+fn frame_pre_v1_4(r:&mut &[u8]) -> Result<frame::PreV1_4> {
+	Ok(frame::PreV1_4 {
+		damage: r.read_f32::<BigEndian>()?,
+	})
+}
+
+fn frame_pre_v1_2(r:&mut &[u8]) -> Result<frame::PreV1_2> {
+	Ok(frame::PreV1_2 {
+		raw_analog_x: r.read_u8()?,
+		#[cfg(v1_4)] v1_4: frame_pre_v1_4(r)?,
+		#[cfg(not(v1_4))] v1_4: match r.is_empty() {
+			true => None,
+			_ => Some(frame_pre_v1_4(r)?),
+		},
+	})
+}
+
+fn frame_pre(r:&mut &[u8], last_char_states:&[CharState; NUM_PORTS]) -> Result<FrameEvent<Pre>> {
 	let id = FrameId {
 		index: r.read_i32::<BigEndian>()?,
 		port: r.read_u8()?,
@@ -287,18 +366,11 @@ fn parse_frame_pre(mut r:&[u8], last_char_states:&[CharState; NUM_PORTS]) -> Res
 		},
 	};
 
-	let mut raw_analog_x = None;
-	let mut damage = None;
-
-	// v1.2
-	if !r.is_empty() {
-		raw_analog_x = Some(r.read_u8()?);
-
-		// v1.4
-		if !r.is_empty() {
-			damage = Some(r.read_f32::<BigEndian>()?);
-		}
-	}
+	#[cfg(v1_2)] let v1_2 = frame_pre_v1_2(r)?;
+	#[cfg(not(v1_2))] let v1_2 = match r.is_empty() {
+		true => None,
+		_ => Some(frame_pre_v1_2(r)?),
+	};
 
 	Ok(FrameEvent {
 		id: id,
@@ -312,13 +384,12 @@ fn parse_frame_pre(mut r:&[u8], last_char_states:&[CharState; NUM_PORTS]) -> Res
 			cstick: cstick,
 			triggers: triggers,
 			buttons: buttons,
-			raw_analog_x: raw_analog_x,
-			damage: damage,
+			v1_2: v1_2,
 		}
 	})
 }
 
-fn parse_flags(buf:&[u8; 5]) -> frame::StateFlags {
+fn flags(buf:&[u8; 5]) -> frame::StateFlags {
 	frame::StateFlags(
 		((buf[0] as u64) << 00) +
 		((buf[1] as u64) << 08) +
@@ -373,7 +444,47 @@ fn update_last_char_state(id:FrameId, character:Internal, state:State, last_char
 	};
 }
 
-fn parse_frame_post(mut r:&[u8], last_char_states:&mut [CharState; NUM_PORTS]) -> Result<FrameEvent<Post>> {
+fn frame_post_v2_1(r:&mut &[u8]) -> Result<frame::PostV2_1> {
+	Ok(frame::PostV2_1 {
+		hurtbox_state: frame::HurtboxState(r.read_u8()?),
+	})
+}
+
+fn frame_post_v2_0(r:&mut &[u8]) -> Result<frame::PostV2_0> {
+	Ok(frame::PostV2_0 {
+		flags: {
+			let mut buf = [0; 5];
+			r.read_exact(&mut buf)?;
+			flags(&buf)
+		},
+		misc_as: r.read_f32::<BigEndian>()?,
+		ground: r.read_u16::<BigEndian>()?,
+		jumps: r.read_u8()?,
+		l_cancel: match r.read_u8()? {
+			0 => None,
+			l_cancel => Some(frame::LCancel(l_cancel)),
+		},
+		airborne: r.read_u8()? != 0,
+		#[cfg(v2_1)] v2_1: frame_post_v2_1(r)?,
+		#[cfg(not(v2_1))] v2_1: match r.is_empty() {
+			true => None,
+			_ => Some(frame_post_v2_1(r)?),
+		},
+	})
+}
+
+fn frame_post_v0_2(r:&mut &[u8]) -> Result<frame::PostV0_2> {
+	Ok(frame::PostV0_2 {
+		state_age: r.read_f32::<BigEndian>()?,
+		#[cfg(v2_0)] v2_0: frame_post_v2_0(r)?,
+		#[cfg(not(v2_0))] v2_0: match r.is_empty() {
+			true => None,
+			_ => Some(frame_post_v2_0(r)?),
+		},
+	})
+}
+
+fn frame_post(r:&mut &[u8], last_char_states:&mut [CharState; NUM_PORTS]) -> Result<FrameEvent<Post>> {
 	let id = FrameId {
 		index: r.read_i32::<BigEndian>()?,
 		port: r.read_u8()?,
@@ -401,41 +512,11 @@ fn parse_frame_post(mut r:&[u8], last_char_states:&mut [CharState; NUM_PORTS]) -
 	let last_hit_by = r.read_u8()?;
 	let stocks = r.read_u8()?;
 
-	let mut state_age = None;
-	let mut flags = None;
-	let mut misc_as = None;
-	let mut ground = None;
-	let mut jumps = None;
-	let mut l_cancel = None;
-	let mut airborne = None;
-	let mut hurtbox_state =  None;
-
-	// v0.2
-	if !r.is_empty() {
-		state_age = Some(r.read_f32::<BigEndian>()?);
-
-		// v2.0
-		if !r.is_empty() {
-			flags = {
-				let mut buf = [0; 5];
-				r.read_exact(&mut buf)?;
-				Some(parse_flags(&buf))
-			};
-			misc_as = Some(r.read_f32::<BigEndian>()?);
-			ground = Some(r.read_u16::<BigEndian>()?);
-			jumps = Some(r.read_u8()?);
-			l_cancel = Some(match r.read_u8()? {
-				0 => None,
-				l_cancel => Some(frame::LCancel(l_cancel)),
-			});
-			airborne = Some(r.read_u8()? != 0);
-
-			// v2.1
-			if !r.is_empty() {
-				hurtbox_state = Some(frame::HurtboxState(r.read_u8()?));
-			}
-		}
-	}
+	#[cfg(v0_2)] let v0_2 = frame_post_v0_2(r)?;
+	#[cfg(not(v0_2))] let v0_2 = match r.is_empty() {
+		true => None,
+		_ => Some(frame_post_v0_2(r)?),
+	};
 
 	update_last_char_state(id, character, state, last_char_states);
 
@@ -453,14 +534,7 @@ fn parse_frame_post(mut r:&[u8], last_char_states:&mut [CharState; NUM_PORTS]) -
 			combo_count: combo_count,
 			last_hit_by: last_hit_by,
 			stocks: stocks,
-			state_age: state_age,
-			flags: flags,
-			misc_as: misc_as,
-			ground: ground,
-			jumps: jumps,
-			l_cancel: l_cancel,
-			airborne: airborne,
-			hurtbox_state: hurtbox_state,
+			v0_2: v0_2,
 		},
 	})
 }
@@ -483,7 +557,7 @@ fn expect_bytes<R:Read>(r:&mut R, expected:&[u8]) -> Result<()> {
 	}
 }
 
-fn parse_event<R:Read, H:Handlers>(mut r:R, payload_sizes:&HashMap<u8, u16>, last_char_states:&mut [CharState; NUM_PORTS], handlers:&mut H) -> Result<Option<Event>> {
+fn event<R:Read, H:Handlers>(mut r:R, payload_sizes:&HashMap<u8, u16>, last_char_states:&mut [CharState; NUM_PORTS], handlers:&mut H) -> Result<Option<Event>> {
 	let code = r.read_u8()?;
 	let size = payload_sizes.get(&code).ok_or_else(|| err!("unknown event: {}", code))?;
 
@@ -494,19 +568,19 @@ fn parse_event<R:Read, H:Handlers>(mut r:R, payload_sizes:&HashMap<u8, u16>, las
 		Ok(event) => match event {
 			Event::Payloads => Err(err!("unexpected event: {}", code)),
 			Event::GameStart => {
-				handlers.game_start(parse_game_start(&*buf)?)?;
+				handlers.game_start(game_start(&mut &*buf)?)?;
 				Ok(Some(event))
 			},
 			Event::GameEnd => {
-				handlers.game_end(parse_game_end(&*buf)?)?;
+				handlers.game_end(game_end(&mut &*buf)?)?;
 				Ok(Some(event))
 			},
 			Event::FramePre => {
-				handlers.frame_pre(parse_frame_pre(&*buf, last_char_states)?)?;
+				handlers.frame_pre(frame_pre(&mut &*buf, last_char_states)?)?;
 				Ok(Some(event))
 			},
 			Event::FramePost => {
-				handlers.frame_post(parse_frame_post(&*buf, last_char_states)?)?;
+				handlers.frame_post(frame_post(&mut &*buf, last_char_states)?)?;
 				Ok(Some(event))
 			},
 		},
@@ -520,10 +594,10 @@ pub fn parse<R:Read + Seek, H:Handlers>(mut r:R, handlers:&mut H) -> Result<()> 
 
 	r.read_u32::<BigEndian>()?; // length of "raw" element (currently unused)
 
-	let payload_sizes = parse_event_payloads(&mut r)?;
+	let payload_sizes = event_payloads(&mut r)?;
 	let mut last_char_states = [DEFAULT_CHAR_STATE; NUM_PORTS];
 
-	while parse_event(r.by_ref(), &payload_sizes, &mut last_char_states, handlers)? != Some(Event::GameEnd) {}
+	while event(r.by_ref(), &payload_sizes, &mut last_char_states, handlers)? != Some(Event::GameEnd) {}
 
 	// metadata key & start ("U\x08metadata{")
 	expect_bytes(&mut r, &[0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b])?;

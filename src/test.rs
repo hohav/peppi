@@ -7,7 +7,7 @@ use super::action_state::{State, Zelda};
 use super::buttons::{Logical, Physical};
 use super::character::{Internal, External};
 use super::frame::{Buttons};
-use super::game::{DashBack, Game, End, EndMethod, Start, Player, PlayerType, ShieldDrop, Slippi, Ucf};
+use super::game::{DashBack, Game, End, EndMethod, Start, Player, PlayerType, PlayerV1_0, ShieldDrop, Slippi, Ucf};
 use super::metadata::{Metadata, MetadataPlayer};
 use super::stage::{Stage};
 use super::ubjson::{ToObject};
@@ -123,11 +123,13 @@ fn basic_game() -> Result<(), String> {
 				offense_ratio: 0.0,
 				defense_ratio: 1.0,
 				model_scale: 1.0,
-				ucf: Some(Ucf {
-					dash_back: None,
-					shield_drop: None,
+				v1_0: Some(PlayerV1_0 {
+					ucf: Ucf {
+						dash_back: None,
+						shield_drop: None
+					},
+					v1_3: None
 				}),
-				name_tag: None,
 			}),
 			Some(Player {
 				character: External::FOX,
@@ -141,23 +143,24 @@ fn basic_game() -> Result<(), String> {
 				offense_ratio: 0.0,
 				defense_ratio: 1.0,
 				model_scale: 1.0,
-				ucf: Some(Ucf {
-					dash_back: None,
-					shield_drop: None,
+				v1_0: Some(PlayerV1_0 {
+					ucf: Ucf {
+						dash_back: None,
+						shield_drop: None
+					},
+					v1_3: None
 				}),
-				name_tag: None,
 			}),
 			None,
 			None,
 		],
 		random_seed: 3803194226,
-		is_pal: None,
-		is_frozen_ps: None,
+		v1_5: None,
 	});
 
 	assert_eq!(game.end, End {
 		method: EndMethod::RESOLVED,
-		lras_initiator: None,
+		v2_0: None,
 	});
 
 	assert_eq!(
@@ -198,10 +201,10 @@ fn ics() -> Result<(), String> {
 
 #[test]
 fn ucf() -> Result<(), String> {
-	assert_eq!(game("shield_drop")?.start.players[0].as_ref().ok_or("missing players[0]")?.ucf,
-		Some(Ucf { dash_back: None, shield_drop: Some(ShieldDrop::UCF) }));
-	assert_eq!(game("dash_back")?.start.players[0].as_ref().ok_or("missing players[0]")?.ucf,
-		Some(Ucf { dash_back: Some(DashBack::UCF), shield_drop: None }));
+	assert_eq!(game("shield_drop")?.start.players[0].as_ref().ok_or("missing players[0]")?.v1_0.as_ref().ok_or("missing players[0].v1_0")?.ucf,
+		Ucf { dash_back: None, shield_drop: Some(ShieldDrop::UCF) });
+	assert_eq!(game("dash_back")?.start.players[0].as_ref().ok_or("missing players[0]")?.v1_0.as_ref().ok_or("missing players[0].v1_0")?.ucf,
+		Ucf { dash_back: Some(DashBack::UCF), shield_drop: None });
 	Ok(())
 }
 

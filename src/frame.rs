@@ -56,6 +56,25 @@ pub trait Indexed {
 }
 
 #[derive(Debug, PartialEq, Serialize)]
+pub struct PreV1_4 {
+	pub damage: f32,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+pub struct PreV1_2 {
+	pub raw_analog_x: u8,
+
+	#[cfg(v1_4)]
+	#[serde(flatten)]
+	pub v1_4: PreV1_4,
+
+	#[cfg(not(v1_4))]
+	#[serde(flatten)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub v1_4: Option<PreV1_4>,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Pre {
 	pub index: i32,
 
@@ -68,19 +87,58 @@ pub struct Pre {
 	pub buttons: Buttons,
 	pub state: action_state::State,
 
-	// v1.2
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub raw_analog_x: Option<u8>,
+	#[cfg(v1_2)]
+	#[serde(flatten)]
+	pub v1_2: PreV1_2,
 
-	// v1.4
+	#[cfg(not(v1_2))]
+	#[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub damage: Option<f32>,
+	pub v1_2: Option<PreV1_2>,
 }
 
 impl Indexed for Pre {
 	fn index(&self) -> i32 {
 		self.index
 	}
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+pub struct PostV2_1 {
+	pub hurtbox_state: HurtboxState,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+pub struct PostV2_0 {
+	pub flags: StateFlags,
+	pub misc_as: f32,
+	pub ground: u16,
+	pub jumps: u8,
+	pub l_cancel: Option<LCancel>,
+	pub airborne: bool,
+
+	#[cfg(v2_1)]
+	#[serde(flatten)]
+	pub v2_1: PostV2_1,
+
+	#[cfg(not(v2_1))]
+	#[serde(flatten)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub v2_1: Option<PostV2_1>,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+pub struct PostV0_2 {
+	pub state_age: f32,
+
+	#[cfg(v2_0)]
+	#[serde(flatten)]
+	pub v2_0: PostV2_0,
+
+	#[cfg(not(v2_0))]
+	#[serde(flatten)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub v2_0: Option<PostV2_0>,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -98,27 +156,14 @@ pub struct Post {
 	pub last_hit_by: u8,
 	pub stocks: u8,
 
-	// v0.2
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub state_age: Option<f32>,
+	#[cfg(v0_2)]
+	#[serde(flatten)]
+	pub v0_2: PostV0_2,
 
-	// v2.0
+	#[cfg(not(v0_2))]
+	#[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub flags: Option<StateFlags>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub misc_as: Option<f32>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub ground: Option<u16>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub jumps: Option<u8>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub l_cancel: Option<Option<LCancel>>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub airborne: Option<bool>,
-
-	// v2.1
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub hurtbox_state: Option<HurtboxState>,
+	pub v0_2: Option<PostV0_2>,
 }
 
 impl Indexed for Post {
