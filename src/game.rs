@@ -114,7 +114,7 @@ pub struct End {
 }
 
 fn skip_frames<T>(_:&T) -> bool {
-	!unsafe { super::SERIALIZE_FRAMES }
+	!unsafe { super::CONFIG.frames }
 }
 
 #[derive(PartialEq, Serialize)]
@@ -127,7 +127,16 @@ pub struct Frames {
 
 impl fmt::Debug for Frames {
 	fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "Frames {{ pre: [...]({}), post: [...]({}) }}", self.pre.len(), self.post.len())
+		match unsafe { super::CONFIG.frames } {
+			true => f.debug_struct("Frames")
+				.field("pre", &self.pre)
+				.field("post", &self.post)
+				.finish(),
+			_ => f.debug_struct("Frames")
+				.field("pre", &self.pre.len())
+				.field("post", &self.post.len())
+				.finish(),
+		}
 	}
 }
 

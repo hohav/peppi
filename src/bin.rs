@@ -46,9 +46,11 @@ fn main() {
 	let as_json = matches.is_present("json");
 
 	unsafe {
-		peppi::SERIALIZE_FRAMES = matches.is_present("frames");
-		peppi::SERIALIZE_ENUMS_WITH_NAMES = matches.is_present("names");
-	}
+		peppi::CONFIG = peppi::Config {
+			frames: matches.is_present("frames"),
+			enum_names: matches.is_present("names"),
+		}
+	};
 
 	if let Err(e) = inspect(&[&path], as_json) {
 		error!("{}", e);

@@ -5,9 +5,16 @@ macro_rules! err {
 	}
 }
 
+pub struct Config {
+	pub frames:bool,
+	pub enum_names:bool,
+}
+
 // TODO: use serde_state to pass this config to the serializers?
-pub static mut SERIALIZE_FRAMES:bool = false;
-pub static mut SERIALIZE_ENUMS_WITH_NAMES:bool = false;
+pub static mut CONFIG:Config = Config {
+	frames: false,
+	enum_names: false,
+};
 
 #[macro_use] mod pseudo_bitmask;
 #[macro_use] mod pseudo_enum;
@@ -52,6 +59,7 @@ impl error::Error for ParseError {
 	}
 }
 
+/// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
 pub fn parse<R:io::Read + io::Seek, H:parse::Handlers>(mut r:R, handlers:&mut H) -> std::result::Result<(), ParseError> {
 	parse::parse(r.by_ref(), handlers)
 		.map_err(|e| ParseError { pos: r.seek(io::SeekFrom::Current(0)).ok(), error: e})?;
