@@ -5,16 +5,28 @@ use clap::{App, Arg};
 extern crate pretty_env_logger;
 use log::{error};
 
-fn inspect(paths:&[&str], as_json:bool) -> Result<(), String> {
+fn inspect(paths:&[&str], config:peppi::Config) -> Result<(), String> {
 	for path in paths {
 		let path = path::Path::new(path);
 		let game = peppi::game(path).map_err(|e| format!("{:?}", e))?;
-		match as_json {
-			true => println!("{}", serde_json::to_string(&game).map_err(|e| format!("{:?}", e))?),
-			_ => println!("{:#?}", game),
+		if let Some(port) = config.states_port {
+			for f in &game.ports[port].as_ref().ok_or(format!("no player at port {}", port))?.leader.post {
+				println!("{:?}", f.state);
+			}
+		} else if config.json {
+			println!("{}", serde_json::to_string(&game).map_err(|e| format!("{:?}", e))?);
+		} else {
+			println!("{:#?}", game);
 		}
 	}
 	Ok(())
+}
+
+fn validate_port(s:String) -> Result<(), String> {
+	match s.as_str() {
+		"0" | "1" | "2" | "3" => Ok(()),
+		_ => Err("invalid port".to_string()),
+	}
 }
 
 fn main() {
@@ -32,6 +44,12 @@ fn main() {
 			.help("Output frame data")
 			.short("f")
 			.long("frames"))
+		.arg(Arg::with_name("PORT")
+			.help("Print just the post-frame action states for PORT (0..3)")
+			.short("s")
+			.long("states")
+			.takes_value(true)
+			.validator(validate_port))
 		.arg(Arg::with_name("names")
 			.help("Append names for known constants")
 			.short("n")
@@ -43,16 +61,17 @@ fn main() {
 		.get_matches();
 
 	let path = matches.value_of("FILE").unwrap().to_string();
-	let as_json = matches.is_present("json");
 
-	unsafe {
-		peppi::CONFIG = peppi::Config {
-			frames: matches.is_present("frames"),
-			enum_names: matches.is_present("names"),
-		}
+	let config = peppi::Config {
+		json: matches.is_present("json"),
+		frames: matches.is_present("frames"),
+		enum_names: matches.is_present("names"),
+		states_port: matches.value_of("PORT").map(|s| s.parse::<usize>().unwrap()),
 	};
 
-	if let Err(e) = inspect(&[&path], as_json) {
+	unsafe { peppi::CONFIG = config };
+
+	if let Err(e) = inspect(&[&path], config) {
 		error!("{}", e);
 	}
 }

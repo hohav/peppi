@@ -5,15 +5,20 @@ macro_rules! err {
 	}
 }
 
+#[derive(Copy, Clone)]
 pub struct Config {
+	pub json:bool,
 	pub frames:bool,
 	pub enum_names:bool,
+	pub states_port:Option<usize>,
 }
 
 // TODO: use serde_state to pass this config to the serializers?
 pub static mut CONFIG:Config = Config {
+	json: false,
 	frames: false,
 	enum_names: false,
+	states_port: None,
 };
 
 #[macro_use] mod pseudo_bitmask;

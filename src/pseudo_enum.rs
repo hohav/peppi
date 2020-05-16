@@ -11,7 +11,7 @@ macro_rules! pseudo_enum {
 			fn fmt(&self, f:&mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 				match unsafe { super::CONFIG.enum_names } {
 					true => match self.0 {
-						$( $value => write!(f, "{}:{}", stringify!($value), stringify!($variant)), )*
+						$( $value => write!(f, "{}:{}", self.0, stringify!($variant)), )*
 						_ => write!(f, "{}", self.0),
 					},
 					_ => write!(f, "{}", self.0),

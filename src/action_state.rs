@@ -1,6 +1,8 @@
+use std::fmt;
+
 use super::character::{Internal};
 
-#[derive(Copy, Clone, Debug, PartialEq, serde::Serialize)]
+#[derive(Copy, Clone, PartialEq, serde::Serialize)]
 #[serde(untagged)]
 pub enum State {
 	Common(Common),
@@ -70,6 +72,42 @@ impl State {
 
 				_ => State::Unknown(value),
 			}
+		}
+	}
+}
+
+impl fmt::Debug for State {
+	fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result {
+		 match *self {
+			State::Common(s) => write!(f, "{:?}", s),
+			State::Bowser(s) => write!(f, "{:?}", s),
+			State::CaptainFalcon(s) => write!(f, "{:?}", s),
+			State::DonkeyKong(s) => write!(f, "{:?}", s),
+			State::DrMario(s) => write!(f, "{:?}", s),
+			State::Falco(s) => write!(f, "{:?}", s),
+			State::Fox(s) => write!(f, "{:?}", s),
+			State::GameAndWatch(s) => write!(f, "{:?}", s),
+			State::Ganondorf(s) => write!(f, "{:?}", s),
+			State::Jigglypuff(s) => write!(f, "{:?}", s),
+			State::Kirby(s) => write!(f, "{:?}", s),
+			State::Link(s) => write!(f, "{:?}", s),
+			State::Luigi(s) => write!(f, "{:?}", s),
+			State::Mario(s) => write!(f, "{:?}", s),
+			State::Marth(s) => write!(f, "{:?}", s),
+			State::Mewtwo(s) => write!(f, "{:?}", s),
+			State::Nana(s) => write!(f, "{:?}", s),
+			State::Ness(s) => write!(f, "{:?}", s),
+			State::Peach(s) => write!(f, "{:?}", s),
+			State::Pichu(s) => write!(f, "{:?}", s),
+			State::Pikachu(s) => write!(f, "{:?}", s),
+			State::Popo(s) => write!(f, "{:?}", s),
+			State::Roy(s) => write!(f, "{:?}", s),
+			State::Samus(s) => write!(f, "{:?}", s),
+			State::Sheik(s) => write!(f, "{:?}", s),
+			State::Yoshi(s) => write!(f, "{:?}", s),
+			State::YoungLink(s) => write!(f, "{:?}", s),
+			State::Zelda(s) => write!(f, "{:?}", s),
+			State::Unknown(s) => write!(f, "{:?}", s),
 		}
 	}
 }
