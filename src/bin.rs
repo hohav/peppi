@@ -28,8 +28,13 @@ fn inspect(paths:&[&str], config:&peppi::Config) -> Result<(), String> {
 				"" => &query[1..],
 				_ => &query[..],
 			}.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
+
 			game.query(&mut std::io::stdout(), config, query).map_err(|e| format!("{:?}", e))?;
-			println!("");
+
+			// arrays will add their own newlines
+			if !query.iter().any(|s| *s == "") {
+				println!("");
+			}
 		} else if config.json {
 			println!("{}", serde_json::to_string(&game).map_err(|e| format!("{:?}", e))?);
 		} else {
