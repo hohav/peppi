@@ -31,10 +31,9 @@ fn inspect(paths:&[&str], config:&peppi::Config) -> Result<(), String> {
 
 			game.query(&mut std::io::stdout(), config, query).map_err(|e| format!("{:?}", e))?;
 
-			// arrays will add their own newlines
-			if !query.iter().any(|s| *s == "") {
-				println!("");
-			}
+			// Single-value queries need this newline, but we'll get a double newline for array queries.
+			// FIXME: handle newlines more smarter, esp. for queries with multiple `[]`.
+			println!("");
 		} else if config.json {
 			println!("{}", serde_json::to_string(&game).map_err(|e| format!("{:?}", e))?);
 		} else {
