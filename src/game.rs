@@ -171,12 +171,15 @@ pub struct Frames {
 }
 
 impl Query for Frames {
-	fn query(&self, f:&mut dyn Write, query:&[&str]) -> Result<()> {
+	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
 		match query.is_empty() {
-			true => write!(f, "{:?}", self),
+			true => match config.json {
+				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
+				_ => write!(f, "{:#?}", self),
+			},
 			_ => match &*query[0] {
-				"pre" => self.pre.query(f, &query[1..]),
-				"post" => self.post.query(f, &query[1..]),
+				"pre" => self.pre.query(f, config, &query[1..]),
+				"post" => self.post.query(f, config, &query[1..]),
 				s => Err(err!("unknown field `frames.{}`", s)),
 			},
 		}
@@ -206,12 +209,15 @@ pub struct Port {
 }
 
 impl Query for Port {
-	fn query(&self, f:&mut dyn Write, query:&[&str]) -> Result<()> {
+	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
 		match query.is_empty() {
-			true => write!(f, "{:?}", self),
+			true => match config.json {
+				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
+				_ => write!(f, "{:#?}", self),
+			},
 			_ => match &*query[0] {
-				"leader" => self.leader.query(f, &query[1..]),
-				"follower" => self.follower.query(f, &query[1..]),
+				"leader" => self.leader.query(f, config, &query[1..]),
+				"follower" => self.follower.query(f, config, &query[1..]),
 				s => Err(err!("unknown field `port.{}`", s)),
 			},
 		}
@@ -227,11 +233,14 @@ pub struct Game {
 }
 
 impl Query for Game {
-	fn query(&self, f:&mut dyn Write, query:&[&str]) -> Result<()> {
+	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
 		match query.is_empty() {
-			true => write!(f, "{:?}", self),
+			true => match config.json {
+				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
+				_ => write!(f, "{:#?}", self),
+			},
 			_ => match &*query[0] {
-				"ports" => self.ports.query(f, &query[1..]),
+				"ports" => self.ports.query(f, config, &query[1..]),
 				s => Err(err!("unknown field `game.{}`", s)),
 			},
 		}
