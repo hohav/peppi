@@ -5,14 +5,31 @@ use clap::{App, Arg};
 extern crate pretty_env_logger;
 use log::{error};
 
-fn inspect(paths:&[&str], config:peppi::Config) -> Result<(), String> {
+use peppi::query::{Query};
+
+fn parse_query(query:&str) -> Vec<String> {
+	let re = regex::Regex::new(r"\[(-?\d*)\]$").unwrap();
+	query.split(".").flat_map(|s|
+		match re.captures(s) {
+			Some(c) => c.get(1).map_or(vec![], |g|
+				vec![s[.. g.start()-1].to_string(), s[g.start() .. g.end()].to_string()]
+			),
+			_ => vec![s.to_string()],
+		}
+	).collect()
+}
+
+fn inspect(paths:&[&str], config:&peppi::Config) -> Result<(), String> {
 	for path in paths {
 		let path = path::Path::new(path);
 		let game = peppi::game(path).map_err(|e| format!("{:?}", e))?;
-		if let Some(port) = config.states_port {
-			for f in &game.ports[port].as_ref().ok_or(format!("no player at port {}", port))?.leader.post {
-				println!("{:?}", f.state);
-			}
+		if let Some(query) = &config.query {
+			let query:&[&str] = &match &*query[0] {
+				"" => &query[1..],
+				_ => &query[..],
+			}.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
+			game.query(&mut std::io::stdout(), query).map_err(|e| format!("{:?}", e))?;
+			println!("");
 		} else if config.json {
 			println!("{}", serde_json::to_string(&game).map_err(|e| format!("{:?}", e))?);
 		} else {
@@ -20,13 +37,6 @@ fn inspect(paths:&[&str], config:peppi::Config) -> Result<(), String> {
 		}
 	}
 	Ok(())
-}
-
-fn validate_port(s:String) -> Result<(), String> {
-	match s.as_str() {
-		"0" | "1" | "2" | "3" => Ok(()),
-		_ => Err("invalid port".to_string()),
-	}
 }
 
 fn main() {
@@ -44,12 +54,11 @@ fn main() {
 			.help("Output frame data")
 			.short("f")
 			.long("frames"))
-		.arg(Arg::with_name("PORT")
-			.help("Print just the post-frame action states for PORT (0..3)")
-			.short("s")
-			.long("states")
-			.takes_value(true)
-			.validator(validate_port))
+		.arg(Arg::with_name("QUERY")
+			.help("Print a subset of parsed data (jq-like)")
+			.short("q")
+			.long("query")
+			.takes_value(true))
 		.arg(Arg::with_name("names")
 			.help("Append names for known constants")
 			.short("n")
@@ -66,12 +75,12 @@ fn main() {
 		json: matches.is_present("json"),
 		frames: matches.is_present("frames"),
 		enum_names: matches.is_present("names"),
-		states_port: matches.value_of("PORT").map(|s| s.parse::<usize>().unwrap()),
+		query: matches.value_of("QUERY").map(|q| parse_query(q)),
 	};
 
-	unsafe { peppi::CONFIG = config };
+	unsafe { peppi::CONFIG = config.clone() };
 
-	if let Err(e) = inspect(&[&path], config) {
+	if let Err(e) = inspect(&[&path], &config) {
 		error!("{}", e);
 	}
 }

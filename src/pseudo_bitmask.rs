@@ -9,11 +9,16 @@ macro_rules! pseudo_bitmask {
 
 		impl std::fmt::Debug for $name {
 			fn fmt(&self, f:&mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-				let mut named_values: Vec<&str> = Vec::new();
-				$( if (self.0 & $value) > 0 {
-					named_values.push(stringify!($variant));
-				} )*
-				write!(f, "{} {:?}", self.0, named_values)
+				match unsafe { super::CONFIG.enum_names } {
+					true => {
+						let mut named_values: Vec<&str> = Vec::new();
+						$( if (self.0 & $value) > 0 {
+							named_values.push(stringify!($variant));
+						} )*
+						write!(f, "{} {:?}", self.0, named_values)
+					},
+					_ => write!(f, "{}", self.0),
+				}
 			}
 		}
 

@@ -1,7 +1,10 @@
 use std::fmt;
+use std::io::{Write, Result};
+
 use serde::{Serialize};
 
 use super::{character, frame, metadata, stage};
+use super::query::{Query};
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Slippi {
@@ -167,6 +170,19 @@ pub struct Frames {
 	pub post: Vec<frame::Post>,
 }
 
+impl Query for Frames {
+	fn query(&self, f:&mut dyn Write, query:&[&str]) -> Result<()> {
+		match query.is_empty() {
+			true => write!(f, "{:?}", self),
+			_ => match &*query[0] {
+				"pre" => self.pre.query(f, &query[1..]),
+				"post" => self.post.query(f, &query[1..]),
+				s => Err(err!("unknown field `frames.{}`", s)),
+			},
+		}
+	}
+}
+
 impl fmt::Debug for Frames {
 	fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result {
 		match unsafe { super::CONFIG.frames } {
@@ -189,10 +205,35 @@ pub struct Port {
 	pub follower: Option<Frames>,
 }
 
+impl Query for Port {
+	fn query(&self, f:&mut dyn Write, query:&[&str]) -> Result<()> {
+		match query.is_empty() {
+			true => write!(f, "{:?}", self),
+			_ => match &*query[0] {
+				"leader" => self.leader.query(f, &query[1..]),
+				"follower" => self.follower.query(f, &query[1..]),
+				s => Err(err!("unknown field `port.{}`", s)),
+			},
+		}
+	}
+}
+
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Game {
 	pub start: Start,
 	pub end: End,
 	pub ports: [Option<Port>; NUM_PORTS],
 	pub metadata: metadata::Metadata,
+}
+
+impl Query for Game {
+	fn query(&self, f:&mut dyn Write, query:&[&str]) -> Result<()> {
+		match query.is_empty() {
+			true => write!(f, "{:?}", self),
+			_ => match &*query[0] {
+				"ports" => self.ports.query(f, &query[1..]),
+				s => Err(err!("unknown field `game.{}`", s)),
+			},
+		}
+	}
 }

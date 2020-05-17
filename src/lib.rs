@@ -5,12 +5,12 @@ macro_rules! err {
 	}
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone, Debug)]
 pub struct Config {
-	pub json:bool,
-	pub frames:bool,
-	pub enum_names:bool,
-	pub states_port:Option<usize>,
+	pub json: bool,
+	pub frames: bool,
+	pub enum_names: bool,
+	pub query: Option<Vec<String>>,
 }
 
 // TODO: use serde_state to pass this config to the serializers?
@@ -18,7 +18,7 @@ pub static mut CONFIG:Config = Config {
 	json: false,
 	frames: false,
 	enum_names: false,
-	states_port: None,
+	query: None,
 };
 
 #[macro_use] mod pseudo_bitmask;
@@ -34,6 +34,7 @@ pub mod character;
 pub mod frame;
 pub mod game;
 pub mod metadata;
+pub mod query;
 pub mod stage;
 pub mod triggers;
 pub mod ubjson;

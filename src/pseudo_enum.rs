@@ -20,7 +20,7 @@ macro_rules! pseudo_enum {
 		}
 
 		impl serde::Serialize for $name {
-			fn serialize<S:serde::ser::Serializer>(&self, serializer:S) -> Result<S::Ok, S::Error> {
+			fn serialize<S:serde::ser::Serializer>(&self, serializer:S) -> std::result::Result<S::Ok, S::Error> {
 				match unsafe { super::CONFIG.enum_names } {
 					true => format!("{:?}", self).serialize(serializer),
 					_ => self.0.serialize(serializer),
