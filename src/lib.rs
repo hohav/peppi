@@ -23,6 +23,7 @@ pub static mut CONFIG:Config = Config {
 
 #[macro_use] mod pseudo_bitmask;
 #[macro_use] mod pseudo_enum;
+#[macro_use] pub mod query;
 
 mod game_parser;
 mod parse;
@@ -34,7 +35,6 @@ pub mod character;
 pub mod frame;
 pub mod game;
 pub mod metadata;
-pub mod query;
 pub mod stage;
 pub mod triggers;
 pub mod ubjson;

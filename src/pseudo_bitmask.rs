@@ -22,15 +22,6 @@ macro_rules! pseudo_bitmask {
 			}
 		}
 
-		impl super::query::Query for $name {
-			fn query(&self, f:&mut dyn std::io::Write, config:&super::Config, _query:&[&str]) -> std::io::Result<()> {
-				match config.json {
-					true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-					_ => write!(f, "{:?}", self),
-				}
-			}
-		}
-
 		impl std::ops::BitOr for $name {
 			type Output = Self;
 
@@ -46,5 +37,7 @@ macro_rules! pseudo_bitmask {
 				$name(self.0 & rhs.0)
 			}
 		}
+
+		query_impl!($name);
 	}
 }

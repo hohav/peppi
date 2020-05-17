@@ -1,10 +1,8 @@
 use std::fmt;
-use std::io::{Write, Result};
 
 use serde::{Serialize};
 
 use super::{character, frame, metadata, stage};
-use super::query::{Query};
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Slippi {
@@ -170,21 +168,13 @@ pub struct Frames {
 	pub post: Vec<frame::Post>,
 }
 
-impl Query for Frames {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
-		match query.is_empty() {
-			true => match config.json {
-				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-				_ => write!(f, "{:#?}", self),
-			},
-			_ => match &*query[0] {
-				"pre" => self.pre.query(f, config, &query[1..]),
-				"post" => self.post.query(f, config, &query[1..]),
-				s => Err(err!("unknown field `frames.{}`", s)),
-			},
-		}
+query_impl!(Frames, self, f, config, query {
+	match &*query[0] {
+		"pre" => self.pre.query(f, config, &query[1..]),
+		"post" => self.post.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `frames.{}`", s)),
 	}
-}
+});
 
 impl fmt::Debug for Frames {
 	fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result {
@@ -208,21 +198,13 @@ pub struct Port {
 	pub follower: Option<Frames>,
 }
 
-impl Query for Port {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
-		match query.is_empty() {
-			true => match config.json {
-				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-				_ => write!(f, "{:#?}", self),
-			},
-			_ => match &*query[0] {
-				"leader" => self.leader.query(f, config, &query[1..]),
-				"follower" => self.follower.query(f, config, &query[1..]),
-				s => Err(err!("unknown field `port.{}`", s)),
-			},
-		}
+query_impl!(Port, self, f, config, query {
+	match &*query[0] {
+		"leader" => self.leader.query(f, config, &query[1..]),
+		"follower" => self.follower.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `port.{}`", s)),
 	}
-}
+});
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Game {
@@ -232,17 +214,9 @@ pub struct Game {
 	pub metadata: metadata::Metadata,
 }
 
-impl Query for Game {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
-		match query.is_empty() {
-			true => match config.json {
-				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-				_ => write!(f, "{:#?}", self),
-			},
-			_ => match &*query[0] {
-				"ports" => self.ports.query(f, config, &query[1..]),
-				s => Err(err!("unknown field `game.{}`", s)),
-			},
-		}
+query_impl!(Game, self, f, config, query {
+	match &*query[0] {
+		"ports" => self.ports.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `game.{}`", s)),
 	}
-}
+});

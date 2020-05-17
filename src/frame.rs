@@ -1,10 +1,8 @@
 use std::fmt;
-use std::io::{Write, Result};
 
 use serde::{Serialize};
 
 use super::{action_state, attack, buttons, character, triggers};
-use super::query::{Query};
 
 pseudo_enum!(LCancel:u8 {
 	1 => SUCCESSFUL,
@@ -28,14 +26,7 @@ impl fmt::Debug for Position {
 	}
 }
 
-impl Query for Position {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, _query:&[&str]) -> Result<()> {
-		match config.json {
-			true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-			_ => write!(f, "{:#?}", self),
-		}
-	}
-}
+query_impl!(Position);
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Buttons {
@@ -43,21 +34,13 @@ pub struct Buttons {
 	pub physical: buttons::Physical,
 }
 
-impl Query for Buttons {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
-		match query.is_empty() {
-			true => match config.json {
-				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-				_ => write!(f, "{:#?}", self),
-			},
-			_ => match &*query[0] {
-				"logical" => self.logical.query(f, config, &query[1..]),
-				"physical" => self.physical.query(f, config, &query[1..]),
-				s => Err(err!("unknown field `buttons.{}`", s)),
-			}
-		}
+query_impl!(Buttons, self, f, config, query {
+	match &*query[0] {
+		"logical" => self.logical.query(f, config, &query[1..]),
+		"physical" => self.physical.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `buttons.{}`", s)),
 	}
-}
+});
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Triggers {
@@ -65,14 +48,7 @@ pub struct Triggers {
 	pub physical: triggers::Physical,
 }
 
-impl Query for Triggers {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, _query:&[&str]) -> Result<()> {
-		match config.json {
-			true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-			_ => write!(f, "{:#?}", self),
-		}
-	}
-}
+query_impl!(Triggers);
 
 pseudo_bitmask!(StateFlags:u64 {
 	1u64 << 04 => REFLECT,
@@ -147,60 +123,36 @@ impl Indexed for Pre {
 	}
 }
 
-impl Query for Pre {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
-		match query.is_empty() {
-			true => match config.json {
-				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-				_ => write!(f, "{:#?}", self),
-			},
-			_ => match &*query[0] {
-				"index" => write!(f, "{}", self.index),
-				"position" => self.position.query(f, config, &query[1..]),
-				"direction" => self.direction.query(f, config, &query[1..]),
-				"joystick" => self.joystick.query(f, config, &query[1..]),
-				"cstick" => self.cstick.query(f, config, &query[1..]),
-				"triggers" => self.triggers.query(f, config, &query[1..]),
-				"random_seed" => write!(f, "{}", self.random_seed),
-				"buttons" => self.buttons.query(f, config, &query[1..]),
-				"state" => self.state.query(f, config, &query[1..]),
-				"v1_2" => self.v1_2.query(f, config, &query[1..]),
-				_ => self.v1_2.query(f, config, query),
-			},
-		}
+query_impl!(Pre, self, f, config, query {
+	match &*query[0] {
+		"index" => write!(f, "{}", self.index),
+		"position" => self.position.query(f, config, &query[1..]),
+		"direction" => self.direction.query(f, config, &query[1..]),
+		"joystick" => self.joystick.query(f, config, &query[1..]),
+		"cstick" => self.cstick.query(f, config, &query[1..]),
+		"triggers" => self.triggers.query(f, config, &query[1..]),
+		"random_seed" => write!(f, "{}", self.random_seed),
+		"buttons" => self.buttons.query(f, config, &query[1..]),
+		"state" => self.state.query(f, config, &query[1..]),
+		"v1_2" => self.v1_2.query(f, config, &query[1..]),
+		_ => self.v1_2.query(f, config, query),
 	}
-}
+});
 
-impl Query for PreV1_2 {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
-		match query.is_empty() {
-			true => match config.json {
-				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-				_ => write!(f, "{:#?}", self),
-			},
-			_ => match &*query[0] {
-				"raw_analog_x" => write!(f, "{}", self.raw_analog_x),
-				"v1_4" => self.v1_4.query(f, config, &query[1..]),
-				_ => self.v1_4.query(f, config, query),
-			},
-		}
+query_impl!(PreV1_2, self, f, config, query {
+	match &*query[0] {
+		"raw_analog_x" => write!(f, "{}", self.raw_analog_x),
+		"v1_4" => self.v1_4.query(f, config, &query[1..]),
+		_ => self.v1_4.query(f, config, query),
 	}
-}
+});
 
-impl Query for PreV1_4 {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
-		match query.is_empty() {
-			true => match config.json {
-				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-				_ => write!(f, "{:#?}", self),
-			},
-			_ => match &*query[0] {
-				"damage" => write!(f, "{}", self.damage),
-				s => Err(err!("unknown field `pre.{}`", s)),
-			},
-		}
+query_impl!(PreV1_4, self, f, config, query {
+	match &*query[0] {
+		"damage" => write!(f, "{}", self.damage),
+		s => Err(err!("unknown field `pre.{}`", s)),
 	}
-}
+});
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct PostV2_1 {
@@ -271,80 +223,48 @@ impl Indexed for Post {
 	}
 }
 
-impl Query for Post {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
-		match query.is_empty() {
-			true => match config.json {
-				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-				_ => write!(f, "{:#?}", self),
-			},
-			_ => match &*query[0] {
-				"index" => write!(f, "{}", self.index),
-				"position" => self.position.query(f, config, &query[1..]),
-				"direction" => self.direction.query(f, config, &query[1..]),
-				"damage" => write!(f, "{}", self.damage),
-				"shield" => write!(f, "{}", self.shield),
-				"state" => self.state.query(f, config, &query[1..]),
-				"character" => self.character.query(f, config, &query[1..]),
-				"last_attack_landed" => self.last_attack_landed.query(f, config, &query[1..]),
-				"combo_count" => write!(f, "{}", self.combo_count),
-				"last_hit_by" => write!(f, "{}", self.last_hit_by),
-				"stocks" => write!(f, "{}", self.stocks),
-				"v0_2" => self.v0_2.query(f, config, &query[1..]),
-				_ => self.v0_2.query(f, config, query),
-			},
-		}
+query_impl!(Post, self, f, config, query {
+	match &*query[0] {
+		"index" => write!(f, "{}", self.index),
+		"position" => self.position.query(f, config, &query[1..]),
+		"direction" => self.direction.query(f, config, &query[1..]),
+		"damage" => write!(f, "{}", self.damage),
+		"shield" => write!(f, "{}", self.shield),
+		"state" => self.state.query(f, config, &query[1..]),
+		"character" => self.character.query(f, config, &query[1..]),
+		"last_attack_landed" => self.last_attack_landed.query(f, config, &query[1..]),
+		"combo_count" => write!(f, "{}", self.combo_count),
+		"last_hit_by" => write!(f, "{}", self.last_hit_by),
+		"stocks" => write!(f, "{}", self.stocks),
+		"v0_2" => self.v0_2.query(f, config, &query[1..]),
+		_ => self.v0_2.query(f, config, query),
 	}
-}
+});
 
-impl Query for PostV0_2 {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
-		match query.is_empty() {
-			true => match config.json {
-				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-				_ => write!(f, "{:#?}", self),
-			},
-			_ => match &*query[0] {
-				"state_age" => write!(f, "{}", self.state_age),
-				"v2_0" => self.v2_0.query(f, config, &query[1..]),
-				_ => self.v2_0.query(f, config, query),
-			},
-		}
+query_impl!(PostV0_2, self, f, config, query {
+	match &*query[0] {
+		"state_age" => write!(f, "{}", self.state_age),
+		"v2_0" => self.v2_0.query(f, config, &query[1..]),
+		_ => self.v2_0.query(f, config, query),
 	}
-}
+});
 
-impl Query for PostV2_0 {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
-		match query.is_empty() {
-			true => match config.json {
-				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-				_ => write!(f, "{:#?}", self),
-			},
-			_ => match &*query[0] {
-				"flags" => self.flags.query(f, config, &query[1..]),
-				"misc_as" => write!(f, "{}", self.misc_as),
-				"ground" => write!(f, "{}", self.ground),
-				"jumps" => write!(f, "{}", self.jumps),
-				"l_cancel" => self.l_cancel.query(f, config, &query[1..]),
-				"airborne" => write!(f, "{}", self.airborne),
-				"v2_1" => self.v2_1.query(f, config, &query[1..]),
-				_ => self.v2_1.query(f, config, query),
-			},
-		}
+query_impl!(PostV2_0, self, f, config, query {
+	match &*query[0] {
+		"flags" => self.flags.query(f, config, &query[1..]),
+		"misc_as" => write!(f, "{}", self.misc_as),
+		"ground" => write!(f, "{}", self.ground),
+		"jumps" => write!(f, "{}", self.jumps),
+		"l_cancel" => self.l_cancel.query(f, config, &query[1..]),
+		"airborne" => write!(f, "{}", self.airborne),
+		"v2_1" => self.v2_1.query(f, config, &query[1..]),
+		_ => self.v2_1.query(f, config, query),
 	}
-}
+});
 
-impl Query for PostV2_1 {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
-		match query.is_empty() {
-			true => match config.json {
-				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-				_ => write!(f, "{:#?}", self),
-			},
-			_ => match &*query[0] {
-				"hurtbox_state" => self.hurtbox_state.query(f, config, &query[1..]),
-				s => Err(err!("unknown field `post.{}`", s)),
-			},
-		}
+query_impl!(PostV2_1, self, f, config, query {
+	match &*query[0] {
+		"hurtbox_state" => self.hurtbox_state.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `post.{}`", s)),
 	}
-}
+});
