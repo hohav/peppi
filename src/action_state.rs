@@ -1,5 +1,4 @@
 use std::fmt;
-use std::io::{Write, Result};
 
 use super::character::{Internal};
 
@@ -113,14 +112,7 @@ impl fmt::Debug for State {
 	}
 }
 
-impl super::query::Query for State {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, _query:&[&str]) -> Result<()> {
-		match config.json {
-			true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-			_ => write!(f, "{:?}", self),
-		}
-	}
-}
+query_impl!(State);
 
 pseudo_enum!(Common:u16 {
 	000 => DEAD_DOWN,

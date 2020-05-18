@@ -12,7 +12,7 @@ use super::action_state::{Common, State};
 use super::attack::{Attack};
 use super::character::{Internal};
 use super::frame::{Pre, Post, Direction, Position};
-use super::game::{Start, End, Player, PlayerType, Slippi, NUM_PORTS};
+use super::game::{Start, End, Player, PlayerType, NUM_PORTS};
 
 const ZELDA_TRANSFORM_FRAME:u32 = 43;
 const SHEIK_TRANSFORM_FRAME:u32 = 36;
@@ -194,14 +194,21 @@ fn game_start_v1_5(r:&mut &[u8]) -> Result<game::StartV1_5> {
 }
 
 fn game_start(mut r:&mut &[u8]) -> Result<Start> {
-	let slippi = Slippi {version: (r.read_u8()?, r.read_u8()?, r.read_u8()?)};
-	debug!("game::Start: {:?}", slippi);
+	debug!("game::Start");
+
+	let slippi = game::Slippi {
+		version: game::SlippiVersion(r.read_u8()?, r.read_u8()?, r.read_u8()?),
+	};
 
 	r.read_u8()?; // unused (build number)
-	r.read_u8()?; // bitfield 1
-	r.read_u8()?; // bitfield 2
-	r.read_u8()?; // ???
-	r.read_u8()?; // bitfield 3
+	let bitfield = {
+		let mut buf = [0; 3];
+		buf[0] = r.read_u8()?; // bitfield 1
+		buf[1] = r.read_u8()?; // bitfield 2
+		r.read_u8()?; // ???
+		buf[2] = r.read_u8()?; // bitfield 3
+		buf
+	};
 	r.read_u32::<BigEndian>()?; // ???
 	let is_teams = r.read_u8()? != 0;
 	r.read_u16::<BigEndian>()?; // ???
@@ -209,7 +216,7 @@ fn game_start(mut r:&mut &[u8]) -> Result<Start> {
 	let self_destruct_score = r.read_i8()?;
 	r.read_u8()?; // ???
 	let stage = stage::Stage(r.read_u16::<BigEndian>()?);
-	let game_timer = r.read_u32::<BigEndian>()?;
+	let timer = r.read_u32::<BigEndian>()?;
 	r.read_exact(&mut [0; 15])?; // ???
 	let item_spawn_bitfield = {
 		let mut buf = [0; 5];
@@ -254,11 +261,12 @@ fn game_start(mut r:&mut &[u8]) -> Result<Start> {
 
 	Ok(Start {
 		slippi: slippi,
+		bitfield: bitfield,
 		is_teams: is_teams,
 		item_spawn_frequency: item_spawn_frequency,
 		self_destruct_score: self_destruct_score,
 		stage: stage,
-		game_timer: game_timer,
+		timer: timer,
 		item_spawn_bitfield: item_spawn_bitfield,
 		damage_ratio: damage_ratio,
 		players: players,

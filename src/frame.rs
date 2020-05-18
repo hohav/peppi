@@ -125,13 +125,13 @@ impl Indexed for Pre {
 
 query_impl!(Pre, self, f, config, query {
 	match &*query[0] {
-		"index" => write!(f, "{}", self.index),
+		"index" => self.index.query(f, config, &query[1..]),
 		"position" => self.position.query(f, config, &query[1..]),
 		"direction" => self.direction.query(f, config, &query[1..]),
 		"joystick" => self.joystick.query(f, config, &query[1..]),
 		"cstick" => self.cstick.query(f, config, &query[1..]),
 		"triggers" => self.triggers.query(f, config, &query[1..]),
-		"random_seed" => write!(f, "{}", self.random_seed),
+		"random_seed" => self.random_seed.query(f, config, &query[1..]),
 		"buttons" => self.buttons.query(f, config, &query[1..]),
 		"state" => self.state.query(f, config, &query[1..]),
 		"v1_2" => self.v1_2.query(f, config, &query[1..]),
@@ -141,7 +141,7 @@ query_impl!(Pre, self, f, config, query {
 
 query_impl!(PreV1_2, self, f, config, query {
 	match &*query[0] {
-		"raw_analog_x" => write!(f, "{}", self.raw_analog_x),
+		"raw_analog_x" => self.raw_analog_x.query(f, config, &query[1..]),
 		"v1_4" => self.v1_4.query(f, config, &query[1..]),
 		_ => self.v1_4.query(f, config, query),
 	}
@@ -149,7 +149,7 @@ query_impl!(PreV1_2, self, f, config, query {
 
 query_impl!(PreV1_4, self, f, config, query {
 	match &*query[0] {
-		"damage" => write!(f, "{}", self.damage),
+		"damage" => self.damage.query(f, config, &query[1..]),
 		s => Err(err!("unknown field `pre.{}`", s)),
 	}
 });
@@ -225,17 +225,17 @@ impl Indexed for Post {
 
 query_impl!(Post, self, f, config, query {
 	match &*query[0] {
-		"index" => write!(f, "{}", self.index),
+		"index" => self.index.query(f, config, &query[1..]),
 		"position" => self.position.query(f, config, &query[1..]),
 		"direction" => self.direction.query(f, config, &query[1..]),
-		"damage" => write!(f, "{}", self.damage),
-		"shield" => write!(f, "{}", self.shield),
+		"damage" => self.damage.query(f, config, &query[1..]),
+		"shield" => self.shield.query(f, config, &query[1..]),
 		"state" => self.state.query(f, config, &query[1..]),
 		"character" => self.character.query(f, config, &query[1..]),
 		"last_attack_landed" => self.last_attack_landed.query(f, config, &query[1..]),
-		"combo_count" => write!(f, "{}", self.combo_count),
-		"last_hit_by" => write!(f, "{}", self.last_hit_by),
-		"stocks" => write!(f, "{}", self.stocks),
+		"combo_count" => self.combo_count.query(f, config, &query[1..]),
+		"last_hit_by" => self.last_hit_by.query(f, config, &query[1..]),
+		"stocks" => self.stocks.query(f, config, &query[1..]),
 		"v0_2" => self.v0_2.query(f, config, &query[1..]),
 		_ => self.v0_2.query(f, config, query),
 	}
@@ -243,7 +243,7 @@ query_impl!(Post, self, f, config, query {
 
 query_impl!(PostV0_2, self, f, config, query {
 	match &*query[0] {
-		"state_age" => write!(f, "{}", self.state_age),
+		"state_age" => self.state_age.query(f, config, &query[1..]),
 		"v2_0" => self.v2_0.query(f, config, &query[1..]),
 		_ => self.v2_0.query(f, config, query),
 	}
@@ -252,11 +252,11 @@ query_impl!(PostV0_2, self, f, config, query {
 query_impl!(PostV2_0, self, f, config, query {
 	match &*query[0] {
 		"flags" => self.flags.query(f, config, &query[1..]),
-		"misc_as" => write!(f, "{}", self.misc_as),
-		"ground" => write!(f, "{}", self.ground),
-		"jumps" => write!(f, "{}", self.jumps),
+		"misc_as" => self.misc_as.query(f, config, &query[1..]),
+		"ground" => self.ground.query(f, config, &query[1..]),
+		"jumps" => self.jumps.query(f, config, &query[1..]),
 		"l_cancel" => self.l_cancel.query(f, config, &query[1..]),
-		"airborne" => write!(f, "{}", self.airborne),
+		"airborne" => self.airborne.query(f, config, &query[1..]),
 		"v2_1" => self.v2_1.query(f, config, &query[1..]),
 		_ => self.v2_1.query(f, config, query),
 	}

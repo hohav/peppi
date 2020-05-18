@@ -21,11 +21,33 @@ pub struct Metadata {
 	#[serde(skip)] pub console_name: Option<String>,
 }
 
+query_impl!(Metadata, self, f, config, query {
+	match &*query[0] {
+		"date" => self.date.query(f, config, &query[1..]),
+		"duration" => self.duration.query(f, config, &query[1..]),
+		"platform" => self.platform.query(f, config, &query[1..]),
+		"players" => self.players.query(f, config, &query[1..]),
+		"console_name" => self.console_name.query(f, config, &query[1..]),
+		_ => self.json.get(&*query[0]).query(f, config, &query[1..]),
+	}
+});
+
 #[derive(Debug, PartialEq, Serialize)]
 pub struct MetadataPlayer {
 	pub characters: Option<HashMap<character::Internal, u32>>,
 	pub netplay_name: Option<String>,
 }
+
+query_impl!(MetadataPlayer, self, f, config, query {
+	match &*query[0] {
+		"characters" => self.characters.query(f, config, &query[1..]),
+		"netplay_name" => self.netplay_name.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `buttons.{}`", s)),
+	}
+});
+
+query_impl!(HashMap<character::Internal, u32>);
+query_impl!(DateTime<Utc>);
 
 fn date(json:&HashMap<String, Object>) -> Option<DateTime<Utc>> {
 	let date_too_short = "2000-01-01T00:00:00".parse::<DateTime<Utc>>();
