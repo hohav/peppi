@@ -7,7 +7,7 @@ use super::action_state::{State, Zelda};
 use super::buttons::{Logical, Physical};
 use super::character::{Internal, External};
 use super::frame::{Buttons};
-use super::game::{DashBack, Game, End, EndMethod, Start, Player, PlayerType, PlayerV1_0, ShieldDrop, Slippi, Ucf};
+use super::game::{DashBack, Game, End, EndMethod, Start, Player, PlayerType, PlayerV1_0, ShieldDrop, Slippi, SlippiVersion, Ucf};
 use super::metadata::{Metadata, MetadataPlayer};
 use super::stage::{Stage};
 use super::ubjson::{ToObject};
@@ -42,7 +42,7 @@ fn slippi_old_version() -> Result<(), String> {
 	let game = game("v0.1")?;
 	let players = game.start.players;
 
-	assert_eq!(game.start.slippi.version, (0,1,0));
+	assert_eq!(game.start.slippi.version, SlippiVersion(0,1,0));
 	assert_eq!(game.metadata.duration, None);
 
 	assert_eq!(players[0].as_ref().ok_or("player 0 missing")?.character, External::FOX);
@@ -102,12 +102,13 @@ fn basic_game() -> Result<(), String> {
 	});
 
 	assert_eq!(game.start, Start {
-		slippi: Slippi { version: (1, 0, 0) },
+		slippi: Slippi { version: SlippiVersion(1, 0, 0) },
+		bitfield: [50, 1, 76],
 		is_teams: false,
 		item_spawn_frequency: -1,
 		self_destruct_score: -1,
 		stage: Stage::YOSHIS_STORY,
-		game_timer: 480,
+		timer: 480,
 		item_spawn_bitfield: [255, 255, 255, 255, 255],
 		damage_ratio: 1.0,
 		players: [
@@ -362,7 +363,7 @@ fn console_name() -> Result<(), String> {
 #[test]
 fn v2() -> Result<(), String> {
 	let game = game("v2.0")?;
-	assert_eq!(game.start.slippi.version, (2,0,1));
+	assert_eq!(game.start.slippi.version, SlippiVersion(2,0,1));
 	Ok(())
 }
 
