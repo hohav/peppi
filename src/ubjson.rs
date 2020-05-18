@@ -1,7 +1,6 @@
 use std::io::{Read, Result, Error, ErrorKind};
 use std::collections::HashMap;
 
-extern crate byteorder;
 use byteorder::{BigEndian, ReadBytesExt};
 
 #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize)]

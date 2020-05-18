@@ -2,7 +2,6 @@ use std::path;
 
 use clap::{App, Arg};
 
-extern crate pretty_env_logger;
 use log::{error};
 
 use peppi::query::{Query};
