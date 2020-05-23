@@ -21,12 +21,9 @@ pub static mut CONFIG:Config = Config {
 	query: None,
 };
 
-#[macro_use] mod pseudo_bitmask;
-#[macro_use] mod pseudo_enum;
+#[macro_use] pub mod pseudo_bitmask;
+#[macro_use] pub mod pseudo_enum;
 #[macro_use] pub mod query;
-
-mod game_parser;
-mod parse;
 
 pub mod action_state;
 pub mod attack;
@@ -34,7 +31,9 @@ pub mod buttons;
 pub mod character;
 pub mod frame;
 pub mod game;
+pub mod game_parser;
 pub mod metadata;
+pub mod parse;
 pub mod stage;
 pub mod triggers;
 pub mod ubjson;
