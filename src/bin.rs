@@ -45,7 +45,7 @@ fn inspect(paths:&[&str], config:&peppi::Config) -> Result<(), String> {
 fn main() {
 	pretty_env_logger::init();
 
-    let matches = App::new("Peppi")
+	let matches = App::new("Peppi")
 		.version("0.1")
 		.author("melkor <hohav@fastmail.com>")
 		.about("Inspector for Slippi SSBM replay files")
