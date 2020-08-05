@@ -1,8 +1,9 @@
 use std::fmt;
+use std::convert::TryInto;
 
 use serde::{Serialize};
 
-use super::{action_state, attack, buttons, character, triggers};
+use super::{action_state, attack, buttons, character, game, triggers};
 
 pseudo_enum!(LCancel:u8 {
 	1 => SUCCESSFUL,
@@ -72,7 +73,8 @@ pseudo_enum!(HurtboxState:u8 {
 });
 
 pub trait Indexed {
-	fn index(&self) -> i32;
+	/// 0-based frame index (in-game frame indexes start at -123)
+	fn array_index(&self) -> usize;
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -118,8 +120,8 @@ pub struct Pre {
 }
 
 impl Indexed for Pre {
-	fn index(&self) -> i32 {
-		self.index
+	fn array_index(&self) -> usize {
+		(self.index - game::FIRST_FRAME_INDEX).try_into().unwrap()
 	}
 }
 
@@ -218,8 +220,8 @@ pub struct Post {
 }
 
 impl Indexed for Post {
-	fn index(&self) -> i32 {
-		self.index
+	fn array_index(&self) -> usize {
+		(self.index - game::FIRST_FRAME_INDEX).try_into().unwrap()
 	}
 }
 

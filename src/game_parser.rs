@@ -2,6 +2,7 @@ use std::io::Result;
 use std::collections::HashMap;
 
 use super::{frame, game, metadata, parse, ubjson};
+use super::frame::Indexed;
 
 #[derive(Debug)]
 pub struct GameParser {
@@ -19,22 +20,6 @@ impl GameParser {
 			ports: self.ports,
 			metadata: metadata::parse(&self.metadata.unwrap_or_default()),
 		})
-	}
-}
-
-fn check_ooo_frames<F:frame::Indexed>(cur:&F, prev:Option<&F>) -> Result<()> {
-	if let Some(prev) = prev {
-		if prev.index() > cur.index() {
-			Err(err!("out-of-order frame: {} -> {}", prev.index(), cur.index()))
-		} else {
-			Ok(())
-		}
-	} else {
-		if cur.index() != game::FIRST_FRAME_INDEX {
-			Err(err!("unexpected first frame index: {}", cur.index()))
-		} else {
-			Ok(())
-		}
 	}
 }
 
@@ -70,8 +55,14 @@ impl parse::Handlers for GameParser {
 			&mut port.leader.pre
 		};
 
-		check_ooo_frames(&e.event, frames.last())?;
-		frames.push(e.event);
+		let idx = e.event.array_index();
+		if idx == frames.len() {
+			frames.push(e.event)
+		} else if idx > frames.len() {
+			Err(err!("missing frames: {:?} -> {:?}", frames.last().map(|f| f.index), e.event.index))?
+		} else { // rollback
+			frames[idx] = e.event
+		};
 
 		Ok(())
 	}
@@ -99,8 +90,14 @@ impl parse::Handlers for GameParser {
 			&mut port.leader.post
 		};
 
-		check_ooo_frames(&e.event, frames.last())?;
-		frames.push(e.event);
+		let idx = e.event.array_index();
+		if idx == frames.len() {
+			frames.push(e.event)
+		} else if idx > frames.len() {
+			Err(err!("out-of-order frame: {:?} -> {:?}", frames.last().map(|f| f.index), e.event.index))?
+		} else { // rollback
+			frames[idx] = e.event
+		};
 
 		Ok(())
 	}
