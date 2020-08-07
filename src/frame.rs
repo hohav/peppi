@@ -1,9 +1,8 @@
 use std::fmt;
-use std::convert::TryInto;
 
-use serde::{Serialize};
+use serde::Serialize;
 
-use super::{action_state, attack, buttons, character, game, triggers};
+use super::{action_state, attack, buttons, character, triggers};
 
 pseudo_enum!(LCancel:u8 {
 	1 => SUCCESSFUL,
@@ -72,9 +71,24 @@ pseudo_enum!(HurtboxState:u8 {
 	2 => INTANGIBLE,
 });
 
-pub trait Indexed {
-	/// 0-based frame index (in-game frame indexes start at -123)
-	fn array_index(&self) -> usize;
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct Start {
+	pub random_seed: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct EndV3_7 {
+	pub latest_finalized_frame: i32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct End {
+	#[cfg(v3_7)] #[serde(flatten)]
+	pub v3_7: EndV3_7,
+
+	#[cfg(not(v3_7))] #[serde(flatten)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub v3_7: Option<EndV3_7>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -86,20 +100,16 @@ pub struct PreV1_4 {
 pub struct PreV1_2 {
 	pub raw_analog_x: u8,
 
-	#[cfg(v1_4)]
-	#[serde(flatten)]
+	#[cfg(v1_4)] #[serde(flatten)]
 	pub v1_4: PreV1_4,
 
-	#[cfg(not(v1_4))]
-	#[serde(flatten)]
+	#[cfg(not(v1_4))] #[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v1_4: Option<PreV1_4>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct Pre {
-	pub index: i32,
-
 	pub position: Position,
 	pub direction: Direction,
 	pub joystick: Position,
@@ -109,25 +119,16 @@ pub struct Pre {
 	pub buttons: Buttons,
 	pub state: action_state::State,
 
-	#[cfg(v1_2)]
-	#[serde(flatten)]
+	#[cfg(v1_2)] #[serde(flatten)]
 	pub v1_2: PreV1_2,
 
-	#[cfg(not(v1_2))]
-	#[serde(flatten)]
+	#[cfg(not(v1_2))] #[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v1_2: Option<PreV1_2>,
 }
 
-impl Indexed for Pre {
-	fn array_index(&self) -> usize {
-		(self.index - game::FIRST_FRAME_INDEX).try_into().unwrap()
-	}
-}
-
 query_impl!(Pre, self, f, config, query {
 	match &*query[0] {
-		"index" => self.index.query(f, config, &query[1..]),
 		"position" => self.position.query(f, config, &query[1..]),
 		"direction" => self.direction.query(f, config, &query[1..]),
 		"joystick" => self.joystick.query(f, config, &query[1..]),
@@ -170,12 +171,10 @@ pub struct PostV2_0 {
 	pub l_cancel: Option<LCancel>,
 	pub airborne: bool,
 
-	#[cfg(v2_1)]
-	#[serde(flatten)]
+	#[cfg(v2_1)] #[serde(flatten)]
 	pub v2_1: PostV2_1,
 
-	#[cfg(not(v2_1))]
-	#[serde(flatten)]
+	#[cfg(not(v2_1))] #[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v2_1: Option<PostV2_1>,
 }
@@ -184,20 +183,16 @@ pub struct PostV2_0 {
 pub struct PostV0_2 {
 	pub state_age: f32,
 
-	#[cfg(v2_0)]
-	#[serde(flatten)]
+	#[cfg(v2_0)] #[serde(flatten)]
 	pub v2_0: PostV2_0,
 
-	#[cfg(not(v2_0))]
-	#[serde(flatten)]
+	#[cfg(not(v2_0))] #[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v2_0: Option<PostV2_0>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct Post {
-	pub index: i32,
-
 	pub position: Position,
 	pub direction: Direction,
 	pub damage: f32,
@@ -209,25 +204,16 @@ pub struct Post {
 	pub last_hit_by: u8,
 	pub stocks: u8,
 
-	#[cfg(v0_2)]
-	#[serde(flatten)]
+	#[cfg(v0_2)] #[serde(flatten)]
 	pub v0_2: PostV0_2,
 
-	#[cfg(not(v0_2))]
-	#[serde(flatten)]
+	#[cfg(not(v0_2))] #[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v0_2: Option<PostV0_2>,
 }
 
-impl Indexed for Post {
-	fn array_index(&self) -> usize {
-		(self.index - game::FIRST_FRAME_INDEX).try_into().unwrap()
-	}
-}
-
 query_impl!(Post, self, f, config, query {
 	match &*query[0] {
-		"index" => self.index.query(f, config, &query[1..]),
 		"position" => self.position.query(f, config, &query[1..]),
 		"direction" => self.direction.query(f, config, &query[1..]),
 		"damage" => self.damage.query(f, config, &query[1..]),

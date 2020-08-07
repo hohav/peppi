@@ -1,3 +1,6 @@
+#![allow(incomplete_features)]
+#![feature(const_generics)]
+
 #[macro_export]
 macro_rules! err {
 	($( $arg:expr ),*) => {
@@ -81,7 +84,10 @@ pub fn game(path:&path::Path) -> std::result::Result<game::Game, ParseError> {
 	let mut game_parser = game_parser::GameParser {
 		start: None,
 		end: None,
-		ports: [None, None, None, None],
+		frames_start: Vec::new(),
+		frames_pre: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
+		frames_post: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
+		frames_end: Vec::new(),
 		metadata: None,
 	};
 

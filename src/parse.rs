@@ -1,6 +1,6 @@
 use std::cmp::min;
 use std::collections::HashMap;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::io::{Read, Result};
 
 use byteorder::{BigEndian, ReadBytesExt};
@@ -12,7 +12,7 @@ use super::action_state::{Common, State};
 use super::attack::Attack;
 use super::character::Internal;
 use super::frame::{Pre, Post, Direction, Position};
-use super::game::{Start, End, Player, PlayerType, NUM_PORTS};
+use super::game::{NUM_PORTS, Player, PlayerType};
 
 const ZELDA_TRANSFORM_FRAME: u32 = 43;
 const SHEIK_TRANSFORM_FRAME: u32 = 36;
@@ -41,19 +41,51 @@ pub enum Event {
 	FramePre = 0x37,
 	FramePost = 0x38,
 	GameEnd = 0x39,
+	FrameStart = 0x3A,
+	FrameEnd = 0x3C,
+}
+
+pub trait Indexed {
+	fn index(&self) -> i32;
+	fn array_index(&self) -> usize;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FrameId {
 	pub index: i32,
+}
+
+impl Indexed for FrameId {
+	fn index(&self) -> i32 {
+		self.index
+	}
+
+	fn array_index(&self) -> usize {
+		(self.index - game::FIRST_FRAME_INDEX).try_into().unwrap()
+	}
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct PortId {
+	pub index: i32,
 	pub port: u8,
 	pub is_follower: bool,
 }
 
+impl Indexed for PortId {
+	fn index(&self) -> i32 {
+		self.index
+	}
+
+	fn array_index(&self) -> usize {
+		(self.index - game::FIRST_FRAME_INDEX).try_into().unwrap()
+	}
+}
+
 #[derive(Debug)]
-pub struct FrameEvent<F> {
-	pub id: FrameId,
-	pub event: F,
+pub struct FrameEvent<Id, Event> {
+	pub id: Id,
+	pub event: Event,
 }
 
 /// Reads the Event Payloads event, which must come first in the raw stream
@@ -204,7 +236,7 @@ fn game_start_v1_5(r: &mut &[u8]) -> Result<game::StartV1_5> {
 	})
 }
 
-fn game_start(mut r: &mut &[u8]) -> Result<Start> {
+fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 	let slippi = game::Slippi {
 		version: game::SlippiVersion(r.read_u8()?, r.read_u8()?, r.read_u8()?),
 	};
@@ -255,12 +287,12 @@ fn game_start(mut r: &mut &[u8]) -> Result<Start> {
 		_ => [Some(player_bytes_v1_3(&mut r)?), Some(player_bytes_v1_3(&mut r)?), Some(player_bytes_v1_3(&mut r)?), Some(player_bytes_v1_3(&mut r)?)],
 	};
 
-	let players = [
-		player(&players_v0[0], is_teams, players_v1_0[0], players_v1_3[0])?,
-		player(&players_v0[1], is_teams, players_v1_0[1], players_v1_3[1])?,
-		player(&players_v0[2], is_teams, players_v1_0[2], players_v1_3[2])?,
-		player(&players_v0[3], is_teams, players_v1_0[3], players_v1_3[3])?,
-	];
+	let mut players = Vec::<Player>::new();
+	for n in 0 .. NUM_PORTS {
+		if let Some(p) = player(&players_v0[n], is_teams, players_v1_0[n], players_v1_3[n])? {
+			players.push(p);
+		}
+	}
 
 	#[cfg(v1_5)] let v1_5 = game_start_v1_5(r)?;
 	#[cfg(not(v1_5))] let v1_5 = match r.is_empty() {
@@ -268,7 +300,7 @@ fn game_start(mut r: &mut &[u8]) -> Result<Start> {
 		_ => Some(game_start_v1_5(r)?),
 	};
 
-	Ok(Start {
+	Ok(game::Start {
 		slippi: slippi,
 		bitfield: bitfield,
 		is_teams: is_teams,
@@ -290,13 +322,45 @@ fn game_end_v2_0(r: &mut &[u8]) -> Result<game::EndV2_0> {
 	})
 }
 
-fn game_end(r: &mut &[u8]) -> Result<End> {
-	Ok(End {
+fn game_end(r: &mut &[u8]) -> Result<game::End> {
+	Ok(game::End {
 		method: game::EndMethod(r.read_u8()?),
 		#[cfg(v2_0)] v2_0: game_end_v2_0(r)?,
 		#[cfg(not(v2_0))] v2_0: match r.is_empty() {
 			true => None,
 			_ => Some(game_end_v2_0(r)?),
+		},
+	})
+}
+
+fn frame_start(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Start>> {
+	let id = FrameId { index: r.read_i32::<BigEndian>()? };
+	trace!("Frame Start: {:?}", id);
+	Ok(FrameEvent {
+		id: id,
+		event: frame::Start {
+			random_seed: r.read_u32::<BigEndian>()?,
+		},
+	})
+}
+
+fn frame_end_v3_7(r: &mut &[u8]) -> Result<frame::EndV3_7> {
+	Ok(frame::EndV3_7 {
+		latest_finalized_frame: r.read_i32::<BigEndian>()?,
+	})
+}
+
+fn frame_end(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::End>> {
+	let id = FrameId { index: r.read_i32::<BigEndian>()? };
+	trace!("Frame End: {:?}", id);
+	Ok(FrameEvent {
+		id: id,
+		event: frame::End {
+			#[cfg(v3_7)] v3_7: frame_end_v3_7(r)?,
+			#[cfg(not(v3_7))] v3_7: match r.is_empty() {
+				true => None,
+				_ => Some(frame_end_v3_7(r)?),
+			},
 		},
 	})
 }
@@ -309,7 +373,7 @@ fn direction(value: f32) -> Result<Direction> {
 	}
 }
 
-fn predict_character(id: FrameId, last_char_states: &[CharState; NUM_PORTS]) -> Internal {
+fn predict_character(id: PortId, last_char_states: &[CharState; NUM_PORTS]) -> Internal {
 	let prev = last_char_states[id.port as usize];
 	match prev.state {
 		State::Zelda(action_state::Zelda::TRANSFORM_GROUND) |
@@ -339,8 +403,8 @@ fn frame_pre_v1_2(r: &mut &[u8]) -> Result<frame::PreV1_2> {
 	})
 }
 
-fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result<FrameEvent<Pre>> {
-	let id = FrameId {
+fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result<FrameEvent<PortId, Pre>> {
+	let id = PortId {
 		index: r.read_i32::<BigEndian>()?,
 		port: r.read_u8()?,
 		is_follower: r.read_u8()? != 0,
@@ -391,7 +455,6 @@ fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result
 	Ok(FrameEvent {
 		id: id,
 		event: Pre {
-			index: id.index,
 			random_seed: random_seed,
 			state: state,
 			position: position,
@@ -415,7 +478,7 @@ fn flags(buf: &[u8; 5]) -> frame::StateFlags {
 	)
 }
 
-fn update_last_char_state(id: FrameId, character: Internal, state: State, last_char_states: &mut [CharState; NUM_PORTS]) {
+fn update_last_char_state(id: PortId, character: Internal, state: State, last_char_states: &mut [CharState; NUM_PORTS]) {
 	let prev = last_char_states[id.port as usize];
 
 	last_char_states[id.port as usize] = CharState {
@@ -500,8 +563,8 @@ fn frame_post_v0_2(r: &mut &[u8]) -> Result<frame::PostV0_2> {
 	})
 }
 
-fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> Result<FrameEvent<Post>> {
-	let id = FrameId {
+fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> Result<FrameEvent<PortId, Post>> {
+	let id = PortId {
 		index: r.read_i32::<BigEndian>()?,
 		port: r.read_u8()?,
 		is_follower: r.read_u8()? != 0,
@@ -539,7 +602,6 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 	Ok(FrameEvent {
 		id: id,
 		event: Post {
-			index: id.index,
 			character: character,
 			state: state,
 			position: position,
@@ -556,11 +618,14 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 }
 
 pub trait Handlers {
-	fn game_start(&mut self, _: Start) -> Result<()> { Ok(()) }
-	fn game_end(&mut self, _: End) -> Result<()> { Ok(()) }
-	fn frame_pre(&mut self, _: FrameEvent<Pre>) -> Result<()> { Ok(()) }
-	fn frame_post(&mut self, _: FrameEvent<Post>) -> Result<()> { Ok(()) }
+	fn game_start(&mut self, _: game::Start) -> Result<()> { Ok(()) }
+	fn game_end(&mut self, _: game::End) -> Result<()> { Ok(()) }
+	fn frame_start(&mut self, _: FrameEvent<FrameId, frame::Start>) -> Result<()> { Ok(()) }
+	fn frame_pre(&mut self, _: FrameEvent<PortId, Pre>) -> Result<()> { Ok(()) }
+	fn frame_post(&mut self, _: FrameEvent<PortId, Post>) -> Result<()> { Ok(()) }
+	fn frame_end(&mut self, _: FrameEvent<FrameId, frame::End>) -> Result<()> { Ok(()) }
 	fn metadata(&mut self, _: HashMap<String, ubjson::Object>) -> Result<()> { Ok(()) }
+	fn finalize(&mut self) -> Result<()> { Ok(()) }
 }
 
 fn expect_bytes<R: Read>(r: &mut R, expected: &[u8]) -> Result<()> {
@@ -590,10 +655,12 @@ fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_
 		use Event::*;
 		match event {
 			GameStart => handlers.game_start(game_start(&mut &*buf)?)?,
+			FrameStart => handlers.frame_start(frame_start(&mut &*buf)?)?,
 			FramePre => handlers.frame_pre(frame_pre(&mut &*buf, last_char_states)?)?,
 			FramePost => handlers.frame_post(frame_post(&mut &*buf, last_char_states)?)?,
+			FrameEnd => handlers.frame_end(frame_end(&mut &*buf)?)?,
 			GameEnd => handlers.game_end(game_end(&mut &*buf)?)?,
-		}
+		};
 	}
 
 	Ok((1 + size as usize, event)) // +1 byte for the event code
@@ -631,5 +698,7 @@ pub fn parse<R: Read, H: Handlers>(mut r: R, handlers: &mut H) -> Result<()> {
 	handlers.metadata(ubjson::parse_map(&mut r)?)?;
 
 	expect_bytes(&mut r, &[0x7d])?; // top-level closing brace ("}")
+
+	handlers.finalize()?;
 	Ok(())
 }

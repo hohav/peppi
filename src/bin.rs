@@ -1,10 +1,9 @@
 use std::path;
 
 use clap::{App, Arg};
-
 use log::{error};
 
-use peppi::query::{Query};
+use peppi::query::Query;
 
 fn parse_query(query:&str) -> Vec<String> {
 	let re = regex::Regex::new(r"\[(-?\d*)\]$").unwrap();
@@ -31,7 +30,7 @@ fn inspect(paths:&[&str], config:&peppi::Config) -> Result<(), String> {
 			game.query(&mut std::io::stdout(), config, query).map_err(|e| format!("{:?}", e))?;
 
 			// Single-value queries need this newline, but we'll get a double newline for array queries.
-			// FIXME: handle newlines more smarter, esp. for queries with multiple `[]`.
+			// TODO: handle newlines more smarter, esp. for queries with multiple `[]`.
 			println!("");
 		} else if config.json {
 			println!("{}", serde_json::to_string(&game).map_err(|e| format!("{:?}", e))?);

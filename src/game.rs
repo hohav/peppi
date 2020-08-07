@@ -1,6 +1,7 @@
 use std::fmt;
 
-use serde::{Serialize};
+use serde::Serialize;
+use serde::ser::SerializeStruct;
 
 use super::{character, frame, metadata, stage};
 
@@ -89,12 +90,9 @@ pub struct PlayerV1_3 {
 pub struct PlayerV1_0 {
 	pub ucf: Ucf,
 
-	#[cfg(v1_3)]
-	#[serde(flatten)]
+	#[cfg(v1_3)] #[serde(flatten)]
 	pub v1_3: PlayerV1_3,
-
-	#[cfg(not(v1_3))]
-	#[serde(flatten)]
+	#[cfg(not(v1_3))] #[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v1_3: Option<PlayerV1_3>,
 }
@@ -115,7 +113,6 @@ pub struct Player {
 
 	#[cfg(v1_0)] #[serde(flatten)]
 	pub v1_0: PlayerV1_0,
-
 	#[cfg(not(v1_0))] #[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v1_0: Option<PlayerV1_0>,
@@ -165,7 +162,6 @@ pub struct StartV1_5 {
 
 	#[cfg(v2_0)] #[serde(flatten)]
 	pub v2_0: StartV2_0,
-
 	#[cfg(not(v2_0))] #[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v2_0: Option<StartV2_0>,
@@ -182,12 +178,11 @@ pub struct Start {
 	pub timer: u32,
 	pub item_spawn_bitfield: [u8; 5],
 	pub damage_ratio: f32,
-	pub players: [Option<Player>; NUM_PORTS],
+	pub players: Vec<Player>,
 	pub random_seed: u32,
 
 	#[cfg(v1_5)] #[serde(flatten)]
 	pub v1_5: StartV1_5,
-
 	#[cfg(not(v1_5))] #[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v1_5: Option<StartV1_5>,
@@ -245,7 +240,6 @@ pub struct End {
 
 	#[cfg(v2_0)] #[serde(flatten)]
 	pub v2_0: EndV2_0,
-
 	#[cfg(not(v2_0))] #[serde(flatten)]
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v2_0: Option<EndV2_0>,
@@ -270,42 +264,72 @@ fn skip_frames<T>(_:&T) -> bool {
 	!unsafe { super::CONFIG.frames }
 }
 
-#[derive(PartialEq, Serialize)]
-pub struct Frames {
-	#[serde(skip_serializing_if = "skip_frames")]
-	pub pre: Vec<frame::Pre>,
-	#[serde(skip_serializing_if = "skip_frames")]
-	pub post: Vec<frame::Post>,
+#[derive(Debug, PartialEq)]
+pub struct Frame<const N: usize> {
+	#[cfg(v2_2)]
+	pub start: frame::Start,
+	#[cfg(not(v2_2))]
+	pub start: Option<frame::Start>,
+
+	#[cfg(v3_0)]
+	pub end: frame::End,
+	#[cfg(not(v3_0))]
+	pub end: Option<frame::End>,
+
+	pub ports: [Port; N],
 }
 
-query_impl!(Frames, self, f, config, query {
+// workaround for Serde not supporting const generics
+impl<const N: usize> Serialize for Frame<N> {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+		let mut state = serializer.serialize_struct("Frame", 1)?;
+
+		#[cfg(v2_2)]
+		state.serialize_field("start", &self.start)?;
+		#[cfg(not(v2_2))]
+		if let Some(start) = self.start {
+			state.serialize_field("start", &start)?;
+		}
+
+		#[cfg(v3_0)]
+		state.serialize_field("end", &self.end)?;
+		#[cfg(not(v3_0))]
+		if let Some(end) = self.end {
+			state.serialize_field("end", &end)?;
+		}
+
+		state.serialize_field("ports", &self.ports[..])?;
+
+		state.end()
+	}
+}
+
+query_impl!(N:usize, Frame<N>, self, f, config, query {
 	match &*query[0] {
-		"pre" => self.pre.query(f, config, &query[1..]),
-		"post" => self.post.query(f, config, &query[1..]),
+		"ports" => self.ports.query(f, config, &query[1..]),
 		s => Err(err!("unknown field `frames.{}`", s)),
 	}
 });
 
-impl fmt::Debug for Frames {
-	fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result {
-		match unsafe { super::CONFIG.frames } {
-			true => f.debug_struct("Frames")
-				.field("pre", &self.pre)
-				.field("post", &self.post)
-				.finish(),
-			_ => f.debug_struct("Frames")
-				.field("pre", &self.pre.len())
-				.field("post", &self.post.len())
-				.finish(),
-		}
-	}
+#[derive(Debug, PartialEq, Serialize)]
+pub struct FrameData {
+	pub pre: frame::Pre,
+	pub post: frame::Post,
 }
+
+query_impl!(FrameData, self, f, config, query {
+	match &*query[0] {
+		"pre" => self.pre.query(f, config, &query[1..]),
+		"post" => self.post.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `leader.{}`", s)),
+	}
+});
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Port {
-	pub leader: Frames,
+	pub leader: FrameData,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub follower: Option<Frames>,
+	pub follower: Option<FrameData>,
 }
 
 query_impl!(Port, self, f, config, query {
@@ -316,19 +340,73 @@ query_impl!(Port, self, f, config, query {
 	}
 });
 
+type Frame1 = Frame<1>;
+type Frame2 = Frame<2>;
+type Frame3 = Frame<3>;
+type Frame4 = Frame<4>;
+
 #[derive(Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum Frames {
+	P1(Vec<Frame1>),
+	P2(Vec<Frame2>),
+	P3(Vec<Frame3>),
+	P4(Vec<Frame4>),
+}
+
+impl Frames {
+	pub fn len(&self) -> usize {
+		match self {
+			Self::P1(frames) => frames.len(),
+			Self::P2(frames) => frames.len(),
+			Self::P3(frames) => frames.len(),
+			Self::P4(frames) => frames.len(),
+		}
+	}
+}
+
+query_impl!(Frames, self, f, config, query {
+	match self {
+		Self::P1(frames) => frames.query(f, config, query),
+		Self::P2(frames) => frames.query(f, config, query),
+		Self::P3(frames) => frames.query(f, config, query),
+		Self::P4(frames) => frames.query(f, config, query),
+	}
+});
+
+#[derive(PartialEq, Serialize)]
 pub struct Game {
 	pub start: Start,
 	pub end: End,
-	pub ports: [Option<Port>; NUM_PORTS],
+	#[serde(skip_serializing_if = "skip_frames")]
+	pub frames: Frames,
 	pub metadata: metadata::Metadata,
+}
+
+impl fmt::Debug for Game {
+	fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result {
+		match unsafe { super::CONFIG.frames } {
+			true => f.debug_struct("Frames")
+				.field("metadata", &self.metadata)
+				.field("start", &self.start)
+				.field("end", &self.end)
+				.field("frames", &self.frames)
+				.finish(),
+			_ => f.debug_struct("Frames")
+				.field("metadata", &self.metadata)
+				.field("start", &self.start)
+				.field("end", &self.end)
+				.field("frames", &self.frames.len())
+				.finish(),
+		}
+	}
 }
 
 query_impl!(Game, self, f, config, query {
 	match &*query[0] {
 		"start" => self.start.query(f, config, &query[1..]),
 		"end" => self.end.query(f, config, &query[1..]),
-		"ports" => self.ports.query(f, config, &query[1..]),
+		"frames" => self.frames.query(f, config, &query[1..]),
 		"metadata" => self.metadata.query(f, config, &query[1..]),
 		s => Err(err!("unknown field `game.{}`", s)),
 	}

@@ -5,6 +5,21 @@ pub trait Query {
 }
 
 macro_rules! query_impl {
+	// TODO: eliminate duplication
+	($n:ident : $nt:ty, $type:ty, $self:ident, $f:ident, $config:ident, $query:ident $body:block) => {
+		impl<const $n:$nt> super::query::Query for $type {
+			fn query(&$self, $f:&mut dyn std::io::Write, $config:&super::Config, $query:&[&str]) -> std::io::Result<()> {
+				match $query.is_empty() {
+					true => match $config.json {
+						true => serde_json::to_writer($f, $self).map_err(|e| err!("JSON serialization error: {:?}", e)),
+						_ => write!($f, "{:#?}", $self),
+					},
+					_ => $body,
+				}
+			}
+		}
+	};
+
 	($type:ty, $self:ident, $f:ident, $config:ident, $query:ident $body:block) => {
 		impl super::query::Query for $type {
 			fn query(&$self, $f:&mut dyn std::io::Write, $config:&super::Config, $query:&[&str]) -> std::io::Result<()> {
@@ -84,7 +99,19 @@ impl<T> Query for [T] where T:Query, T:std::fmt::Debug, T:serde::Serialize {
 	collection_query!();
 }
 
-impl<T> Query for [T; super::game::NUM_PORTS] where T:Query, T:std::fmt::Debug, T:serde::Serialize {
+impl<T> Query for [T; 1] where T:Query, T:std::fmt::Debug, T:serde::Serialize {
+	collection_query!();
+}
+
+impl<T> Query for [T; 2] where T:Query, T:std::fmt::Debug, T:serde::Serialize {
+	collection_query!();
+}
+
+impl<T> Query for [T; 3] where T:Query, T:std::fmt::Debug, T:serde::Serialize {
+	collection_query!();
+}
+
+impl<T> Query for [T; 4] where T:Query, T:std::fmt::Debug, T:serde::Serialize {
 	collection_query!();
 }
 
@@ -109,6 +136,7 @@ query_impl!(i32);
 query_impl!(u64);
 query_impl!(i64);
 query_impl!(f32);
+query_impl!(usize);
 
 query_impl!(bool);
 query_impl!(String);
