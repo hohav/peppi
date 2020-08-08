@@ -58,11 +58,17 @@ impl parse::Handlers for GameParser {
 		let idx = e.event.array_index();
 		if idx == frames.len() {
 			frames.push(e.event)
-		} else if idx > frames.len() {
-			Err(err!("missing frames: {:?} -> {:?}", frames.last().map(|f| f.index), e.event.index))?
-		} else { // rollback
+		} else if idx < frames.len() { // rollback
 			frames[idx] = e.event
-		};
+		} else {
+			if let Some(&last) = frames.last() {
+				while frames.len() < idx {
+					frames.push(last);
+				}
+			} else {
+				Err(err!("missing frames: {:?} -> {:?}", frames.last().map(|f| f.index), e.event.index))?
+			}
+		}
 
 		Ok(())
 	}
@@ -93,11 +99,17 @@ impl parse::Handlers for GameParser {
 		let idx = e.event.array_index();
 		if idx == frames.len() {
 			frames.push(e.event)
-		} else if idx > frames.len() {
-			Err(err!("out-of-order frame: {:?} -> {:?}", frames.last().map(|f| f.index), e.event.index))?
-		} else { // rollback
+		} else if idx < frames.len() { // rollback
 			frames[idx] = e.event
-		};
+		} else {
+			if let Some(&last) = frames.last() {
+				while frames.len() < idx {
+					frames.push(last);
+				}
+			} else {
+				Err(err!("missing frames: {:?} -> {:?}", frames.last().map(|f| f.index), e.event.index))?
+			}
+		}
 
 		Ok(())
 	}

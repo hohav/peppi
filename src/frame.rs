@@ -77,12 +77,12 @@ pub trait Indexed {
 	fn array_index(&self) -> usize;
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct PreV1_4 {
 	pub damage: f32,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct PreV1_2 {
 	pub raw_analog_x: u8,
 
@@ -96,7 +96,7 @@ pub struct PreV1_2 {
 	pub v1_4: Option<PreV1_4>,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct Pre {
 	pub index: i32,
 
@@ -156,12 +156,12 @@ query_impl!(PreV1_4, self, f, config, query {
 	}
 });
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct PostV2_1 {
 	pub hurtbox_state: HurtboxState,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct PostV2_0 {
 	pub flags: StateFlags,
 	pub misc_as: f32,
@@ -180,7 +180,7 @@ pub struct PostV2_0 {
 	pub v2_1: Option<PostV2_1>,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct PostV0_2 {
 	pub state_age: f32,
 
@@ -194,7 +194,7 @@ pub struct PostV0_2 {
 	pub v2_0: Option<PostV2_0>,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct Post {
 	pub index: i32,
 
