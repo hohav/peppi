@@ -1,16 +1,16 @@
-use std::cmp::{min};
+use std::cmp::min;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::io::{Read, Result};
 
 use byteorder::{BigEndian, ReadBytesExt};
 use encoding_rs::SHIFT_JIS;
-use log::{debug};
+use log::debug;
 
 use super::{action_state, buttons, character, frame, game, stage, triggers, ubjson};
 use super::action_state::{Common, State};
-use super::attack::{Attack};
-use super::character::{Internal};
+use super::attack::Attack;
+use super::character::Internal;
 use super::frame::{Pre, Post, Direction, Position};
 use super::game::{Start, End, Player, PlayerType, NUM_PORTS};
 
