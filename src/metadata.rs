@@ -19,11 +19,9 @@ pub struct Metadata {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub platform: Option<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub players: Option<Vec<Player>>,
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub console: Option<String>,
-
-	pub json: HashMap<String, Object>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub players: Option<Vec<Player>>,
 }
 
 query_impl!(Metadata, self, f, config, query {
@@ -31,9 +29,8 @@ query_impl!(Metadata, self, f, config, query {
 		"date" => self.date.query(f, config, &query[1..]),
 		"duration" => self.duration.query(f, config, &query[1..]),
 		"platform" => self.platform.query(f, config, &query[1..]),
-		"players" => self.players.query(f, config, &query[1..]),
 		"console" => self.console.query(f, config, &query[1..]),
-		"json" => self.json.query(f, config, &query[1..]),
+		"players" => self.players.query(f, config, &query[1..]),
 		s => Err(err!("unknown field `metadata.{}`", s)),
 	}
 });
@@ -187,7 +184,6 @@ fn console(json: &HashMap<String, Object>) -> Result<Option<String>> {
 
 pub fn parse(json: &HashMap<String, Object>) -> Result<Metadata> {
 	Ok(Metadata {
-		json: json.clone(),
 		date: date(json)?,
 		duration: duration(json)?,
 		platform: platform(json)?,

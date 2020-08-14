@@ -693,9 +693,12 @@ pub fn parse<R: Read, H: Handlers>(mut r: R, handlers: &mut H) -> Result<()> {
 	expect_bytes(&mut r,
 		// `metadata` key & type ("U\x08metadata{")
 		&[0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b])?;
+
 	// Since we already read the opening "{" from the `metadata` value,
 	// we know it's a map. `parse_map` will consume the corresponding "}".
-	handlers.metadata(ubjson::parse_map(&mut r)?)?;
+	let metadata = ubjson::parse_map(&mut r)?;
+	debug!("Raw metadata: {:?}", metadata);
+	handlers.metadata(metadata)?;
 
 	expect_bytes(&mut r, &[0x7d])?; // top-level closing brace ("}")
 
