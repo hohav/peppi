@@ -1,7 +1,7 @@
 use std::cmp::{min};
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::io::{Read, Seek, Result};
+use std::io::{Read, Result};
 
 use byteorder::{BigEndian, ReadBytesExt};
 use encoding_rs::SHIFT_JIS;
@@ -32,10 +32,11 @@ struct CharState {
 	age: u32,
 }
 
+const PAYLOADS_EVENT_CODE: u8 = 0x35;
+
 #[derive(Debug, PartialEq, num_enum::TryFromPrimitive)]
 #[repr(u8)]
 pub enum Event {
-	Payloads = 0x35,
 	GameStart = 0x36,
 	FramePre = 0x37,
 	FramePost = 0x38,
@@ -55,23 +56,32 @@ pub struct FrameEvent<F> {
 	pub event: F,
 }
 
-fn event_payloads<R:Read>(r:&mut R) -> Result<HashMap<u8, u16>> {
+/// Reads the Event Payloads event, which must come first in the raw stream
+/// and tells us the sizes for all other events to follow.
+/// Returns the number of bytes read by this function, plus a map of event
+/// codes to payload sizes. This map uses raw event codes as keys (as opposed
+/// to `Event` enum values) for forwards compatibility, as it allows us to
+/// skip unknown event types.
+fn payload_sizes<R:Read>(r:&mut R) -> Result<(usize, HashMap<u8, u16>)> {
 	let code = r.read_u8()?;
-	if code != Event::Payloads as u8 {
+	if code != PAYLOADS_EVENT_CODE {
 		Err(err!("expected event payloads, but got: {}", code))?;
 	}
 
-	let payload_size = r.read_u8()?; // includes size byte for some reason
-	if payload_size % 3 != 1 {
-		Err(err!("invalid payload size: {}", payload_size))?;
+	// Size in bytes of the subsequent list of payload-size kv pairs.
+	// Each pair is 3 bytes, so this size should be divisible by 3.
+	// However the value includes this size byte itself, so it's off-by-one.
+	let size = r.read_u8()?;
+	if size % 3 != 1 {
+		Err(err!("invalid payload size: {}", size))?;
 	}
 
-	let mut payload_sizes = HashMap::new();
-	for _ in (0..(payload_size - 1)).step_by(3) {
-		payload_sizes.insert(r.read_u8()?, r.read_u16::<BigEndian>()?);
+	let mut sizes = HashMap::new();
+	for _ in (0 .. size - 1).step_by(3) {
+		sizes.insert(r.read_u8()?, r.read_u16::<BigEndian>()?);
 	}
 
-	Ok(payload_sizes)
+	Ok((1 + size as usize, sizes)) // +1 byte for the event code
 }
 
 fn player_v1_3(r:[u8; 16]) -> Result<game::PlayerV1_3> {
@@ -565,55 +575,52 @@ fn expect_bytes<R:Read>(r:&mut R, expected:&[u8]) -> Result<()> {
 	}
 }
 
-fn event<R:Read, H:Handlers>(mut r:R, payload_sizes:&HashMap<u8, u16>, last_char_states:&mut [CharState; NUM_PORTS], handlers:&mut H) -> Result<Option<Event>> {
+/// Parses a single event from the raw stream. If the event is one of the
+/// supported `Event` types, calls the corresponding `Handler` callback with
+/// the parsed event.
+/// Returns the number of bytes read by this function.
+fn event<R:Read, H:Handlers>(mut r:R, payload_sizes:&HashMap<u8, u16>, last_char_states:&mut [CharState; NUM_PORTS], handlers:&mut H) -> Result<usize> {
 	let code = r.read_u8()?;
-	let size = payload_sizes.get(&code).ok_or_else(|| err!("unknown event: {}", code))?;
+	let size = *payload_sizes.get(&code).ok_or_else(|| err!("unknown event: {}", code))? as usize;
 
-	let mut buf = vec![0; *size as usize];
+	let mut buf = vec![0; size];
 	r.read_exact(&mut *buf)?;
 
-	match Event::try_from(code) {
-		Ok(event) => match event {
-			Event::Payloads => Err(err!("unexpected event: {}", code)),
-			Event::GameStart => {
-				handlers.game_start(game_start(&mut &*buf)?)?;
-				Ok(Some(event))
-			},
-			Event::GameEnd => {
-				handlers.game_end(game_end(&mut &*buf)?)?;
-				Ok(Some(event))
-			},
-			Event::FramePre => {
-				handlers.frame_pre(frame_pre(&mut &*buf, last_char_states)?)?;
-				Ok(Some(event))
-			},
-			Event::FramePost => {
-				handlers.frame_post(frame_post(&mut &*buf, last_char_states)?)?;
-				Ok(Some(event))
-			},
-		},
-		Err(_) => Ok(None),
+	if let Some(event) = Event::try_from(code).ok() {
+		use Event::*;
+		match event {
+			GameStart => handlers.game_start(game_start(&mut &*buf)?)?,
+			FramePre => handlers.frame_pre(frame_pre(&mut &*buf, last_char_states)?)?,
+			FramePost => handlers.frame_post(frame_post(&mut &*buf, last_char_states)?)?,
+			GameEnd => handlers.game_end(game_end(&mut &*buf)?)?,
+		}
 	}
+
+	Ok(1 + size as usize) // +1 byte for the event code
 }
 
-pub fn parse<R:Read + Seek, H:Handlers>(mut r:R, handlers:&mut H) -> Result<()> {
-	// header ("{U\x03raw[$U#l")
-	expect_bytes(&mut r, &[0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c])?;
+pub fn parse<R:Read, H:Handlers>(mut r:R, handlers:&mut H) -> Result<()> {
+	// For speed, assume the `raw` element comes first and handle it manually.
+	// The official JS parser does this too, so it should be reliable.
+	expect_bytes(&mut r,
+		// top-level opening brace, `raw` key & type ("{U\x03raw[$U#l")
+		&[0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c])?;
 
-	r.read_u32::<BigEndian>()?; // length of "raw" element (currently unused)
-
-	let payload_sizes = event_payloads(&mut r)?;
+	let raw_len = r.read_u32::<BigEndian>()? as usize;
+	let (mut bytes_read, payload_sizes) = payload_sizes(&mut r)?;
 	let mut last_char_states = [DEFAULT_CHAR_STATE; NUM_PORTS];
 
-	while event(r.by_ref(), &payload_sizes, &mut last_char_states, handlers)? != Some(Event::GameEnd) {}
+	while bytes_read < raw_len {
+		bytes_read += event(r.by_ref(), &payload_sizes, &mut last_char_states, handlers)?;
+	}
 
-	// metadata key & start ("U\x08metadata{")
-	expect_bytes(&mut r, &[0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b])?;
-
+	expect_bytes(&mut r,
+		// `metadata` key & type ("U\x08metadata{")
+		&[0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b])?;
+	// Since we already read the opening "{" from the `metadata` value,
+	// we know it's a map. `parse_map` will consume the corresponding "}".
 	handlers.metadata(ubjson::parse_map(&mut r)?)?;
 
-	// closing UBJSON brace & end of file ("}")
-	expect_bytes(&mut r, &[0x7d])?;
-
+	expect_bytes(&mut r, &[0x7d])?; // top-level closing brace ("}")
 	Ok(())
 }
