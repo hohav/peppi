@@ -14,12 +14,12 @@ use super::character::{Internal};
 use super::frame::{Pre, Post, Direction, Position};
 use super::game::{Start, End, Player, PlayerType, NUM_PORTS};
 
-const ZELDA_TRANSFORM_FRAME:u32 = 43;
-const SHEIK_TRANSFORM_FRAME:u32 = 36;
+const ZELDA_TRANSFORM_FRAME: u32 = 43;
+const SHEIK_TRANSFORM_FRAME: u32 = 36;
 
 // We only track this for Sheik/Zelda transformations, which can't happen on
 // the first frame. So we can initialize with any arbitrary character value.
-const DEFAULT_CHAR_STATE:CharState = CharState {
+const DEFAULT_CHAR_STATE: CharState = CharState {
 	character: Internal(255),
 	state: State::Common(Common::WAIT),
 	age: 0
@@ -62,7 +62,7 @@ pub struct FrameEvent<F> {
 /// codes to payload sizes. This map uses raw event codes as keys (as opposed
 /// to `Event` enum values) for forwards compatibility, as it allows us to
 /// skip unknown event types.
-fn payload_sizes<R:Read>(r:&mut R) -> Result<(usize, HashMap<u8, u16>)> {
+fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, HashMap<u8, u16>)> {
 	let code = r.read_u8()?;
 	if code != PAYLOADS_EVENT_CODE {
 		Err(err!("expected event payloads, but got: {}", code))?;
@@ -84,7 +84,7 @@ fn payload_sizes<R:Read>(r:&mut R) -> Result<(usize, HashMap<u8, u16>)> {
 	Ok((1 + size as usize, sizes)) // +1 byte for the event code
 }
 
-fn player_v1_3(r:[u8; 16]) -> Result<game::PlayerV1_3> {
+fn player_v1_3(r: [u8; 16]) -> Result<game::PlayerV1_3> {
 	let first_null = r.iter().position(|&x| x == 0).unwrap_or(16);
 	let (name_tag, _) = SHIFT_JIS.decode_without_bom_handling(&r[0..first_null]);
 	Ok(game::PlayerV1_3 {
@@ -92,7 +92,7 @@ fn player_v1_3(r:[u8; 16]) -> Result<game::PlayerV1_3> {
 	})
 }
 
-fn player_v1_0(r:[u8; 8], v1_3:Option<[u8; 16]>) -> Result<game::PlayerV1_0> {
+fn player_v1_0(r: [u8; 8], v1_3: Option<[u8; 16]>) -> Result<game::PlayerV1_0> {
 	let mut r = &r[..];
 	Ok(game::PlayerV1_0 {
 		ucf: game::Ucf {
@@ -113,7 +113,7 @@ fn player_v1_0(r:[u8; 8], v1_3:Option<[u8; 16]>) -> Result<game::PlayerV1_0> {
 	})
 }
 
-fn player(v0:&[u8; 36], is_teams:bool, v1_0:Option<[u8; 8]>, v1_3:Option<[u8; 16]>) -> Result<Option<Player>> {
+fn player(v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3: Option<[u8; 16]>) -> Result<Option<Player>> {
 	let mut r = &v0[..];
 	let character = character::External(r.read_u8()?);
 	let r#type = game::PlayerType(r.read_u8()?);
@@ -174,25 +174,25 @@ fn player(v0:&[u8; 36], is_teams:bool, v1_0:Option<[u8; 8]>, v1_3:Option<[u8; 16
 	})
 }
 
-fn player_bytes_v1_3(r:&mut &[u8]) -> Result<[u8; 16]> {
+fn player_bytes_v1_3(r: &mut &[u8]) -> Result<[u8; 16]> {
 	let mut buf = [0; 16];
 	r.read_exact(&mut buf)?;
 	Ok(buf)
 }
 
-fn player_bytes_v1_0(r:&mut &[u8]) -> Result<[u8; 8]> {
+fn player_bytes_v1_0(r: &mut &[u8]) -> Result<[u8; 8]> {
 	let mut buf = [0; 8];
 	r.read_exact(&mut buf)?;
 	Ok(buf)
 }
 
-fn game_start_v2_0(r:&mut &[u8]) -> Result<game::StartV2_0> {
+fn game_start_v2_0(r: &mut &[u8]) -> Result<game::StartV2_0> {
 	Ok(game::StartV2_0 {
 		is_frozen_ps: r.read_u8()? != 0,
 	})
 }
 
-fn game_start_v1_5(r:&mut &[u8]) -> Result<game::StartV1_5> {
+fn game_start_v1_5(r: &mut &[u8]) -> Result<game::StartV1_5> {
 	Ok(game::StartV1_5 {
 		is_pal: r.read_u8()? != 0,
 		#[cfg(v2_0)] v2_0: game_start_v2_0()?,
@@ -203,7 +203,7 @@ fn game_start_v1_5(r:&mut &[u8]) -> Result<game::StartV1_5> {
 	})
 }
 
-fn game_start(mut r:&mut &[u8]) -> Result<Start> {
+fn game_start(mut r: &mut &[u8]) -> Result<Start> {
 	debug!("game::Start");
 
 	let slippi = game::Slippi {
@@ -285,13 +285,13 @@ fn game_start(mut r:&mut &[u8]) -> Result<Start> {
 	})
 }
 
-fn game_end_v2_0(r:&mut &[u8]) -> Result<game::EndV2_0> {
+fn game_end_v2_0(r: &mut &[u8]) -> Result<game::EndV2_0> {
 	Ok(game::EndV2_0 {
 		lras_initiator: r.read_i8()?,
 	})
 }
 
-fn game_end(r:&mut &[u8]) -> Result<End> {
+fn game_end(r: &mut &[u8]) -> Result<End> {
 	debug!("game::End");
 	Ok(End {
 		method: game::EndMethod(r.read_u8()?),
@@ -303,7 +303,7 @@ fn game_end(r:&mut &[u8]) -> Result<End> {
 	})
 }
 
-fn direction(value:f32) -> Result<Direction> {
+fn direction(value: f32) -> Result<Direction> {
 	match value {
 		v if v < 0.0 => Ok(Direction::LEFT),
 		v if v > 0.0 => Ok(Direction::RIGHT),
@@ -311,7 +311,7 @@ fn direction(value:f32) -> Result<Direction> {
 	}
 }
 
-fn predict_character(id:FrameId, last_char_states:&[CharState; NUM_PORTS]) -> Internal {
+fn predict_character(id: FrameId, last_char_states: &[CharState; NUM_PORTS]) -> Internal {
 	let prev = last_char_states[id.port as usize];
 	match prev.state {
 		State::Zelda(action_state::Zelda::TRANSFORM_GROUND) |
@@ -324,13 +324,13 @@ fn predict_character(id:FrameId, last_char_states:&[CharState; NUM_PORTS]) -> In
 	}
 }
 
-fn frame_pre_v1_4(r:&mut &[u8]) -> Result<frame::PreV1_4> {
+fn frame_pre_v1_4(r: &mut &[u8]) -> Result<frame::PreV1_4> {
 	Ok(frame::PreV1_4 {
 		damage: r.read_f32::<BigEndian>()?,
 	})
 }
 
-fn frame_pre_v1_2(r:&mut &[u8]) -> Result<frame::PreV1_2> {
+fn frame_pre_v1_2(r: &mut &[u8]) -> Result<frame::PreV1_2> {
 	Ok(frame::PreV1_2 {
 		raw_analog_x: r.read_u8()?,
 		#[cfg(v1_4)] v1_4: frame_pre_v1_4(r)?,
@@ -341,7 +341,7 @@ fn frame_pre_v1_2(r:&mut &[u8]) -> Result<frame::PreV1_2> {
 	})
 }
 
-fn frame_pre(r:&mut &[u8], last_char_states:&[CharState; NUM_PORTS]) -> Result<FrameEvent<Pre>> {
+fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result<FrameEvent<Pre>> {
 	let id = FrameId {
 		index: r.read_i32::<BigEndian>()?,
 		port: r.read_u8()?,
@@ -407,7 +407,7 @@ fn frame_pre(r:&mut &[u8], last_char_states:&[CharState; NUM_PORTS]) -> Result<F
 	})
 }
 
-fn flags(buf:&[u8; 5]) -> frame::StateFlags {
+fn flags(buf: &[u8; 5]) -> frame::StateFlags {
 	frame::StateFlags(
 		((buf[0] as u64) << 00) +
 		((buf[1] as u64) << 08) +
@@ -417,7 +417,7 @@ fn flags(buf:&[u8; 5]) -> frame::StateFlags {
 	)
 }
 
-fn update_last_char_state(id:FrameId, character:Internal, state:State, last_char_states:&mut [CharState; NUM_PORTS]) {
+fn update_last_char_state(id: FrameId, character: Internal, state: State, last_char_states: &mut [CharState; NUM_PORTS]) {
 	let prev = last_char_states[id.port as usize];
 
 	last_char_states[id.port as usize] = CharState {
@@ -462,13 +462,13 @@ fn update_last_char_state(id:FrameId, character:Internal, state:State, last_char
 	};
 }
 
-fn frame_post_v2_1(r:&mut &[u8]) -> Result<frame::PostV2_1> {
+fn frame_post_v2_1(r: &mut &[u8]) -> Result<frame::PostV2_1> {
 	Ok(frame::PostV2_1 {
 		hurtbox_state: frame::HurtboxState(r.read_u8()?),
 	})
 }
 
-fn frame_post_v2_0(r:&mut &[u8]) -> Result<frame::PostV2_0> {
+fn frame_post_v2_0(r: &mut &[u8]) -> Result<frame::PostV2_0> {
 	Ok(frame::PostV2_0 {
 		flags: {
 			let mut buf = [0; 5];
@@ -491,7 +491,7 @@ fn frame_post_v2_0(r:&mut &[u8]) -> Result<frame::PostV2_0> {
 	})
 }
 
-fn frame_post_v0_2(r:&mut &[u8]) -> Result<frame::PostV0_2> {
+fn frame_post_v0_2(r: &mut &[u8]) -> Result<frame::PostV0_2> {
 	Ok(frame::PostV0_2 {
 		state_age: r.read_f32::<BigEndian>()?,
 		#[cfg(v2_0)] v2_0: frame_post_v2_0(r)?,
@@ -502,7 +502,7 @@ fn frame_post_v0_2(r:&mut &[u8]) -> Result<frame::PostV0_2> {
 	})
 }
 
-fn frame_post(r:&mut &[u8], last_char_states:&mut [CharState; NUM_PORTS]) -> Result<FrameEvent<Post>> {
+fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> Result<FrameEvent<Post>> {
 	let id = FrameId {
 		index: r.read_i32::<BigEndian>()?,
 		port: r.read_u8()?,
@@ -558,14 +558,14 @@ fn frame_post(r:&mut &[u8], last_char_states:&mut [CharState; NUM_PORTS]) -> Res
 }
 
 pub trait Handlers {
-	fn game_start(&mut self, _:Start) -> Result<()> { Ok(()) }
-	fn game_end(&mut self, _:End) -> Result<()> { Ok(()) }
-	fn frame_pre(&mut self, _:FrameEvent<Pre>) -> Result<()> { Ok(()) }
-	fn frame_post(&mut self, _:FrameEvent<Post>) -> Result<()> { Ok(()) }
-	fn metadata(&mut self, _:HashMap<String, ubjson::Object>) -> Result<()> { Ok(()) }
+	fn game_start(&mut self, _: Start) -> Result<()> { Ok(()) }
+	fn game_end(&mut self, _: End) -> Result<()> { Ok(()) }
+	fn frame_pre(&mut self, _: FrameEvent<Pre>) -> Result<()> { Ok(()) }
+	fn frame_post(&mut self, _: FrameEvent<Post>) -> Result<()> { Ok(()) }
+	fn metadata(&mut self, _: HashMap<String, ubjson::Object>) -> Result<()> { Ok(()) }
 }
 
-fn expect_bytes<R:Read>(r:&mut R, expected:&[u8]) -> Result<()> {
+fn expect_bytes<R: Read>(r: &mut R, expected: &[u8]) -> Result<()> {
 	let mut actual = vec![0; expected.len()];
 	r.read_exact(&mut actual)?;
 	if expected == actual.as_slice() {
@@ -579,7 +579,7 @@ fn expect_bytes<R:Read>(r:&mut R, expected:&[u8]) -> Result<()> {
 /// supported `Event` types, calls the corresponding `Handler` callback with
 /// the parsed event.
 /// Returns the number of bytes read by this function.
-fn event<R:Read, H:Handlers>(mut r:R, payload_sizes:&HashMap<u8, u16>, last_char_states:&mut [CharState; NUM_PORTS], handlers:&mut H) -> Result<usize> {
+fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_char_states: &mut [CharState; NUM_PORTS], handlers: &mut H) -> Result<usize> {
 	let code = r.read_u8()?;
 	let size = *payload_sizes.get(&code).ok_or_else(|| err!("unknown event: {}", code))? as usize;
 
@@ -600,7 +600,7 @@ fn event<R:Read, H:Handlers>(mut r:R, payload_sizes:&HashMap<u8, u16>, last_char
 }
 
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn parse<R:Read, H:Handlers>(mut r:R, handlers:&mut H) -> Result<()> {
+pub fn parse<R: Read, H: Handlers>(mut r: R, handlers: &mut H) -> Result<()> {
 	// For speed, assume the `raw` element comes first and handle it manually.
 	// The official JS parser does this too, so it should be reliable.
 	expect_bytes(&mut r,
