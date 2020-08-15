@@ -5,7 +5,7 @@ use std::io::{Read, Result};
 
 use byteorder::{BigEndian, ReadBytesExt};
 use encoding_rs::SHIFT_JIS;
-use log::debug;
+use log::{debug, trace};
 
 use super::{action_state, buttons, character, frame, game, stage, triggers, ubjson};
 use super::action_state::{Common, State};
@@ -81,6 +81,7 @@ fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, HashMap<u8, u16>)> {
 		sizes.insert(r.read_u8()?, r.read_u16::<BigEndian>()?);
 	}
 
+	trace!("Event payload sizes: {:?}", sizes);
 	Ok((1 + size as usize, sizes)) // +1 byte for the event code
 }
 
@@ -204,8 +205,6 @@ fn game_start_v1_5(r: &mut &[u8]) -> Result<game::StartV1_5> {
 }
 
 fn game_start(mut r: &mut &[u8]) -> Result<Start> {
-	debug!("game::Start");
-
 	let slippi = game::Slippi {
 		version: game::SlippiVersion(r.read_u8()?, r.read_u8()?, r.read_u8()?),
 	};
@@ -292,7 +291,6 @@ fn game_end_v2_0(r: &mut &[u8]) -> Result<game::EndV2_0> {
 }
 
 fn game_end(r: &mut &[u8]) -> Result<End> {
-	debug!("game::End");
 	Ok(End {
 		method: game::EndMethod(r.read_u8()?),
 		#[cfg(v2_0)] v2_0: game_end_v2_0(r)?,
@@ -347,7 +345,7 @@ fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result
 		port: r.read_u8()?,
 		is_follower: r.read_u8()? != 0,
 	};
-	debug!("frame::Pre: {:?}", id);
+	trace!("Pre-Frame Update: {:?}", id);
 
 	// We need to know the character to interpret the action state properly, but for Sheik/Zelda we
 	// don't know whether they transformed this frame untilwe get the corresponding frame::Post
@@ -508,7 +506,7 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 		port: r.read_u8()?,
 		is_follower: r.read_u8()? != 0,
 	};
-	debug!("frame::Post: {:?}", id);
+	trace!("Post-Frame Update: {:?}", id);
 
 	let character = Internal(r.read_u8()?);
 	let state = State::from(r.read_u16::<BigEndian>()?, character);
@@ -581,8 +579,9 @@ fn expect_bytes<R: Read>(r: &mut R, expected: &[u8]) -> Result<()> {
 /// Returns the number of bytes read by this function.
 fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_char_states: &mut [CharState; NUM_PORTS], handlers: &mut H) -> Result<usize> {
 	let code = r.read_u8()?;
-	let size = *payload_sizes.get(&code).ok_or_else(|| err!("unknown event: {}", code))? as usize;
+	debug!("Event: {:#x}", code);
 
+	let size = *payload_sizes.get(&code).ok_or_else(|| err!("unknown event: {}", code))? as usize;
 	let mut buf = vec![0; size];
 	r.read_exact(&mut *buf)?;
 
