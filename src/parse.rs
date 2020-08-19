@@ -599,6 +599,7 @@ fn event<R:Read, H:Handlers>(mut r:R, payload_sizes:&HashMap<u8, u16>, last_char
 	Ok(1 + size as usize) // +1 byte for the event code
 }
 
+/// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
 pub fn parse<R:Read, H:Handlers>(mut r:R, handlers:&mut H) -> Result<()> {
 	// For speed, assume the `raw` element comes first and handle it manually.
 	// The official JS parser does this too, so it should be reliable.

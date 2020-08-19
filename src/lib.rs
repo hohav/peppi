@@ -67,6 +67,8 @@ impl error::Error for ParseError {
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
 pub fn parse<R:io::Read + io::Seek, H:parse::Handlers>(mut r:R, handlers:&mut H) -> std::result::Result<(), ParseError> {
 	parse::parse(r.by_ref(), handlers)
+		// Wrap with the approximate file position where the error occurred.
+		// This is why we require `R:Seek`.
 		.map_err(|e| ParseError { pos: r.seek(io::SeekFrom::Current(0)).ok(), error: e})?;
 	Ok(())
 }
