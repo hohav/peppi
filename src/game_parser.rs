@@ -2,7 +2,8 @@ use std::io::Result;
 use std::collections::HashMap;
 
 use super::{frame, game, metadata, parse, ubjson};
-use super::game::{Frame, Frames, Game, Port, NUM_PORTS};
+use super::frame::{Frame, Port};
+use super::game::{Frames, Game, NUM_PORTS};
 
 #[derive(Debug)]
 pub struct GameParser {
@@ -17,7 +18,7 @@ pub struct GameParser {
 
 pub fn port(pre: frame::Pre, post: frame::Post) -> Port {
 	Port {
-		leader: game::FrameData {
+		leader: frame::Data {
 			pre: pre,
 			post: post,
 		},

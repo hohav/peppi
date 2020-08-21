@@ -1,7 +1,6 @@
 use std::fmt;
 
 use serde::Serialize;
-use serde::ser::SerializeStruct;
 
 use super::{character, frame, metadata, stage};
 
@@ -264,94 +263,13 @@ fn skip_frames<T>(_:&T) -> bool {
 	!unsafe { super::CONFIG.frames }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Frame<const N: usize> {
-	#[cfg(v2_2)]
-	pub start: frame::Start,
-	#[cfg(not(v2_2))]
-	pub start: Option<frame::Start>,
-
-	#[cfg(v3_0)]
-	pub end: frame::End,
-	#[cfg(not(v3_0))]
-	pub end: Option<frame::End>,
-
-	pub ports: [Port; N],
-}
-
-// workaround for Serde not supporting const generics
-impl<const N: usize> Serialize for Frame<N> {
-	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
-		let mut state = serializer.serialize_struct("Frame", 1)?;
-
-		#[cfg(v2_2)]
-		state.serialize_field("start", &self.start)?;
-		#[cfg(not(v2_2))]
-		if let Some(start) = self.start {
-			state.serialize_field("start", &start)?;
-		}
-
-		#[cfg(v3_0)]
-		state.serialize_field("end", &self.end)?;
-		#[cfg(not(v3_0))]
-		if let Some(end) = self.end {
-			state.serialize_field("end", &end)?;
-		}
-
-		state.serialize_field("ports", &self.ports[..])?;
-
-		state.end()
-	}
-}
-
-query_impl!(N:usize, Frame<N>, self, f, config, query {
-	match &*query[0] {
-		"ports" => self.ports.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `frames.{}`", s)),
-	}
-});
-
-#[derive(Debug, PartialEq, Serialize)]
-pub struct FrameData {
-	pub pre: frame::Pre,
-	pub post: frame::Post,
-}
-
-query_impl!(FrameData, self, f, config, query {
-	match &*query[0] {
-		"pre" => self.pre.query(f, config, &query[1..]),
-		"post" => self.post.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `leader.{}`", s)),
-	}
-});
-
-#[derive(Debug, PartialEq, Serialize)]
-pub struct Port {
-	pub leader: FrameData,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub follower: Option<FrameData>,
-}
-
-query_impl!(Port, self, f, config, query {
-	match &*query[0] {
-		"leader" => self.leader.query(f, config, &query[1..]),
-		"follower" => self.follower.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `port.{}`", s)),
-	}
-});
-
-type Frame1 = Frame<1>;
-type Frame2 = Frame<2>;
-type Frame3 = Frame<3>;
-type Frame4 = Frame<4>;
-
 #[derive(Debug, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Frames {
-	P1(Vec<Frame1>),
-	P2(Vec<Frame2>),
-	P3(Vec<Frame3>),
-	P4(Vec<Frame4>),
+	P1(Vec<frame::Frame1>),
+	P2(Vec<frame::Frame2>),
+	P3(Vec<frame::Frame3>),
+	P4(Vec<frame::Frame4>),
 }
 
 impl Frames {
