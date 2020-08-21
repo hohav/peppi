@@ -318,7 +318,10 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 
 fn game_end_v2_0(r: &mut &[u8]) -> Result<game::EndV2_0> {
 	Ok(game::EndV2_0 {
-		lras_initiator: r.read_i8()?,
+		lras_initiator: match r.read_i8()? {
+			n if n >= 0 && n < NUM_PORTS => Some(n),
+			_ => None,
+		},
 	})
 }
 

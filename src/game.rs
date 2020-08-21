@@ -231,7 +231,7 @@ pseudo_enum!(EndMethod:u8 {
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct EndV2_0 {
-	pub lras_initiator: i8,
+	pub lras_initiator: Option<i8>,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
