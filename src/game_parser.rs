@@ -5,139 +5,101 @@ use super::{frame, game, metadata, parse, ubjson};
 use super::frame::{Frame, Port};
 use super::game::{Frames, Game, NUM_PORTS};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
+pub struct FrameEvents {
+	pub pre: [Vec<frame::Pre>; NUM_PORTS],
+	pub post: [Vec<frame::Post>; NUM_PORTS],
+}
+
+#[derive(Debug, Default)]
 pub struct GameParser {
 	pub start: Option<game::Start>,
 	pub end: Option<game::End>,
 	pub frames_start: Vec<frame::Start>,
 	pub frames_end: Vec<frame::End>,
-	pub frames_pre: [Vec<frame::Pre>; NUM_PORTS],
-	pub frames_post: [Vec<frame::Post>; NUM_PORTS],
+	pub frames_leaders: FrameEvents,
+	pub frames_followers: FrameEvents,
 	pub metadata: Option<HashMap<String, ubjson::Object>>,
 }
 
-pub fn port(pre: frame::Pre, post: frame::Post) -> Port {
-	Port {
-		leader: frame::Data {
-			pre: pre,
-			post: post,
-		},
-		follower: None,
-	}
-}
+macro_rules! into_game {
+	($gp: expr, $frames_type: ident => $( $idx: expr ),* $(,)? ) => {{
+		let start = $gp.start.ok_or_else(|| err!("missing start event"))?;
+		let end = $gp.end.ok_or_else(|| err!("missing end event"))?;
+		let ports: Vec<_> = start.players.iter().map(|p| p.port as usize).collect();
 
-// TODO: eliminate duplication
-pub fn frames1(start: Vec<frame::Start>, end: Vec<frame::End>, pre: Vec<&Vec<frame::Pre>>, post: Vec<&Vec<frame::Post>>) -> Result<Frames> {
-	let mut frames = Vec::new();
-	for n in 0 .. pre[0].len() {
-		frames.push(Frame {
-			start: start.get(n).copied(),
-			end: end.get(n).copied(),
-			ports: [
-				port(pre[0][n], post[0][n])
-			]
-		});
-	}
-	Ok(Frames::P1(frames))
-}
+		let metadata = metadata::parse(&$gp.metadata.unwrap_or_default())?;
+		if let Some(ref players) = metadata.players {
+			let meta_ports: Vec<_> = players.iter().map(|p| p.port as usize).collect();
+			if meta_ports != ports {
+				Err(err!("game-start ports ({:?}) != metadata ports ({:?})", ports, meta_ports))?;
+			}
+		}
 
-pub fn frames2(start: Vec<frame::Start>, end: Vec<frame::End>, pre: Vec<&Vec<frame::Pre>>, post: Vec<&Vec<frame::Post>>) -> Result<Frames> {
-	let mut frames = Vec::new();
-	for n in 0 .. pre[0].len() {
-		frames.push(Frame {
-			start: start.get(n).copied(),
-			end: end.get(n).copied(),
-			ports: [
-				port(pre[0][n], post[0][n]),
-				port(pre[1][n], post[1][n]),
-			]
-		});
-	}
-	Ok(Frames::P2(frames))
-}
+		let frame_count = $gp.frames_leaders.pre[ports[0]].len();
 
-pub fn frames3(start: Vec<frame::Start>, end: Vec<frame::End>, pre: Vec<&Vec<frame::Pre>>, post: Vec<&Vec<frame::Post>>) -> Result<Frames> {
-	let mut frames = Vec::new();
-	for n in 0 .. pre[0].len() {
-		frames.push(Frame {
-			start: start.get(n).copied(),
-			end: end.get(n).copied(),
-			ports: [
-				port(pre[0][n], post[0][n]),
-				port(pre[1][n], post[1][n]),
-				port(pre[2][n], post[2][n]),
-			]
-		});
-	}
-	Ok(Frames::P3(frames))
-}
+		for p in &ports {
+			match $gp.frames_leaders.pre[*p].len() {
+				n if n == frame_count => (),
+				n => Err(err!("mismatched pre-frame counts: {}, {}", frame_count, n))?,
+			}
+		}
 
-pub fn frames4(start: Vec<frame::Start>, end: Vec<frame::End>, pre: Vec<&Vec<frame::Pre>>, post: Vec<&Vec<frame::Post>>) -> Result<Frames> {
-	let mut frames = Vec::new();
-	for n in 0 .. pre[0].len() {
-		frames.push(Frame {
-			start: start.get(n).copied(),
-			end: end.get(n).copied(),
-			ports: [
-				port(pre[0][n], post[0][n]),
-				port(pre[1][n], post[1][n]),
-				port(pre[2][n], post[2][n]),
-				port(pre[3][n], post[3][n]),
-			]
-		});
-	}
-	Ok(Frames::P4(frames))
+		for p in &ports {
+			match $gp.frames_leaders.post[*p].len() {
+				n if n == frame_count => (),
+				n => Err(err!("mismatched post-frame counts: {}, {}", frame_count, n))?,
+			}
+		}
+
+		let mut frames = Vec::with_capacity(frame_count);
+		for n in 0 .. frame_count {
+			frames.push(Frame {
+				start: $gp.frames_start.get(n).copied(),
+				end: $gp.frames_end.get(n).copied(),
+				ports: [ $(
+					Port {
+						leader: frame::Data {
+							pre: $gp.frames_leaders.pre[ports[$idx]][n],
+							post: $gp.frames_leaders.post[ports[$idx]][n],
+						},
+						follower: {
+							let pre = &$gp.frames_followers.pre[ports[$idx]];
+							let post = &$gp.frames_followers.post[ports[$idx]];
+							match (pre.is_empty(), post.is_empty()) {
+								(true, true) => None,
+								(false, false) => Some(Box::new(frame::Data {
+									pre: pre[n],
+									post: post[n],
+								})),
+								_ => Err(err!("inconsistent follower data (frame: {})", n))?,
+							}
+						},
+					},
+				)* ],
+			});
+		}
+
+		Game {
+			start: start,
+			end: end,
+			frames: Frames::$frames_type(frames),
+			metadata: metadata,
+		}
+	}}
 }
 
 impl GameParser {
 	pub fn into_game(self) -> Result<Game> {
-		let start = self.start.ok_or_else(|| err!("missing start event"))?;
-		let end = self.end.ok_or_else(|| err!("missing end event"))?;
-		let num_ports = start.players.len();
-
-		let metadata = metadata::parse(&self.metadata.unwrap_or_default())?;
-		if let Some(players) = metadata.players.as_ref() {
-			if num_ports != players.len() {
-				Err(err!("unexpected number of metadata players: {}", players.len()))?;
-			}
-		}
-
-		let frames_pre: Vec<_> = self.frames_pre.iter().filter(|x| !x.is_empty()).collect();
-		if num_ports != frames_pre.len() {
-			Err(err!("unexpected number of pre-frame ports: {}", frames_pre.len()))?;
-		}
-
-		let frames_post: Vec<_> = self.frames_post.iter().filter(|x| !x.is_empty()).collect();
-		if num_ports != frames_post.len() {
-			Err(err!("unexpected number of post-frame ports: {}", frames_post.len()))?;
-		}
-
-		match num_ports {
-			1 => Ok(Game {
-				start: start,
-				end: end,
-				frames: frames1(self.frames_start, self.frames_end, frames_pre, frames_post)?,
-				metadata: metadata,
-			}),
-			2 => Ok(Game {
-				start: start,
-				end: end,
-				frames: frames2(self.frames_start, self.frames_end, frames_pre, frames_post)?,
-				metadata: metadata,
-			}),
-			3 => Ok(Game {
-				start: start,
-				end: end,
-				frames: frames3(self.frames_start, self.frames_end, frames_pre, frames_post)?,
-				metadata: metadata,
-			}),
-			4 => Ok(Game {
-				start: start,
-				end: end,
-				frames: frames4(self.frames_start, self.frames_end, frames_pre, frames_post)?,
-				metadata: metadata,
-			}),
-			n => Err(err!("unsupported number of ports: {}", n))?,
+		match self.start {
+			None => Err(err!("missing start event")),
+			Some(ref start) => match start.players.len() {
+				1 => Ok(into_game!(self, P1 => 0)),
+				2 => Ok(into_game!(self, P2 => 0, 1)),
+				3 => Ok(into_game!(self, P3 => 0, 1, 2)),
+				4 => Ok(into_game!(self, P4 => 0, 1, 2, 3)),
+				n => Err(err!("unsupported number of ports: {}", n)),
+			},
 		}
 	}
 }
@@ -161,6 +123,19 @@ fn append_frame_event<Id, Event>(v: &mut Vec<Event>, evt: parse::FrameEvent<Id, 
 	Ok(())
 }
 
+/// fills in missing frame data for eliminated players by duplicating their last-seen data
+macro_rules! append_missing_frame_data {
+	( $arr: expr, $count: expr ) => {
+		for f in $arr.iter_mut() {
+			if let Some(&last) = f.last() {
+				while f.len() < $count {
+					f.push(last);
+				}
+			}
+		}
+	}
+}
+
 impl parse::Handlers for GameParser {
 	fn game_start(&mut self, s: game::Start) -> Result<()> {
 		self.start = Some(s);
@@ -178,16 +153,16 @@ impl parse::Handlers for GameParser {
 	}
 
 	fn frame_pre(&mut self, evt: parse::FrameEvent<parse::PortId, frame::Pre>) -> Result<()> {
-		match evt.id.port as usize {
-			p if p < NUM_PORTS => Ok(append_frame_event(&mut self.frames_pre[p], evt)?),
-			p => Err(err!("invalid port: {}", p)),
+		match evt.id.is_follower {
+			true => Ok(append_frame_event(&mut self.frames_followers.pre[evt.id.port as usize], evt)?),
+			_ => Ok(append_frame_event(&mut self.frames_leaders.pre[evt.id.port as usize], evt)?),
 		}
 	}
 
 	fn frame_post(&mut self, evt: parse::FrameEvent<parse::PortId, frame::Post>) -> Result<()> {
-		match evt.id.port as usize {
-			p if p < NUM_PORTS => Ok(append_frame_event(&mut self.frames_post[p], evt)?),
-			p => Err(err!("invalid port: {}", p)),
+		match evt.id.is_follower {
+			true => Ok(append_frame_event(&mut self.frames_followers.post[evt.id.port as usize], evt)?),
+			_ => Ok(append_frame_event(&mut self.frames_leaders.post[evt.id.port as usize], evt)?),
 		}
 	}
 
@@ -202,24 +177,12 @@ impl parse::Handlers for GameParser {
 	}
 
 	fn finalize(&mut self) -> Result<()> {
-		let frame_count = self.frames_pre.iter().map(|f| f.len()).max().unwrap_or(0);
+		let frame_count = self.frames_leaders.pre.iter().map(Vec::len).max().unwrap_or(0);
 
-		// fill in missing frames for eliminated players by duplicating the last frame
-		for f in self.frames_pre.iter_mut() {
-			if let Some(&last) = f.last() {
-				while f.len() < frame_count {
-					f.push(last);
-				}
-			}
-		}
-
-		for f in self.frames_post.iter_mut() {
-			if let Some(&last) = f.last() {
-				while f.len() < frame_count {
-					f.push(last);
-				}
-			}
-		}
+		append_missing_frame_data!(self.frames_leaders.pre, frame_count);
+		append_missing_frame_data!(self.frames_leaders.post, frame_count);
+		append_missing_frame_data!(self.frames_followers.pre, frame_count);
+		append_missing_frame_data!(self.frames_followers.post, frame_count);
 
 		Ok(())
 	}

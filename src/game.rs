@@ -7,6 +7,17 @@ use super::{character, frame, metadata, stage};
 pub const NUM_PORTS:usize = 4;
 pub const FIRST_FRAME_INDEX:i32 = -123;
 
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, num_enum::TryFromPrimitive)]
+#[repr(u8)]
+pub enum Port {
+	P1 = 0,
+	P2 = 1,
+	P3 = 2,
+	P4 = 3,
+}
+
+query_impl!(Port);
+
 #[derive(Debug, PartialEq, Serialize)]
 pub struct SlippiVersion(pub u8, pub u8, pub u8);
 
@@ -98,6 +109,8 @@ pub struct PlayerV1_0 {
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Player {
+	pub port: Port,
+
 	pub character: character::External,
 	pub r#type: PlayerType,
 	pub stocks: u8,
@@ -230,7 +243,7 @@ pseudo_enum!(EndMethod:u8 {
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct EndV2_0 {
-	pub lras_initiator: Option<i8>,
+	pub lras_initiator: Option<Port>,
 }
 
 #[derive(Debug, PartialEq, Serialize)]

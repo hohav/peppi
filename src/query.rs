@@ -41,6 +41,12 @@ macro_rules! query_impl {
 	};
 }
 
+impl<T> Query for Box<T> where T:Query {
+	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
+		(**self).query(f, config, query)
+	}
+}
+
 impl<T> Query for Option<T> where T:Query {
 	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
 		match self {

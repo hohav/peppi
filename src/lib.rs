@@ -80,17 +80,7 @@ pub fn parse<R:io::Read + io::Seek, H:parse::Handlers>(mut r:R, handlers:&mut H)
 pub fn game(path:&path::Path) -> std::result::Result<game::Game, ParseError> {
 	let f = fs::File::open(path).map_err(|e| ParseError { pos: None, error: e })?;
 	let mut r = io::BufReader::new(f);
-
-	let mut game_parser = game_parser::GameParser {
-		start: None,
-		end: None,
-		frames_start: Vec::new(),
-		frames_pre: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
-		frames_post: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
-		frames_end: Vec::new(),
-		metadata: None,
-	};
-
+	let mut game_parser: game_parser::GameParser = Default::default();
 	parse(&mut r, &mut game_parser)
 		.and_then(|_| game_parser.into_game().map_err(|e| ParseError { pos: None, error: e }))
 }

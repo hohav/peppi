@@ -77,7 +77,7 @@ fn main() {
 		json: matches.is_present("json"),
 		frames: matches.is_present("frames"),
 		enum_names: matches.is_present("names"),
-		query: matches.value_of("QUERY").map(|q| parse_query(q)),
+		query: matches.value_of("QUERY").map(parse_query),
 	};
 
 	unsafe { peppi::CONFIG = config.clone() };

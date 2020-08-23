@@ -7,7 +7,7 @@ use log::warn;
 use serde::Serialize;
 
 use super::character;
-use super::game::{FIRST_FRAME_INDEX, NUM_PORTS};
+use super::game::{FIRST_FRAME_INDEX, Port};
 use super::ubjson::Object;
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -51,7 +51,7 @@ query_impl!(Netplay, self, f, config, query {
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Player {
-	pub port: usize,
+	pub port: Port,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub characters: Option<HashMap<character::Internal, usize>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -77,7 +77,7 @@ fn date(json: &HashMap<String, Object>) -> Result<Option<DateTime<Utc>>> {
 			Ok(start_at) => Ok(Some(start_at)),
 			e if e == date_too_short =>
 				format!("{}Z", start_at).parse::<DateTime<Utc>>()
-					.map(|d| Some(d))
+					.map(Some)
 					.map_err(|e| err!("metadata.startAt: parse error: {:?}, {:?}", e, start_at)),
 			Err(e) => Err(err!("metadata.startAt: parse error: {:?}, {:?}", e, start_at)),
 		},
@@ -117,7 +117,7 @@ fn parse_characters(characters: &HashMap<String, Object>) -> Result<HashMap<char
 	}).collect()
 }
 
-fn metadata_player(port: usize, player: &HashMap<String, Object>) -> Result<Player> {
+fn metadata_player(port: Port, player: &HashMap<String, Object>) -> Result<Player> {
 	Ok(Player {
 		port: port,
 		characters: match player.get("characters") {
@@ -154,15 +154,15 @@ fn players(json: &HashMap<String, Object>) -> Result<Option<Vec<Player>>> {
 			let mut players: Vec<_> = players.iter().collect();
 			players.sort_by_key(|(k, _)| k.parse::<usize>().unwrap_or(0));
 			for (port, player) in players {
-				match port.parse::<usize>() {
-					Ok(port) if port < NUM_PORTS => {
-						match player {
+				match port.parse::<u8>() {
+					Ok(port) => match Port::try_from(port) {
+						Ok(port) => match player {
 							Object::Map(player) => result.push(metadata_player(port, player)?),
-							player => Err(err!("metadata.players.{}: expected map, but got: {:?}", port, player))?,
-						}
+							player => Err(err!("metadata.players.{:?}: expected map, but got: {:?}", port, player))?,
+						},
+						Err(e) => Err(err!("metadata.players: invalid port: {}, {:?}", port, e))?,
 					},
-					Ok(port) => Err(err!("metadata.players: port number out of valid range: {}", port))?,
-					Err(e) => Err(err!("metadata.players: non-numeric port: {}, {:?}", port, e))?,
+					Err(e) => Err(err!("metadata.players: invalid port: {}, {:?}", port, e))?,
 				};
 			}
 			match result.len() {

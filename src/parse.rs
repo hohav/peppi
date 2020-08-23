@@ -12,7 +12,7 @@ use super::action_state::{Common, State};
 use super::attack::Attack;
 use super::character::Internal;
 use super::frame::{Pre, Post, Direction, Position};
-use super::game::{NUM_PORTS, Player, PlayerType};
+use super::game::{NUM_PORTS, Player, PlayerType, Port};
 
 const ZELDA_TRANSFORM_FRAME: u32 = 43;
 const SHEIK_TRANSFORM_FRAME: u32 = 36;
@@ -68,7 +68,7 @@ impl Indexed for FrameId {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct PortId {
 	pub index: i32,
-	pub port: u8,
+	pub port: Port,
 	pub is_follower: bool,
 }
 
@@ -146,7 +146,7 @@ fn player_v1_0(r: [u8; 8], v1_3: Option<[u8; 16]>) -> Result<game::PlayerV1_0> {
 	})
 }
 
-fn player(v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3: Option<[u8; 16]>) -> Result<Option<Player>> {
+fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3: Option<[u8; 16]>) -> Result<Option<Player>> {
 	let mut r = &v0[..];
 	let character = character::External(r.read_u8()?);
 	let r#type = game::PlayerType(r.read_u8()?);
@@ -190,6 +190,7 @@ fn player(v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3: Option<[u8
 
 	Ok(match r#type {
 		PlayerType::HUMAN | PlayerType::CPU | PlayerType::DEMO => Some(Player {
+			port: port,
 			character: character,
 			r#type: r#type,
 			stocks: stocks,
@@ -289,7 +290,7 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 
 	let mut players = Vec::<Player>::new();
 	for n in 0 .. NUM_PORTS {
-		if let Some(p) = player(&players_v0[n], is_teams, players_v1_0[n], players_v1_3[n])? {
+		if let Some(p) = player(Port::try_from(n as u8).unwrap(), &players_v0[n], is_teams, players_v1_0[n], players_v1_3[n])? {
 			players.push(p);
 		}
 	}
@@ -318,10 +319,7 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 
 fn game_end_v2_0(r: &mut &[u8]) -> Result<game::EndV2_0> {
 	Ok(game::EndV2_0 {
-		lras_initiator: match r.read_i8()? {
-			n if n >= 0 && n < NUM_PORTS => Some(n),
-			_ => None,
-		},
+		lras_initiator: Port::try_from(r.read_u8()?).ok(),
 	})
 }
 
@@ -409,7 +407,7 @@ fn frame_pre_v1_2(r: &mut &[u8]) -> Result<frame::PreV1_2> {
 fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result<FrameEvent<PortId, Pre>> {
 	let id = PortId {
 		index: r.read_i32::<BigEndian>()?,
-		port: r.read_u8()?,
+		port: Port::try_from(r.read_u8()?).map_err(|e| err!("invalid port: {:?}", e))?,
 		is_follower: r.read_u8()? != 0,
 	};
 	trace!("Pre-Frame Update: {:?}", id);
@@ -544,7 +542,7 @@ fn frame_post_v2_0(r: &mut &[u8]) -> Result<frame::PostV2_0> {
 		jumps: r.read_u8()?,
 		l_cancel: match r.read_u8()? {
 			0 => None,
-			l_cancel => Some(frame::LCancel(l_cancel)),
+			i => Some(frame::LCancel(i)),
 		},
 		airborne: r.read_u8()? != 0,
 		#[cfg(v2_1)] v2_1: frame_post_v2_1(r)?,
@@ -569,7 +567,7 @@ fn frame_post_v0_2(r: &mut &[u8]) -> Result<frame::PostV0_2> {
 fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> Result<FrameEvent<PortId, Post>> {
 	let id = PortId {
 		index: r.read_i32::<BigEndian>()?,
-		port: r.read_u8()?,
+		port: Port::try_from(r.read_u8()?).map_err(|e| err!("invalid port: {:?}", e))?,
 		is_follower: r.read_u8()? != 0,
 	};
 	trace!("Post-Frame Update: {:?}", id);
@@ -591,7 +589,7 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 		}
 	};
 	let combo_count = r.read_u8()?;
-	let last_hit_by = r.read_u8()?;
+	let last_hit_by = Port::try_from(r.read_u8()?).ok();
 	let stocks = r.read_u8()?;
 
 	#[cfg(v0_2)] let v0_2 = frame_post_v0_2(r)?;

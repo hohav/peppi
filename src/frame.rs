@@ -3,15 +3,15 @@ use std::fmt;
 use serde::Serialize;
 use serde::ser::SerializeStruct;
 
-use super::{action_state, attack, buttons, character, triggers};
+use super::{action_state, attack, buttons, character, game, triggers};
 
-pseudo_enum!(LCancel:u8 {
+pseudo_enum!(LCancel: u8 {
 	1 => SUCCESSFUL,
 	2 => UNSUCCESSFUL,
 });
 
-pseudo_enum!(Direction:u8 {
-	0 => LEFT,
+pseudo_enum!(Direction: i8 {
+	-1 => LEFT,
 	1 => RIGHT,
 });
 
@@ -51,7 +51,7 @@ pub struct Triggers {
 
 query_impl!(Triggers);
 
-pseudo_bitmask!(StateFlags:u64 {
+pseudo_bitmask!(StateFlags: u64 {
 	1u64 << 04 => REFLECT,
 	1u64 << 10 => UNTOUCHABLE,
 	1u64 << 11 => FAST_FALL,
@@ -66,7 +66,7 @@ pseudo_bitmask!(StateFlags:u64 {
 	1u64 << 39 => OFF_SCREEN,
 });
 
-pseudo_enum!(HurtboxState:u8 {
+pseudo_enum!(HurtboxState: u8 {
 	0 => VULNERABLE,
 	1 => INVULNERABLE,
 	2 => INTANGIBLE,
@@ -202,7 +202,7 @@ pub struct Post {
 	pub character: character::Internal,
 	pub last_attack_landed: Option<attack::Attack>,
 	pub combo_count: u8,
-	pub last_hit_by: u8,
+	pub last_hit_by: Option<game::Port>,
 	pub stocks: u8,
 
 	#[cfg(v0_2)] #[serde(flatten)]
@@ -258,6 +258,35 @@ query_impl!(PostV2_1, self, f, config, query {
 	}
 });
 
+#[derive(Debug, PartialEq, Serialize)]
+pub struct Data {
+	pub pre: Pre,
+	pub post: Post,
+}
+
+query_impl!(Data, self, f, config, query {
+	match &*query[0] {
+		"pre" => self.pre.query(f, config, &query[1..]),
+		"post" => self.post.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `leader.{}`", s)),
+	}
+});
+
+#[derive(Debug, PartialEq, Serialize)]
+pub struct Port {
+	pub leader: Data,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub follower: Option<Box<Data>>,
+}
+
+query_impl!(Port, self, f, config, query {
+	match &*query[0] {
+		"leader" => self.leader.query(f, config, &query[1..]),
+		"follower" => self.follower.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `port.{}`", s)),
+	}
+});
+
 #[derive(Debug, PartialEq)]
 pub struct Frame<const N: usize> {
 	#[cfg(v2_2)]
@@ -298,39 +327,10 @@ impl<const N: usize> Serialize for Frame<N> {
 	}
 }
 
-query_impl!(N:usize, Frame<N>, self, f, config, query {
+query_impl!(N: usize, Frame<N>, self, f, config, query {
 	match &*query[0] {
 		"ports" => self.ports.query(f, config, &query[1..]),
 		s => Err(err!("unknown field `frames.{}`", s)),
-	}
-});
-
-#[derive(Debug, PartialEq, Serialize)]
-pub struct Data {
-	pub pre: Pre,
-	pub post: Post,
-}
-
-query_impl!(Data, self, f, config, query {
-	match &*query[0] {
-		"pre" => self.pre.query(f, config, &query[1..]),
-		"post" => self.post.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `leader.{}`", s)),
-	}
-});
-
-#[derive(Debug, PartialEq, Serialize)]
-pub struct Port {
-	pub leader: Data,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub follower: Option<Data>,
-}
-
-query_impl!(Port, self, f, config, query {
-	match &*query[0] {
-		"leader" => self.leader.query(f, config, &query[1..]),
-		"follower" => self.follower.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `port.{}`", s)),
 	}
 });
 
