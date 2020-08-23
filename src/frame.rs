@@ -72,6 +72,13 @@ pub struct Start {
 	pub random_seed: u32,
 }
 
+query_impl!(Start, self, f, config, query {
+	match &*query[0] {
+		"random_seed" => self.random_seed.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `start.{}`", s)),
+	}
+});
+
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct EndV3_7 {
 	pub latest_finalized_frame: i32,
@@ -86,6 +93,20 @@ pub struct End {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v3_7: Option<EndV3_7>,
 }
+
+query_impl!(EndV3_7, self, f, config, query {
+	match &*query[0] {
+		"latest_finalized_frame" => self.latest_finalized_frame.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `end.{}`", s)),
+	}
+});
+
+query_impl!(End, self, f, config, query {
+	match &*query[0] {
+		"v3_7" => self.v3_7.query(f, config, &query[1..]),
+		_ => self.v3_7.query(f, config, query),
+	}
+});
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct PreV1_4 {
@@ -324,8 +345,10 @@ impl<const N: usize> Serialize for Frame<N> {
 
 query_impl!(N: usize, Frame<N>, self, f, config, query {
 	match &*query[0] {
+		"start" => self.start.query(f, config, &query[1..]),
+		"end" => self.end.query(f, config, &query[1..]),
 		"ports" => self.ports.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `frames.{}`", s)),
+		s => Err(err!("unknown field `frame.{}`", s)),
 	}
 });
 
