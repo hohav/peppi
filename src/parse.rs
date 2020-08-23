@@ -7,11 +7,11 @@ use byteorder::{BigEndian, ReadBytesExt};
 use encoding_rs::SHIFT_JIS;
 use log::{debug, trace};
 
-use super::{action_state, buttons, character, frame, game, stage, triggers, ubjson};
+use super::{action_state, buttons, character, frame, game, item, stage, triggers, ubjson};
 use super::action_state::{Common, State};
 use super::attack::Attack;
 use super::character::Internal;
-use super::frame::{Pre, Post, Direction, Position};
+use super::frame::{Pre, Post, Direction, Position, Velocity};
 use super::game::{NUM_PORTS, Player, PlayerType, Port};
 
 const ZELDA_TRANSFORM_FRAME: u32 = 43;
@@ -42,6 +42,7 @@ pub enum Event {
 	FramePost = 0x38,
 	GameEnd = 0x39,
 	FrameStart = 0x3A,
+	Item = 0x3B,
 	FrameEnd = 0x3C,
 }
 
@@ -366,6 +367,30 @@ fn frame_end(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::End>> {
 	})
 }
 
+fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Item>> {
+	let id = FrameId { index: r.read_i32::<BigEndian>()? };
+	trace!("Item Update: {:?}", id);
+	Ok(FrameEvent {
+		id: id,
+		event: frame::Item {
+			r#type: item::Item(r.read_u16::<BigEndian>()?),
+			state: r.read_u8()?,
+			direction: direction(r.read_f32::<BigEndian>()?)?,
+			velocity: Velocity {
+				x: r.read_f32::<BigEndian>()?,
+				y: r.read_f32::<BigEndian>()?,
+			},
+			position: Position {
+				x: r.read_f32::<BigEndian>()?,
+				y: r.read_f32::<BigEndian>()?,
+			},
+			damage: r.read_u16::<BigEndian>()?,
+			timer: r.read_f32::<BigEndian>()?,
+			id: r.read_u32::<BigEndian>()?,
+		},
+	})
+}
+
 fn direction(value: f32) -> Result<Direction> {
 	match value {
 		v if v < 0.0 => Ok(Direction::LEFT),
@@ -627,6 +652,7 @@ pub trait Handlers {
 	fn frame_pre(&mut self, _: FrameEvent<PortId, Pre>) -> Result<()> { Ok(()) }
 	fn frame_post(&mut self, _: FrameEvent<PortId, Post>) -> Result<()> { Ok(()) }
 	fn frame_end(&mut self, _: FrameEvent<FrameId, frame::End>) -> Result<()> { Ok(()) }
+	fn item(&mut self, _: FrameEvent<FrameId, frame::Item>) -> Result<()> { Ok(()) }
 	fn metadata(&mut self, _: HashMap<String, ubjson::Object>) -> Result<()> { Ok(()) }
 	fn finalize(&mut self) -> Result<()> { Ok(()) }
 }
@@ -662,6 +688,7 @@ fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_
 			FramePre => handlers.frame_pre(frame_pre(&mut &*buf, last_char_states)?)?,
 			FramePost => handlers.frame_post(frame_post(&mut &*buf, last_char_states)?)?,
 			FrameEnd => handlers.frame_end(frame_end(&mut &*buf)?)?,
+			Item => handlers.item(item(&mut &*buf)?)?,
 			GameEnd => handlers.game_end(game_end(&mut &*buf)?)?,
 		};
 	}

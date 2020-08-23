@@ -35,6 +35,7 @@ pub mod character;
 pub mod frame;
 pub mod game;
 pub mod game_parser;
+pub mod item;
 pub mod metadata;
 pub mod parse;
 pub mod stage;

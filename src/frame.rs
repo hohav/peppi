@@ -3,7 +3,7 @@ use std::fmt;
 use serde::Serialize;
 use serde::ser::SerializeStruct;
 
-use super::{action_state, attack, buttons, character, game, triggers};
+use super::{action_state, attack, buttons, character, game, item, triggers};
 
 pseudo_enum!(Direction: i8 {
 	-1 => LEFT,
@@ -23,6 +23,20 @@ impl fmt::Debug for Position {
 }
 
 query_impl!(Position);
+
+#[derive(Copy, Clone, PartialEq, Serialize)]
+pub struct Velocity {
+	pub x: f32,
+	pub y: f32,
+}
+
+impl fmt::Debug for Velocity {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "({}, {})", self.x, self.y)
+	}
+}
+
+query_impl!(Velocity);
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Buttons {
@@ -316,6 +330,7 @@ pub struct Frame<const N: usize> {
 	pub end: Option<End>,
 
 	pub ports: [Port; N],
+	pub items: Vec<Item>,
 }
 
 // workaround for Serde not supporting const generics
@@ -338,6 +353,7 @@ impl<const N: usize> Serialize for Frame<N> {
 		}
 
 		state.serialize_field("ports", &self.ports[..])?;
+		state.serialize_field("items", &self.items[..])?;
 
 		state.end()
 	}
@@ -348,6 +364,7 @@ query_impl!(N: usize, Frame<N>, self, f, config, query {
 		"start" => self.start.query(f, config, &query[1..]),
 		"end" => self.end.query(f, config, &query[1..]),
 		"ports" => self.ports.query(f, config, &query[1..]),
+		"items" => self.items.query(f, config, &query[1..]),
 		s => Err(err!("unknown field `frame.{}`", s)),
 	}
 });
@@ -356,3 +373,29 @@ pub type Frame1 = Frame<1>;
 pub type Frame2 = Frame<2>;
 pub type Frame3 = Frame<3>;
 pub type Frame4 = Frame<4>;
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct Item {
+	pub id: u32,
+	pub r#type: item::Item,
+	pub state: u8,
+	pub direction: Direction,
+	pub position: Position,
+	pub velocity: Velocity,
+	pub damage: u16,
+	pub timer: f32,
+}
+
+query_impl!(Item, self, f, config, query {
+	match &*query[0] {
+		"id" => self.id.query(f, config, &query[1..]),
+		"type" => self.r#type.query(f, config, &query[1..]),
+		"state" => self.state.query(f, config, &query[1..]),
+		"direction" => self.direction.query(f, config, &query[1..]),
+		"position" => self.position.query(f, config, &query[1..]),
+		"velocity" => self.velocity.query(f, config, &query[1..]),
+		"damage" => self.damage.query(f, config, &query[1..]),
+		"timer" => self.timer.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `item.{}`", s)),
+	}
+});
