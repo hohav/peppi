@@ -542,7 +542,9 @@ fn frame_post_v2_0(r: &mut &[u8]) -> Result<frame::PostV2_0> {
 		jumps: r.read_u8()?,
 		l_cancel: match r.read_u8()? {
 			0 => None,
-			i => Some(frame::LCancel(i)),
+			1 => Some(true),
+			2 => Some(false),
+			i => Err(err!("invalid L-Cancel value: {}", i))?,
 		},
 		airborne: r.read_u8()? != 0,
 		#[cfg(v2_1)] v2_1: frame_post_v2_1(r)?,

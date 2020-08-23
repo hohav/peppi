@@ -5,11 +5,6 @@ use serde::ser::SerializeStruct;
 
 use super::{action_state, attack, buttons, character, game, triggers};
 
-pseudo_enum!(LCancel: u8 {
-	1 => SUCCESSFUL,
-	2 => UNSUCCESSFUL,
-});
-
 pseudo_enum!(Direction: i8 {
 	-1 => LEFT,
 	1 => RIGHT,
@@ -169,7 +164,7 @@ pub struct PostV2_0 {
 	pub misc_as: f32,
 	pub ground: u16,
 	pub jumps: u8,
-	pub l_cancel: Option<LCancel>,
+	pub l_cancel: Option<bool>,
 	pub airborne: bool,
 
 	#[cfg(v2_1)] #[serde(flatten)]
