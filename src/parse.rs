@@ -25,7 +25,7 @@ const DEFAULT_CHAR_STATE: CharState = CharState {
 	age: 0
 };
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct CharState {
 	character: Internal,
 	state: State,
@@ -34,7 +34,7 @@ struct CharState {
 
 const PAYLOADS_EVENT_CODE: u8 = 0x35;
 
-#[derive(Debug, PartialEq, num_enum::TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, num_enum::TryFromPrimitive)]
 #[repr(u8)]
 pub enum Event {
 	GameStart = 0x36,
@@ -43,7 +43,7 @@ pub enum Event {
 	GameEnd = 0x39,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FrameId {
 	pub index: i32,
 	pub port: u8,
@@ -577,7 +577,7 @@ fn expect_bytes<R: Read>(r: &mut R, expected: &[u8]) -> Result<()> {
 /// supported `Event` types, calls the corresponding `Handler` callback with
 /// the parsed event.
 /// Returns the number of bytes read by this function.
-fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_char_states: &mut [CharState; NUM_PORTS], handlers: &mut H) -> Result<usize> {
+fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_char_states: &mut [CharState; NUM_PORTS], handlers: &mut H) -> Result<(usize, Option<Event>)> {
 	let code = r.read_u8()?;
 	debug!("Event: {:#x}", code);
 
@@ -585,7 +585,8 @@ fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_
 	let mut buf = vec![0; size];
 	r.read_exact(&mut *buf)?;
 
-	if let Some(event) = Event::try_from(code).ok() {
+	let event = Event::try_from(code).ok();
+	if let Some(event) = event {
 		use Event::*;
 		match event {
 			GameStart => handlers.game_start(game_start(&mut &*buf)?)?,
@@ -595,7 +596,7 @@ fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_
 		}
 	}
 
-	Ok(1 + size as usize) // +1 byte for the event code
+	Ok((1 + size as usize, event)) // +1 byte for the event code
 }
 
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
@@ -609,9 +610,17 @@ pub fn parse<R: Read, H: Handlers>(mut r: R, handlers: &mut H) -> Result<()> {
 	let raw_len = r.read_u32::<BigEndian>()? as usize;
 	let (mut bytes_read, payload_sizes) = payload_sizes(&mut r)?;
 	let mut last_char_states = [DEFAULT_CHAR_STATE; NUM_PORTS];
+	let mut last_event: Option<Event> = None;
 
-	while bytes_read < raw_len {
-		bytes_read += event(r.by_ref(), &payload_sizes, &mut last_char_states, handlers)?;
+	// `raw_len` will be 0 for an in-progress replay
+	while (raw_len == 0 || bytes_read < raw_len) && last_event != Some(Event::GameEnd) {
+		let (bytes, event) = event(r.by_ref(), &payload_sizes, &mut last_char_states, handlers)?;
+		bytes_read += bytes;
+		last_event = event;
+	}
+
+	if raw_len != 0 && bytes_read != raw_len {
+		Err(err!("failed to consume expected number of bytes: {}, {}", raw_len, bytes_read))?;
 	}
 
 	expect_bytes(&mut r,
