@@ -221,9 +221,23 @@ fn player_bytes_v1_0(r: &mut &[u8]) -> Result<[u8; 8]> {
 	Ok(buf)
 }
 
+fn game_start_v3_7(r: &mut &[u8]) -> Result<game::StartV3_7> {
+	Ok(game::StartV3_7 {
+		scene: game::Scene {
+			minor: r.read_u8()?,
+			major: r.read_u8()?,
+		},
+	})
+}
+
 fn game_start_v2_0(r: &mut &[u8]) -> Result<game::StartV2_0> {
 	Ok(game::StartV2_0 {
 		is_frozen_ps: r.read_u8()? != 0,
+		#[cfg(v3_7)] v3_7: game_start_v3_7()?,
+		#[cfg(not(v3_7))] v3_7: match r.is_empty() {
+			true => None,
+			_ => Some(game_start_v3_7(r)?),
+		},
 	})
 }
 

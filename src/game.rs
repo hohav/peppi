@@ -164,8 +164,33 @@ query_impl!(Player, self, f, config, query {
 });
 
 #[derive(Debug, PartialEq, Serialize)]
+pub struct Scene {
+	pub minor: u8,
+	pub major: u8,
+}
+
+query_impl!(Scene, self, f, config, query {
+	match &*query[0] {
+		"minor" => self.minor.query(f, config, &query[1..]),
+		"major" => self.major.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `scene.{}`", s)),
+	}
+});
+
+#[derive(Debug, PartialEq, Serialize)]
+pub struct StartV3_7 {
+	pub scene: Scene,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
 pub struct StartV2_0 {
 	pub is_frozen_ps: bool,
+
+	#[cfg(v2_0)] #[serde(flatten)]
+	pub v3_7: StartV3_7,
+	#[cfg(not(v3_7))] #[serde(flatten)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub v3_7: Option<StartV3_7>,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -200,10 +225,18 @@ pub struct Start {
 	pub v1_5: Option<StartV1_5>,
 }
 
+query_impl!(StartV3_7, self, f, config, query {
+	match &*query[0] {
+		"scene" => self.scene.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `start.{}`", s)),
+	}
+});
+
 query_impl!(StartV2_0, self, f, config, query {
 	match &*query[0] {
 		"is_frozen_ps" => self.is_frozen_ps.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `start.{}`", s)),
+		"v3_7" => self.v3_7.query(f, config, &query[1..]),
+		_ => self.v3_7.query(f, config, query),
 	}
 });
 
