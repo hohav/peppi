@@ -188,19 +188,45 @@ query_impl!(PreV1_4, self, f, config, query {
 	}
 });
 
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+pub struct Velocities {
+	pub autogenous: Velocity,
+	pub knockback: Velocity,
+}
+
+query_impl!(Velocities, self, f, config, query {
+	match &*query[0] {
+		"autogenous" => self.autogenous.query(f, config, &query[1..]),
+		"knockback" => self.knockback.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `velocities.{}`", s)),
+	}
+});
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct PostV3_5 {
+	pub velocities: Velocities,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct PostV2_1 {
 	pub hurtbox_state: HurtboxState,
+
+	#[cfg(v3_5)] #[serde(flatten)]
+	pub v3_5: PostV3_5,
+
+	#[cfg(not(v3_5))] #[serde(flatten)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub v3_5: Option<PostV3_5>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct PostV2_0 {
 	pub flags: StateFlags,
 	pub misc_as: f32,
+	pub airborne: bool,
 	pub ground: u16,
 	pub jumps: u8,
 	pub l_cancel: Option<bool>,
-	pub airborne: bool,
 
 	#[cfg(v2_1)] #[serde(flatten)]
 	pub v2_1: PostV2_1,
@@ -284,6 +310,14 @@ query_impl!(PostV2_0, self, f, config, query {
 query_impl!(PostV2_1, self, f, config, query {
 	match &*query[0] {
 		"hurtbox_state" => self.hurtbox_state.query(f, config, &query[1..]),
+		"v3_5" => self.v3_5.query(f, config, &query[1..]),
+		_ => self.v3_5.query(f, config, query),
+	}
+});
+
+query_impl!(PostV3_5, self, f, config, query {
+	match &*query[0] {
+		"velocities" => self.velocities.query(f, config, &query[1..]),
 		s => Err(err!("unknown field `post.{}`", s)),
 	}
 });

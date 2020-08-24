@@ -549,33 +549,68 @@ fn update_last_char_state(id: PortId, character: Internal, state: State, last_ch
 	};
 }
 
-fn frame_post_v2_1(r: &mut &[u8]) -> Result<frame::PostV2_1> {
+fn frame_post_v3_5(r: &mut &[u8], airborne: bool) -> Result<frame::PostV3_5> {
+	let autogenous_air_x_speed = r.read_f32::<BigEndian>()?;
+	let autogenous_y_speed = r.read_f32::<BigEndian>()?;
+	let knockback_velocity = Velocity {
+		x: r.read_f32::<BigEndian>()?,
+		y: r.read_f32::<BigEndian>()?,
+	};
+	let autogenous_ground_x_speed = r.read_f32::<BigEndian>()?;
+
+	Ok(frame::PostV3_5 {
+		velocities: frame::Velocities {
+			autogenous: Velocity {
+				x: match airborne {
+					true => autogenous_air_x_speed,
+					_ => autogenous_ground_x_speed,
+				},
+				y: autogenous_y_speed,
+			},
+			knockback: knockback_velocity,
+		},
+	})
+}
+
+fn frame_post_v2_1(r: &mut &[u8], airborne: bool) -> Result<frame::PostV2_1> {
 	Ok(frame::PostV2_1 {
 		hurtbox_state: frame::HurtboxState(r.read_u8()?),
+		#[cfg(v3_5)] v3_5: frame_post_v3_5(r, airborne)?,
+		#[cfg(not(v3_5))] v3_5: match r.is_empty() {
+			true => None,
+			_ => Some(frame_post_v3_5(r, airborne)?),
+		},
 	})
 }
 
 fn frame_post_v2_0(r: &mut &[u8]) -> Result<frame::PostV2_0> {
+	let flags = {
+		let mut buf = [0; 5];
+		r.read_exact(&mut buf)?;
+		flags(&buf)
+	};
+	let misc_as = r.read_f32::<BigEndian>()?;
+	let airborne = r.read_u8()? != 0;
+	let ground = r.read_u16::<BigEndian>()?;
+	let jumps = r.read_u8()?;
+	let l_cancel = match r.read_u8()? {
+		0 => None,
+		1 => Some(true),
+		2 => Some(false),
+		i => Err(err!("invalid L-Cancel value: {}", i))?,
+	};
+
 	Ok(frame::PostV2_0 {
-		flags: {
-			let mut buf = [0; 5];
-			r.read_exact(&mut buf)?;
-			flags(&buf)
-		},
-		misc_as: r.read_f32::<BigEndian>()?,
-		ground: r.read_u16::<BigEndian>()?,
-		jumps: r.read_u8()?,
-		l_cancel: match r.read_u8()? {
-			0 => None,
-			1 => Some(true),
-			2 => Some(false),
-			i => Err(err!("invalid L-Cancel value: {}", i))?,
-		},
-		airborne: r.read_u8()? != 0,
-		#[cfg(v2_1)] v2_1: frame_post_v2_1(r)?,
+		flags: flags,
+		misc_as: misc_as,
+		airborne: airborne,
+		ground: ground,
+		jumps: jumps,
+		l_cancel: l_cancel,
+		#[cfg(v2_1)] v2_1: frame_post_v2_1(r, airborne)?,
 		#[cfg(not(v2_1))] v2_1: match r.is_empty() {
 			true => None,
-			_ => Some(frame_post_v2_1(r)?),
+			_ => Some(frame_post_v2_1(r, airborne)?),
 		},
 	})
 }
