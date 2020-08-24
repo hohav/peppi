@@ -5,7 +5,7 @@ use log::{error};
 
 use peppi::query::Query;
 
-fn parse_query(query:&str) -> Vec<String> {
+fn parse_query(query: &str) -> Vec<String> {
 	let re = regex::Regex::new(r"\[(-?\d*)\]$").unwrap();
 	query.split(".").flat_map(|s|
 		match re.captures(s) {
@@ -17,12 +17,12 @@ fn parse_query(query:&str) -> Vec<String> {
 	).collect()
 }
 
-fn inspect(paths:&[&str], config:&peppi::Config) -> Result<(), String> {
+fn inspect(paths: &[&str], config: &peppi::Config) -> Result<(), String> {
 	for path in paths {
 		let path = path::Path::new(path);
 		let game = peppi::game(path).map_err(|e| format!("{:?}", e))?;
 		if let Some(query) = &config.query {
-			let query:&[&str] = &match &*query[0] {
+			let query: &[&str] = &match &*query[0] {
 				"" => &query[1..],
 				_ => &query[..],
 			}.iter().map(|s| s.as_str()).collect::<Vec<&str>>();

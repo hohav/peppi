@@ -1,4 +1,4 @@
-pseudo_bitmask!(Physical:u16 {
+pseudo_bitmask!(Physical: u16 {
 	1u16 << 12 => START,
 	1u16 << 11 => Y,
 	1u16 << 10 => X,
@@ -14,7 +14,7 @@ pseudo_bitmask!(Physical:u16 {
 	0u16 => NONE,
 });
 
-pseudo_bitmask!(Logical:u32 {
+pseudo_bitmask!(Logical: u32 {
 	1u32 << 31 => TRIGGER_ANALOG,
 	1u32 << 23 => CSTICK_RIGHT,
 	1u32 << 22 => CSTICK_LEFT,

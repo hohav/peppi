@@ -37,7 +37,7 @@ pub enum State {
 }
 
 impl State {
-	pub fn from(value:u16, character:Internal) -> State {
+	pub fn from(value: u16, character: Internal) -> State {
 		if value <= 340 {
 			State::Common(Common(value))
 		} else {
@@ -77,7 +77,7 @@ impl State {
 }
 
 impl fmt::Debug for State {
-	fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		 match *self {
 			State::Common(s) => write!(f, "{:?}", s),
 			State::Bowser(s) => write!(f, "{:?}", s),
@@ -114,7 +114,7 @@ impl fmt::Debug for State {
 
 query_impl!(State);
 
-pseudo_enum!(Common:u16 {
+pseudo_enum!(Common: u16 {
 	000 => DEAD_DOWN,
 	001 => DEAD_LEFT,
 	002 => DEAD_RIGHT,
@@ -458,7 +458,7 @@ pseudo_enum!(Common:u16 {
 	340 => BARREL_CANNON_WAIT,
 });
 
-pseudo_enum!(Bowser:u16 {
+pseudo_enum!(Bowser: u16 {
 	341 => FIRE_BREATH_GROUND_STARTUP,
 	342 => FIRE_BREATH_GROUND_LOOP,
 	343 => FIRE_BREATH_GROUND_END,
@@ -484,7 +484,7 @@ pseudo_enum!(Bowser:u16 {
 	363 => BOMB_LAND,
 });
 
-pseudo_enum!(CaptainFalcon:u16 {
+pseudo_enum!(CaptainFalcon: u16 {
 	347 => FALCON_PUNCH_GROUND,
 	348 => FALCON_PUNCH_AIR,
 	349 => RAPTOR_BOOST_GROUND,
@@ -504,7 +504,7 @@ pseudo_enum!(CaptainFalcon:u16 {
 	363 => FALCON_KICK_HIT_WALL,
 });
 
-pseudo_enum!(DonkeyKong:u16 {
+pseudo_enum!(DonkeyKong: u16 {
 	351 => KONG_KARRY_WAIT,
 	352 => KONG_KARRY_WALK_SLOW,
 	353 => KONG_KARRY_WALK_MIDDLE,
@@ -541,7 +541,7 @@ pseudo_enum!(DonkeyKong:u16 {
 	385 => HAND_SLAP_END,
 });
 
-pseudo_enum!(DrMario:u16 {
+pseudo_enum!(DrMario: u16 {
 	341 => TAUNT_R,
 	343 => MEGAVITAMIN_GROUND,
 	344 => MEGAVITAMIN_AIR,
@@ -553,7 +553,7 @@ pseudo_enum!(DrMario:u16 {
 	350 => TORNADO_AIR,
 });
 
-pseudo_enum!(Falco:u16 {
+pseudo_enum!(Falco: u16 {
 	341 => BLASTER_GROUND_STARTUP,
 	342 => BLASTER_GROUND_LOOP,
 	343 => BLASTER_GROUND_END,
@@ -591,7 +591,7 @@ pseudo_enum!(Falco:u16 {
 	375 => SMASH_TAUNT_LEFT_FINISH,
 });
 
-pseudo_enum!(Fox:u16 {
+pseudo_enum!(Fox: u16 {
 	341 => BLASTER_GROUND_STARTUP,
 	342 => BLASTER_GROUND_LOOP,
 	343 => BLASTER_GROUND_END,
@@ -629,7 +629,7 @@ pseudo_enum!(Fox:u16 {
 	375 => SMASH_TAUNT_LEFT_FINISH,
 });
 
-pseudo_enum!(GameAndWatch:u16 {
+pseudo_enum!(GameAndWatch: u16 {
 	341 => JAB,
 	342 => JAB_2,
 	343 => RAPID_JABS,
@@ -672,7 +672,7 @@ pseudo_enum!(GameAndWatch:u16 {
 	380 => OIL_PANIC_AIR_SPILL,
 });
 
-pseudo_enum!(Ganondorf:u16 {
+pseudo_enum!(Ganondorf: u16 {
 	347 => WARLOCK_PUNCH_GROUND,
 	348 => WARLOCK_PUNCH_AIR,
 	349 => GERUDO_DRAGON_GROUND,
@@ -692,7 +692,7 @@ pseudo_enum!(Ganondorf:u16 {
 	363 => WIZARDS_FOOT_HIT_WALL,
 });
 
-pseudo_enum!(Jigglypuff:u16 {
+pseudo_enum!(Jigglypuff: u16 {
 	341 => JUMP_2,
 	342 => JUMP_3,
 	343 => JUMP_4,
@@ -726,7 +726,7 @@ pseudo_enum!(Jigglypuff:u16 {
 	372 => REST_AIR_RIGHT,
 });
 
-pseudo_enum!(Kirby:u16 {
+pseudo_enum!(Kirby: u16 {
 	341 => JUMP_2,
 	342 => JUMP_3,
 	343 => JUMP_4,
@@ -913,7 +913,7 @@ pseudo_enum!(Kirby:u16 {
 	537 => ROY_FLARE_BLADE_AIR_FULLY_CHARGED,
 });
 
-pseudo_enum!(Link:u16 {
+pseudo_enum!(Link: u16 {
 	341 => SIDE_SMASH_2,
 	344 => BOW_GROUND_CHARGE,
 	345 => BOW_GROUND_FULLY_CHARGED,
@@ -935,7 +935,7 @@ pseudo_enum!(Link:u16 {
 	361 => ZAIR_CATCH,
 });
 
-pseudo_enum!(Luigi:u16 {
+pseudo_enum!(Luigi: u16 {
 	341 => FIREBALL_GROUND,
 	342 => FIREBALL_AIR,
 	343 => GREEN_MISSILE_GROUND_STARTUP,
@@ -955,7 +955,7 @@ pseudo_enum!(Luigi:u16 {
 	358 => CYCLONE_AIR,
 });
 
-pseudo_enum!(Mario:u16 {
+pseudo_enum!(Mario: u16 {
 	343 => FIREBALL_GROUND,
 	344 => FIREBALL_AIR,
 	345 => CAPE_GROUND,
@@ -966,7 +966,7 @@ pseudo_enum!(Mario:u16 {
 	350 => TORNADO_AIR,
 });
 
-pseudo_enum!(Marth:u16 {
+pseudo_enum!(Marth: u16 {
 	341 => SHIELD_BREAKER_GROUND_START_CHARGE,
 	342 => SHIELD_BREAKER_GROUND_CHARGE_LOOP,
 	343 => SHIELD_BREAKER_GROUND_EARLY_RELEASE,
@@ -1001,7 +1001,7 @@ pseudo_enum!(Marth:u16 {
 	372 => COUNTER_AIR_HIT,
 });
 
-pseudo_enum!(Mewtwo:u16 {
+pseudo_enum!(Mewtwo: u16 {
 	341 => SHADOW_BALL_GROUND_START_CHARGE,
 	342 => SHADOW_BALL_GROUND_CHARGE_LOOP,
 	343 => SHADOW_BALL_GROUND_FULLY_CHARGED,
@@ -1024,7 +1024,7 @@ pseudo_enum!(Mewtwo:u16 {
 	360 => DISABLE_AIR,
 });
 
-pseudo_enum!(Nana:u16 {
+pseudo_enum!(Nana: u16 {
 	341 => ICE_SHOT_GROUND,
 	342 => ICE_SHOT_AIR,
 	357 => BLIZZARD_GROUND,
@@ -1036,7 +1036,7 @@ pseudo_enum!(Nana:u16 {
 	365 => BELAY_CATAPULTING,
 });
 
-pseudo_enum!(Ness:u16 {
+pseudo_enum!(Ness: u16 {
 	341 => SIDE_SMASH,
 	342 => UP_SMASH,
 	343 => UP_SMASH_CHARGE,
@@ -1073,7 +1073,7 @@ pseudo_enum!(Ness:u16 {
 	375 => PSI_MAGNET_AIR_END,
 });
 
-pseudo_enum!(Peach:u16 {
+pseudo_enum!(Peach: u16 {
 	341 => FLOAT,
 	342 => FLOAT_END_FORWARD,
 	343 => FLOAT_END_BACKWARD,
@@ -1103,7 +1103,7 @@ pseudo_enum!(Peach:u16 {
 	370 => PARASOL_OPEN,
 });
 
-pseudo_enum!(Pichu:u16 {
+pseudo_enum!(Pichu: u16 {
 	341 => THUNDER_JOLT_GROUND,
 	342 => THUNDER_JOLT_AIR,
 	343 => SKULL_BASH_GROUND_STARTUP,
@@ -1131,7 +1131,7 @@ pseudo_enum!(Pichu:u16 {
 	366 => THUNDER_AIR_END,
 });
 
-pseudo_enum!(Pikachu:u16 {
+pseudo_enum!(Pikachu: u16 {
 	341 => THUNDER_JOLT_GROUND,
 	342 => THUNDER_JOLT_AIR,
 	343 => SKULL_BASH_GROUND_STARTUP,
@@ -1159,7 +1159,7 @@ pseudo_enum!(Pikachu:u16 {
 	366 => THUNDER_AIR_END,
 });
 
-pseudo_enum!(Popo:u16 {
+pseudo_enum!(Popo: u16 {
 	341 => ICE_SHOT_GROUND,
 	342 => ICE_SHOT_AIR,
 	343 => SQUALL_HAMMER_GROUND_SOLO,
@@ -1179,7 +1179,7 @@ pseudo_enum!(Popo:u16 {
 	358 => BLIZZARD_AIR,
 });
 
-pseudo_enum!(Roy:u16 {
+pseudo_enum!(Roy: u16 {
 	341 => FLARE_BLADE_GROUND_START_CHARGE,
 	342 => FLARE_BLADE_GROUND_CHARGE_LOOP,
 	343 => FLARE_BLADE_GROUND_EARLY_RELEASE,
@@ -1214,7 +1214,7 @@ pseudo_enum!(Roy:u16 {
 	372 => COUNTER_AIR_HIT,
 });
 
-pseudo_enum!(Samus:u16 {
+pseudo_enum!(Samus: u16 {
 	341 => BOMB_JUMP_GROUND,
 	342 => BOMB_JUMP_AIR,
 	343 => CHARGE_SHOT_GROUND_START,
@@ -1235,7 +1235,7 @@ pseudo_enum!(Samus:u16 {
 	358 => ZAIR_CATCH,
 });
 
-pseudo_enum!(Sheik:u16 {
+pseudo_enum!(Sheik: u16 {
 	341 => NEEDLE_STORM_GROUND_START_CHARGE,
 	342 => NEEDLE_STORM_GROUND_CHARGE_LOOP,
 	343 => NEEDLE_STORM_GROUND_END_CHARGE,
@@ -1262,7 +1262,7 @@ pseudo_enum!(Sheik:u16 {
 	364 => TRANSFORM_AIR_ENDING,
 });
 
-pseudo_enum!(Yoshi:u16 {
+pseudo_enum!(Yoshi: u16 {
 	342 => SHIELD_HOLD,
 	343 => SHIELD_RELEASE,
 	344 => SHIELD_DAMAGE,
@@ -1288,7 +1288,7 @@ pseudo_enum!(Yoshi:u16 {
 	368 => BOMB_AIR,
 });
 
-pseudo_enum!(YoungLink:u16 {
+pseudo_enum!(YoungLink: u16 {
 	341 => SIDE_SMASH_2,
 	342 => TAUNT_R,
 	343 => TAUNT_L,
@@ -1312,7 +1312,7 @@ pseudo_enum!(YoungLink:u16 {
 	361 => ZAIR_CATCH,
 });
 
-pseudo_enum!(Zelda:u16 {
+pseudo_enum!(Zelda: u16 {
 	341 => NAYRUS_LOVE_GROUND,
 	342 => NAYRUS_LOVE_AIR,
 	343 => DINS_FIRE_GROUND_STARTUP,

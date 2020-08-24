@@ -1,4 +1,4 @@
-pseudo_enum!(Attack:u8 {
+pseudo_enum!(Attack: u8 {
 	01 => NON_STALING,
 	02 => JAB_1,
 	03 => JAB_2,

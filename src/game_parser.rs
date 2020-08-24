@@ -187,7 +187,7 @@ impl parse::Handlers for GameParser {
 		Ok(())
 	}
 
-	fn metadata(&mut self, metadata:HashMap<String, ubjson::Object>) -> Result<()> {
+	fn metadata(&mut self, metadata: HashMap<String, ubjson::Object>) -> Result<()> {
 		self.metadata = Some(metadata);
 		Ok(())
 	}

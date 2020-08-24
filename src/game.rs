@@ -4,8 +4,8 @@ use serde::Serialize;
 
 use super::{character, frame, metadata, stage};
 
-pub const NUM_PORTS:usize = 4;
-pub const FIRST_FRAME_INDEX:i32 = -123;
+pub const NUM_PORTS: usize = 4;
+pub const FIRST_FRAME_INDEX: i32 = -123;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, num_enum::TryFromPrimitive)]
 #[repr(u8)]
@@ -35,19 +35,19 @@ query_impl!(Slippi, self, f, config, query {
 	}
 });
 
-pseudo_enum!(PlayerType:u8 {
+pseudo_enum!(PlayerType: u8 {
 	0 => HUMAN,
 	1 => CPU,
 	2 => DEMO,
 });
 
-pseudo_enum!(TeamColor:u8 {
+pseudo_enum!(TeamColor: u8 {
 	0 => RED,
 	1 => BLUE,
 	2 => GREEN,
 });
 
-pseudo_enum!(TeamShade:u8 {
+pseudo_enum!(TeamShade: u8 {
 	0 => NORMAL,
 	1 => LIGHT,
 	2 => DARK,
@@ -67,12 +67,12 @@ query_impl!(Team, self, f, config, query {
 	}
 });
 
-pseudo_enum!(DashBack:u32 {
+pseudo_enum!(DashBack: u32 {
 	1 => UCF,
 	2 => ARDUINO,
 });
 
-pseudo_enum!(ShieldDrop:u32 {
+pseudo_enum!(ShieldDrop: u32 {
 	1 => UCF,
 	2 => ARDUINO,
 });
@@ -233,7 +233,7 @@ query_impl!(Start, self, f, config, query {
 	}
 });
 
-pseudo_enum!(EndMethod:u8 {
+pseudo_enum!(EndMethod: u8 {
 	0 => UNRESOLVED,
 	1 => TIME,
 	2 => GAME,
@@ -272,7 +272,7 @@ query_impl!(End, self, f, config, query {
 	}
 });
 
-fn skip_frames<T>(_:&T) -> bool {
+fn skip_frames<T>(_: &T) -> bool {
 	!unsafe { super::CONFIG.frames }
 }
 
@@ -315,7 +315,7 @@ pub struct Game {
 }
 
 impl fmt::Debug for Game {
-	fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match unsafe { super::CONFIG.frames } {
 			true => f.debug_struct("Frames")
 				.field("metadata", &self.metadata)

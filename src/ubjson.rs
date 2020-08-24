@@ -47,14 +47,14 @@ impl ToObject for HashMap<String, Object> {
 	}
 }
 
-fn parse_utf8<R:Read>(r: &mut R) -> Result<String> {
+fn parse_utf8<R: Read>(r: &mut R) -> Result<String> {
 	let length = r.read_u8()?;
 	let mut buf = vec![0; length as usize];
 	r.read_exact(&mut buf)?;
 	String::from_utf8(buf).map_err(|e| Error::new(ErrorKind::InvalidData, e))
 }
 
-fn parse_val<R:Read>(r: &mut R) -> Result<Object> {
+fn parse_val<R: Read>(r: &mut R) -> Result<Object> {
 	match r.read_u8()? {
 		// "S": str
 		0x53 => match r.read_u8()? {
@@ -69,7 +69,7 @@ fn parse_val<R:Read>(r: &mut R) -> Result<Object> {
 	}
 }
 
-fn parse_key<R:Read>(r: &mut R) -> Result<Option<String>> {
+fn parse_key<R: Read>(r: &mut R) -> Result<Option<String>> {
 	match r.read_u8()? {
 		0x55 => Ok(Some(parse_utf8(r)?)),
 		0x7d => Ok(None),
@@ -77,7 +77,7 @@ fn parse_key<R:Read>(r: &mut R) -> Result<Option<String>> {
 	}
 }
 
-pub fn parse_map<R:Read>(r: &mut R) -> Result<HashMap<String, Object>> {
+pub fn parse_map<R: Read>(r: &mut R) -> Result<HashMap<String, Object>> {
 	let mut m = HashMap::new();
 	while match parse_key(r)? {
 		Some(k) => {m.insert(k, parse_val(r)?); true},

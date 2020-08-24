@@ -1,4 +1,4 @@
-pseudo_enum!(Stage:u16 {
+pseudo_enum!(Stage: u16 {
 	02 => FOUNTAIN_OF_DREAMS,
 	03 => POKEMON_STADIUM,
 	04 => PRINCESS_PEACHS_CASTLE,

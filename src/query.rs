@@ -1,14 +1,14 @@
 use std::io::{Write, Result};
 
 pub trait Query {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()>;
+	fn query(&self, f: &mut dyn Write, config: &super::Config, query: &[&str]) -> Result<()>;
 }
 
 macro_rules! query_impl {
 	// TODO: eliminate duplication
-	($n:ident : $nt:ty, $type:ty, $self:ident, $f:ident, $config:ident, $query:ident $body:block) => {
+	($n: ident : $nt: ty, $type: ty, $self: ident, $f: ident, $config: ident, $query: ident $body: block) => {
 		impl<const $n:$nt> super::query::Query for $type {
-			fn query(&$self, $f:&mut dyn std::io::Write, $config:&super::Config, $query:&[&str]) -> std::io::Result<()> {
+			fn query(&$self, $f: &mut dyn std::io::Write, $config: &super::Config, $query: &[&str]) -> std::io::Result<()> {
 				match $query.is_empty() {
 					true => match $config.json {
 						true => serde_json::to_writer($f, $self).map_err(|e| err!("JSON serialization error: {:?}", e)),
@@ -20,9 +20,9 @@ macro_rules! query_impl {
 		}
 	};
 
-	($type:ty, $self:ident, $f:ident, $config:ident, $query:ident $body:block) => {
+	($type: ty, $self: ident, $f: ident, $config: ident, $query: ident $body: block) => {
 		impl super::query::Query for $type {
-			fn query(&$self, $f:&mut dyn std::io::Write, $config:&super::Config, $query:&[&str]) -> std::io::Result<()> {
+			fn query(&$self, $f: &mut dyn std::io::Write, $config: &super::Config, $query: &[&str]) -> std::io::Result<()> {
 				match $query.is_empty() {
 					true => match $config.json {
 						true => serde_json::to_writer($f, $self).map_err(|e| err!("JSON serialization error: {:?}", e)),
@@ -34,21 +34,21 @@ macro_rules! query_impl {
 		}
 	};
 
-	($type:ty) => {
+	($type: ty) => {
 		query_impl!($type, self, f, config, query {
 			Err(err!("can't query an atom ({:?})", query))
 		});
 	};
 }
 
-impl<T> Query for Box<T> where T:Query {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
+impl<T> Query for Box<T> where T: Query {
+	fn query(&self, f: &mut dyn Write, config: &super::Config, query: &[&str]) -> Result<()> {
 		(**self).query(f, config, query)
 	}
 }
 
-impl<T> Query for Option<T> where T:Query {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
+impl<T> Query for Option<T> where T: Query {
+	fn query(&self, f: &mut dyn Write, config: &super::Config, query: &[&str]) -> Result<()> {
 		match self {
 			Some(x) => x.query(f, config, query),
 			_ => match config.json {
@@ -59,15 +59,15 @@ impl<T> Query for Option<T> where T:Query {
 	}
 }
 
-impl<T> Query for &T where T:Query {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
+impl<T> Query for &T where T: Query {
+	fn query(&self, f: &mut dyn Write, config: &super::Config, query: &[&str]) -> Result<()> {
 		(*self).query(f, config, query)
 	}
 }
 
 macro_rules! collection_query {
 	() => {
-		fn query(&self, f:&mut dyn Write, config:&super::Config, query:&[&str]) -> Result<()> {
+		fn query(&self, f: &mut dyn Write, config: &super::Config, query: &[&str]) -> Result<()> {
 			match query.is_empty() {
 				true => match config.json {
 					true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
@@ -97,32 +97,32 @@ macro_rules! collection_query {
 	}
 }
 
-impl<T> Query for Vec<T> where T:Query, T:std::fmt::Debug, T:serde::Serialize {
+impl<T> Query for Vec<T> where T: Query, T: std::fmt::Debug, T: serde::Serialize {
 	collection_query!();
 }
 
-impl<T> Query for [T] where T:Query, T:std::fmt::Debug, T:serde::Serialize {
+impl<T> Query for [T] where T: Query, T: std::fmt::Debug, T: serde::Serialize {
 	collection_query!();
 }
 
-impl<T> Query for [T; 1] where T:Query, T:std::fmt::Debug, T:serde::Serialize {
+impl<T> Query for [T; 1] where T: Query, T: std::fmt::Debug, T: serde::Serialize {
 	collection_query!();
 }
 
-impl<T> Query for [T; 2] where T:Query, T:std::fmt::Debug, T:serde::Serialize {
+impl<T> Query for [T; 2] where T: Query, T: std::fmt::Debug, T: serde::Serialize {
 	collection_query!();
 }
 
-impl<T> Query for [T; 3] where T:Query, T:std::fmt::Debug, T:serde::Serialize {
+impl<T> Query for [T; 3] where T: Query, T: std::fmt::Debug, T: serde::Serialize {
 	collection_query!();
 }
 
-impl<T> Query for [T; 4] where T:Query, T:std::fmt::Debug, T:serde::Serialize {
+impl<T> Query for [T; 4] where T: Query, T: std::fmt::Debug, T: serde::Serialize {
 	collection_query!();
 }
 
-impl<T> Query for std::collections::HashMap<String, T> where T:Query, T:std::fmt::Debug, T:serde::Serialize {
-	fn query(&self, f:&mut dyn std::io::Write, config:&super::Config, query:&[&str]) -> std::io::Result<()> {
+impl<T> Query for std::collections::HashMap<String, T> where T: Query, T: std::fmt::Debug, T: serde::Serialize {
+	fn query(&self, f: &mut dyn std::io::Write, config: &super::Config, query: &[&str]) -> std::io::Result<()> {
 		match query.is_empty() {
 			true => match config.json {
 				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),

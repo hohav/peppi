@@ -9,7 +9,7 @@ pub struct Physical {
 }
 
 impl super::query::Query for Physical {
-	fn query(&self, f:&mut dyn Write, config:&super::Config, _query:&[&str]) -> Result<()> {
+	fn query(&self, f: &mut dyn Write, config: &super::Config, _query: &[&str]) -> Result<()> {
 		match config.json {
 			true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
 			_ => write!(f, "{:?}", self),

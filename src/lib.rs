@@ -3,7 +3,7 @@
 
 #[macro_export]
 macro_rules! err {
-	($( $arg:expr ),*) => {
+	($( $arg: expr ),*) => {
 		std::io::Error::new(std::io::ErrorKind::InvalidData, format!($( $arg ),*))
 	}
 }
@@ -17,7 +17,7 @@ pub struct Config {
 }
 
 // TODO: use serde_state to pass this config to the serializers?
-pub static mut CONFIG:Config = Config {
+pub static mut CONFIG: Config = Config {
 	json: false,
 	frames: false,
 	enum_names: false,
@@ -69,16 +69,16 @@ impl error::Error for ParseError {
 }
 
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn parse<R:io::Read + io::Seek, H:parse::Handlers>(mut r:R, handlers:&mut H) -> std::result::Result<(), ParseError> {
+pub fn parse<R: io::Read + io::Seek, H: parse::Handlers>(mut r: R, handlers: &mut H) -> std::result::Result<(), ParseError> {
 	parse::parse(r.by_ref(), handlers)
 		// Wrap with the approximate file position where the error occurred.
-		// This is why we require `R:Seek`.
+		// This is why we require `R: Seek`.
 		.map_err(|e| ParseError { pos: r.seek(io::SeekFrom::Current(0)).ok(), error: e})?;
 	Ok(())
 }
 
 /// Parses the Slippi replay file at `path`, returning a `game::Game` object.
-pub fn game(path:&path::Path) -> std::result::Result<game::Game, ParseError> {
+pub fn game(path: &path::Path) -> std::result::Result<game::Game, ParseError> {
 	let f = fs::File::open(path).map_err(|e| ParseError { pos: None, error: e })?;
 	let mut r = io::BufReader::new(f);
 	let mut game_parser: game_parser::GameParser = Default::default();
