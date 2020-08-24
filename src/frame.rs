@@ -402,6 +402,25 @@ pub type Frame3 = Frame<3>;
 pub type Frame4 = Frame<4>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct ChargeShot {
+	pub power: u8,
+	pub is_released: bool,
+}
+
+query_impl!(ChargeShot, self, f, config, query {
+	match &*query[0] {
+		"power" => self.power.query(f, config, &query[1..]),
+		"is_released" => self.is_released.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `charge_shot.{}`", s)),
+	}
+});
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct ItemV3_2 {
+	pub misc: [u8; 4],
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct Item {
 	pub id: u32,
 	pub r#type: item::Item,
@@ -411,7 +430,20 @@ pub struct Item {
 	pub velocity: Velocity,
 	pub damage: u16,
 	pub timer: f32,
+
+	#[cfg(v3_2)] #[serde(flatten)]
+	pub v3_2: ItemV3_2,
+	#[cfg(not(v3_2))] #[serde(flatten)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub v3_2: Option<ItemV3_2>,
 }
+
+query_impl!(ItemV3_2, self, f, config, query {
+	match &*query[0] {
+		"misc" => self.misc.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `item.{}`", s)),
+	}
+});
 
 query_impl!(Item, self, f, config, query {
 	match &*query[0] {
@@ -423,6 +455,7 @@ query_impl!(Item, self, f, config, query {
 		"velocity" => self.velocity.query(f, config, &query[1..]),
 		"damage" => self.damage.query(f, config, &query[1..]),
 		"timer" => self.timer.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `item.{}`", s)),
+		"v3_2" => self.v3_2.query(f, config, &query[1..]),
+		_ => self.v3_2.query(f, config, query),
 	}
 });

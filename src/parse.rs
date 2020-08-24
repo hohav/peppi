@@ -381,13 +381,20 @@ fn frame_end(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::End>> {
 	})
 }
 
+fn item_v3_2(r: &mut &[u8]) -> Result<frame::ItemV3_2> {
+	Ok(frame::ItemV3_2 {
+		misc: [r.read_u8()?, r.read_u8()?, r.read_u8()?, r.read_u8()?],
+	})
+}
+
 fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Item>> {
 	let id = FrameId { index: r.read_i32::<BigEndian>()? };
 	trace!("Item Update: {:?}", id);
+	let item_type = item::Item(r.read_u16::<BigEndian>()?);
 	Ok(FrameEvent {
 		id: id,
 		event: frame::Item {
-			r#type: item::Item(r.read_u16::<BigEndian>()?),
+			r#type: item_type,
 			state: r.read_u8()?,
 			direction: direction(r.read_f32::<BigEndian>()?)?,
 			velocity: Velocity {
@@ -401,6 +408,11 @@ fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Item>> {
 			damage: r.read_u16::<BigEndian>()?,
 			timer: r.read_f32::<BigEndian>()?,
 			id: r.read_u32::<BigEndian>()?,
+			#[cfg(v3_2)] v3_2: item_v3_2(r)?,
+			#[cfg(not(v3_2))] v3_2: match r.is_empty() {
+				true => None,
+				_ => Some(item_v3_2(r)?),
+			},
 		},
 	})
 }
