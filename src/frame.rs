@@ -416,8 +416,19 @@ query_impl!(ChargeShot, self, f, config, query {
 });
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct ItemV3_6 {
+	pub owner: Option<game::Port>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct ItemV3_2 {
 	pub misc: [u8; 4],
+
+	#[cfg(v3_6)] #[serde(flatten)]
+	pub v3_6: ItemV3_6,
+	#[cfg(not(v3_6))] #[serde(flatten)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub v3_6: Option<ItemV3_6>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -438,10 +449,18 @@ pub struct Item {
 	pub v3_2: Option<ItemV3_2>,
 }
 
+query_impl!(ItemV3_6, self, f, config, query {
+	match &*query[0] {
+		"owner" => self.owner.query(f, config, &query[1..]),
+		s => Err(err!("unknown field `item.{}`", s)),
+	}
+});
+
 query_impl!(ItemV3_2, self, f, config, query {
 	match &*query[0] {
 		"misc" => self.misc.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `item.{}`", s)),
+		"v3_6" => self.v3_6.query(f, config, &query[1..]),
+		_ => self.v3_6.query(f, config, query),
 	}
 });
 

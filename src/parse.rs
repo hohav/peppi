@@ -381,9 +381,20 @@ fn frame_end(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::End>> {
 	})
 }
 
+fn item_v3_6(r: &mut &[u8]) -> Result<frame::ItemV3_6> {
+	Ok(frame::ItemV3_6 {
+		owner: Port::try_from(r.read_u8()?).ok(),
+	})
+}
+
 fn item_v3_2(r: &mut &[u8]) -> Result<frame::ItemV3_2> {
 	Ok(frame::ItemV3_2 {
 		misc: [r.read_u8()?, r.read_u8()?, r.read_u8()?, r.read_u8()?],
+		#[cfg(v3_6)] v3_6: item_v3_6(r)?,
+		#[cfg(not(v3_6))] v3_6: match r.is_empty() {
+			true => None,
+			_ => Some(item_v3_6(r)?),
+		},
 	})
 }
 
