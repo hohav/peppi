@@ -60,11 +60,9 @@ fn main() {
 Compiling Peppi by itself will give you a binary called `slp` that's useful for inspecting replays. For example, this command shows you the post-frame action state for each port (player) on the last frame of the game:
 
 ```bash
-$ slp -nq '.ports[].leader.post[-1].state' game.slp
+$ slp -nq frames[-1].ports[].leader.post.state game.slp
 14:WAIT
 1:DEAD_LEFT
-None
-None
 ```
 
 Run `slp --help` for more info.
