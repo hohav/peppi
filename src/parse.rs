@@ -769,7 +769,7 @@ fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_
 }
 
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn parse<R: Read, H: Handlers>(mut r: R, handlers: &mut H) -> Result<()> {
+pub fn parse<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H) -> Result<()> {
 	// For speed, assume the `raw` element comes first and handle it manually.
 	// The official JS parser does this too, so it should be reliable.
 	expect_bytes(&mut r,

@@ -48,7 +48,7 @@ use std::{error, fmt, fs, io, path};
 
 #[derive(Debug)]
 pub struct ParseError {
-	pub pos: Option<u64>,
+	pub pos: Option<usize>,
 	pub error: io::Error,
 }
 
@@ -68,18 +68,34 @@ impl error::Error for ParseError {
 	}
 }
 
+pub struct TrackingReader<R> {
+	reader: R,
+	bytes_read: usize,
+}
+
+impl<R: io::Read> io::Read for TrackingReader<R> {
+	fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+		let result = self.reader.read(buf);
+		if let Ok(bytes) = result {
+			self.bytes_read += bytes;
+		}
+		result
+	}
+}
+
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn parse<R: io::Read + io::Seek, H: parse::Handlers>(mut r: R, handlers: &mut H) -> std::result::Result<(), ParseError> {
-	parse::parse(r.by_ref(), handlers)
-		// Wrap with the approximate file position where the error occurred.
-		// This is why we require `R: Seek`.
-		.map_err(|e| ParseError { pos: r.seek(io::SeekFrom::Current(0)).ok(), error: e})?;
-	Ok(())
+pub fn parse<R: io::Read, H: parse::Handlers>(r: &mut R, handlers: &mut H) -> std::result::Result<(), ParseError> {
+	let mut r = TrackingReader {
+		bytes_read: 0,
+		reader: r,
+	};
+	parse::parse(&mut r, handlers)
+		.map_err(|e| ParseError { error: e, pos: Some(r.bytes_read) })
 }
 
 /// Parses the Slippi replay file at `path`, returning a `game::Game` object.
 pub fn game(path: &path::Path) -> std::result::Result<game::Game, ParseError> {
-	let f = fs::File::open(path).map_err(|e| ParseError { pos: None, error: e })?;
+	let f = fs::File::open(path).map_err(|e| ParseError { error: e, pos: None })?;
 	let mut r = io::BufReader::new(f);
 	let mut game_parser: game_parser::GameParser = Default::default();
 	parse(&mut r, &mut game_parser)
