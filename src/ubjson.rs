@@ -11,14 +11,6 @@ pub enum Object {
 	Str(String),
 }
 
-query_impl!(Object, self, f, config, query {
-	match self {
-		Object::Int(i) => i.query(f, config, query),
-		Object::Str(s) => s.query(f, config, query),
-		Object::Map(m) => m.query(f, config, query),
-	}
-});
-
 pub trait ToObject {
 	fn to_object(self) -> Object;
 }

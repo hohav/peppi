@@ -121,18 +121,6 @@ impl<T> Query for [T; 4] where T: Query, T: std::fmt::Debug, T: serde::Serialize
 	collection_query!();
 }
 
-impl<T> Query for std::collections::HashMap<String, T> where T: Query, T: std::fmt::Debug, T: serde::Serialize {
-	fn query(&self, f: &mut dyn std::io::Write, config: &super::Config, query: &[&str]) -> std::io::Result<()> {
-		match query.is_empty() {
-			true => match config.json {
-				true => serde_json::to_writer(f, self).map_err(|e| err!("JSON serialization error: {:?}", e)),
-				_ => write!(f, "{:#?}", self),
-			},
-			_ => self.get(query[0]).query(f, config, &query[1..]),
-		}
-	}
-}
-
 query_impl!(u8);
 query_impl!(i8);
 query_impl!(u16);
