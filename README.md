@@ -61,8 +61,7 @@ Compiling Peppi by itself will give you a binary called `slp` that's useful for 
 
 ```bash
 $ slp -nq frames[-1].ports[].leader.post.state game.slp
-14:WAIT
-1:DEAD_LEFT
+["14:WAIT","1:DEAD_LEFT"]
 ```
 
 Run `slp --help` for more info.

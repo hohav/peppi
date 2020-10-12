@@ -9,6 +9,7 @@ byteorder = "1"
 chrono = { version = "0.4", features = ["serde"] }
 clap = "2.33"
 encoding_rs = "0.8"
+jmespatch = { version = "0.3.0", features = ["specialized"] }
 log = "0.4"
 num_enum = "0.4"
 pretty_env_logger = "0.4"

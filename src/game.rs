@@ -16,24 +16,13 @@ pub enum Port {
 	P4 = 3,
 }
 
-query_impl!(Port);
-
 #[derive(Debug, PartialEq, Serialize)]
 pub struct SlippiVersion(pub u8, pub u8, pub u8);
-
-query_impl!(SlippiVersion);
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Slippi {
 	pub version: SlippiVersion,
 }
-
-query_impl!(Slippi, self, f, config, query {
-	match &*query[0] {
-		"version" => self.version.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `slippi.{}`", s)),
-	}
-});
 
 pseudo_enum!(PlayerType: u8 {
 	0 => HUMAN,
@@ -59,14 +48,6 @@ pub struct Team {
 	pub shade: TeamShade,
 }
 
-query_impl!(Team, self, f, config, query {
-	match &*query[0] {
-		"color" => self.color.query(f, config, &query[1..]),
-		"shade" => self.shade.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `team.{}`", s)),
-	}
-});
-
 pseudo_enum!(DashBack: u32 {
 	1 => UCF,
 	2 => ARDUINO,
@@ -82,14 +63,6 @@ pub struct Ucf {
 	pub dash_back: Option<DashBack>,
 	pub shield_drop: Option<ShieldDrop>,
 }
-
-query_impl!(Ucf, self, f, config, query {
-	match &*query[0] {
-		"dash_back" => self.dash_back.query(f, config, &query[1..]),
-		"shield_drop" => self.shield_drop.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `ucf.{}`", s)),
-	}
-});
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct PlayerV1_3 {
@@ -130,52 +103,11 @@ pub struct Player {
 	pub v1_0: Option<PlayerV1_0>,
 }
 
-query_impl!(PlayerV1_3, self, f, config, query {
-	match &*query[0] {
-		"name_tag" => self.name_tag.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `player.{}`", s)),
-	}
-});
-
-query_impl!(PlayerV1_0, self, f, config, query {
-	match &*query[0] {
-		"ucf" => self.ucf.query(f, config, &query[1..]),
-		"v1_3" => self.v1_3.query(f, config, &query[1..]),
-		_ => self.v1_3.query(f, config, query),
-	}
-});
-
-query_impl!(Player, self, f, config, query {
-	match &*query[0] {
-		"character" => self.character.query(f, config, &query[1..]),
-		"r#type" => self.r#type.query(f, config, &query[1..]),
-		"stocks" => self.stocks.query(f, config, &query[1..]),
-		"costume" => self.costume.query(f, config, &query[1..]),
-		"team" => self.team.query(f, config, &query[1..]),
-		"handicap" => self.handicap.query(f, config, &query[1..]),
-		"bitfield" => self.bitfield.query(f, config, &query[1..]),
-		"cpu_level" => self.cpu_level.query(f, config, &query[1..]),
-		"offense_ratio" => self.offense_ratio.query(f, config, &query[1..]),
-		"defense_ratio" => self.defense_ratio.query(f, config, &query[1..]),
-		"model_scale" => self.model_scale.query(f, config, &query[1..]),
-		"v1_0" => self.v1_0.query(f, config, &query[1..]),
-		_ => self.v1_0.query(f, config, query),
-	}
-});
-
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Scene {
 	pub minor: u8,
 	pub major: u8,
 }
-
-query_impl!(Scene, self, f, config, query {
-	match &*query[0] {
-		"minor" => self.minor.query(f, config, &query[1..]),
-		"major" => self.major.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `scene.{}`", s)),
-	}
-});
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct StartV3_7 {
@@ -225,47 +157,6 @@ pub struct Start {
 	pub v1_5: Option<StartV1_5>,
 }
 
-query_impl!(StartV3_7, self, f, config, query {
-	match &*query[0] {
-		"scene" => self.scene.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `start.{}`", s)),
-	}
-});
-
-query_impl!(StartV2_0, self, f, config, query {
-	match &*query[0] {
-		"is_frozen_ps" => self.is_frozen_ps.query(f, config, &query[1..]),
-		"v3_7" => self.v3_7.query(f, config, &query[1..]),
-		_ => self.v3_7.query(f, config, query),
-	}
-});
-
-query_impl!(StartV1_5, self, f, config, query {
-	match &*query[0] {
-		"is_pal" => self.is_pal.query(f, config, &query[1..]),
-		"v2_0" => self.v2_0.query(f, config, &query[1..]),
-		_ => self.v2_0.query(f, config, query),
-	}
-});
-
-query_impl!(Start, self, f, config, query {
-	match &*query[0] {
-		"slippi" => self.slippi.query(f, config, &query[1..]),
-		"bitfield" => self.bitfield.query(f, config, &query[1..]),
-		"is_teams" => self.is_teams.query(f, config, &query[1..]),
-		"item_spawn_frequency" => self.item_spawn_frequency.query(f, config, &query[1..]),
-		"self_destruct_score" => self.self_destruct_score.query(f, config, &query[1..]),
-		"stage" => self.stage.query(f, config, &query[1..]),
-		"timer" => self.timer.query(f, config, &query[1..]),
-		"item_spawn_bitfield" => self.item_spawn_bitfield.query(f, config, &query[1..]),
-		"damage_ratio" => self.damage_ratio.query(f, config, &query[1..]),
-		"players" => self.players.query(f, config, &query[1..]),
-		"random_seed" => self.random_seed.query(f, config, &query[1..]),
-		"v1_5" => self.v1_5.query(f, config, &query[1..]),
-		_ => self.v1_5.query(f, config, query),
-	}
-});
-
 pseudo_enum!(EndMethod: u8 {
 	0 => UNRESOLVED,
 	1 => TIME,
@@ -290,21 +181,6 @@ pub struct End {
 	pub v2_0: Option<EndV2_0>,
 }
 
-query_impl!(EndV2_0, self, f, config, query {
-	match &*query[0] {
-		"lras_initiator" => self.lras_initiator.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `end.{}`", s)),
-	}
-});
-
-query_impl!(End, self, f, config, query {
-	match &*query[0] {
-		"method" => self.method.query(f, config, &query[1..]),
-		"v2_0" => self.v2_0.query(f, config, &query[1..]),
-		_ => self.v2_0.query(f, config, query),
-	}
-});
-
 fn skip_frames<T>(_: &T) -> bool {
 	!unsafe { super::CONFIG.frames }
 }
@@ -328,15 +204,6 @@ impl Frames {
 		}
 	}
 }
-
-query_impl!(Frames, self, f, config, query {
-	match self {
-		Self::P1(frames) => frames.query(f, config, query),
-		Self::P2(frames) => frames.query(f, config, query),
-		Self::P3(frames) => frames.query(f, config, query),
-		Self::P4(frames) => frames.query(f, config, query),
-	}
-});
 
 #[derive(PartialEq, Serialize)]
 pub struct Game {
@@ -365,13 +232,3 @@ impl fmt::Debug for Game {
 		}
 	}
 }
-
-query_impl!(Game, self, f, config, query {
-	match &*query[0] {
-		"start" => self.start.query(f, config, &query[1..]),
-		"end" => self.end.query(f, config, &query[1..]),
-		"frames" => self.frames.query(f, config, &query[1..]),
-		"metadata" => self.metadata.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `game.{}`", s)),
-	}
-});

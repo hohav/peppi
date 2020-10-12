@@ -5,6 +5,7 @@ use std::io::Result;
 use chrono::{DateTime, Utc};
 use log::warn;
 use serde::Serialize;
+use serde::ser::SerializeMap;
 
 use super::character;
 use super::game::{FIRST_FRAME_INDEX, Port};
@@ -24,50 +25,35 @@ pub struct Metadata {
 	pub players: Option<Vec<Player>>,
 }
 
-query_impl!(Metadata, self, f, config, query {
-	match &*query[0] {
-		"date" => self.date.query(f, config, &query[1..]),
-		"duration" => self.duration.query(f, config, &query[1..]),
-		"platform" => self.platform.query(f, config, &query[1..]),
-		"console" => self.console.query(f, config, &query[1..]),
-		"players" => self.players.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `metadata.{}`", s)),
-	}
-});
-
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Netplay {
 	pub code: String,
 	pub name: String,
 }
 
-query_impl!(Netplay, self, f, config, query {
-	match &*query[0] {
-		"code" => self.code.query(f, config, &query[1..]),
-		"name" => self.name.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `netplay.{}`", s)),
+// needed for JMESPath
+pub fn serialize_characters<S>(characters: &Option<HashMap<character::Internal, usize>>, serializer: S) -> std::result::Result<S::Ok, S::Error> where S: serde::Serializer {
+	match characters {
+		Some(characters) => {
+			let mut map = serializer.serialize_map(Some(characters.len()))?;
+			for (k, v) in characters {
+				map.serialize_entry(&format!("{:?}", k), v)?;
+			}
+			map.end()
+		},
+		_ => serializer.serialize_none(),
 	}
-});
+}
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Player {
 	pub port: Port,
 	#[serde(skip_serializing_if = "Option::is_none")]
+	#[serde(serialize_with = "serialize_characters")]
 	pub characters: Option<HashMap<character::Internal, usize>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub netplay: Option<Netplay>,
 }
-
-query_impl!(Player, self, f, config, query {
-	match &*query[0] {
-		"characters" => self.characters.query(f, config, &query[1..]),
-		"netplay" => self.netplay.query(f, config, &query[1..]),
-		s => Err(err!("unknown field `player.{}`", s)),
-	}
-});
-
-query_impl!(HashMap<character::Internal, usize>);
-query_impl!(DateTime<Utc>);
 
 fn date(json: &HashMap<String, Object>) -> Result<Option<DateTime<Utc>>> {
 	let date_too_short = "2000-01-01T00:00:00".parse::<DateTime<Utc>>();

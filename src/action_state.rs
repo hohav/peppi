@@ -112,8 +112,6 @@ impl fmt::Debug for State {
 	}
 }
 
-query_impl!(State);
-
 pseudo_enum!(Common: u16 {
 	000 => DEAD_DOWN,
 	001 => DEAD_LEFT,

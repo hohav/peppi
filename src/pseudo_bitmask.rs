@@ -37,7 +37,5 @@ macro_rules! pseudo_bitmask {
 				$name(self.0 & rhs.0)
 			}
 		}
-
-		query_impl!($name);
 	}
 }

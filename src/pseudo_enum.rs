@@ -54,7 +54,5 @@ macro_rules! pseudo_enum {
 				}
 			}
 		}
-
-		query_impl!($name);
 	}
 }

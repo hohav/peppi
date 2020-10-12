@@ -13,7 +13,7 @@ pub struct Config {
 	pub json: bool,
 	pub frames: bool,
 	pub enum_names: bool,
-	pub query: Option<Vec<String>>,
+	pub query: Option<String>,
 }
 
 // TODO: use serde_state to pass this config to the serializers?
@@ -26,7 +26,6 @@ pub static mut CONFIG: Config = Config {
 
 #[macro_use] pub mod pseudo_bitmask;
 #[macro_use] pub mod pseudo_enum;
-#[macro_use] pub mod query;
 
 pub mod action_state;
 pub mod attack;
