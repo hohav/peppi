@@ -3,9 +3,11 @@ use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::io::{Read, Result};
 
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::ReadBytesExt;
 use encoding_rs::SHIFT_JIS;
 use log::{debug, trace};
+
+type BE = byteorder::BigEndian;
 
 use super::{action_state, buttons, character, frame, game, item, stage, triggers, ubjson};
 use super::action_state::{Common, State};
@@ -111,7 +113,7 @@ fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, HashMap<u8, u16>)> {
 
 	let mut sizes = HashMap::new();
 	for _ in (0 .. size - 1).step_by(3) {
-		sizes.insert(r.read_u8()?, r.read_u16::<BigEndian>()?);
+		sizes.insert(r.read_u8()?, r.read_u16::<BE>()?);
 	}
 
 	trace!("Event payload sizes: {:?}", sizes);
@@ -130,11 +132,11 @@ fn player_v1_0(r: [u8; 8], v1_3: Option<[u8; 16]>) -> Result<game::PlayerV1_0> {
 	let mut r = &r[..];
 	Ok(game::PlayerV1_0 {
 		ucf: game::Ucf {
-			dash_back: match r.read_u32::<BigEndian>()? {
+			dash_back: match r.read_u32::<BE>()? {
 				0 => None,
 				db => Some(game::DashBack(db)),
 			},
-			shield_drop: match r.read_u32::<BigEndian>()? {
+			shield_drop: match r.read_u32::<BE>()? {
 				0 => None,
 				sd => Some(game::ShieldDrop(sd)),
 			},
@@ -166,9 +168,9 @@ fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3
 			false => None,
 		}
 	};
-	r.read_u16::<BigEndian>()?; // ???
+	r.read_u16::<BE>()?; // ???
 	let bitfield = r.read_u8()?;
-	r.read_u16::<BigEndian>()?; // ???
+	r.read_u16::<BE>()?; // ???
 	let cpu_level = {
 		let cpu_level = r.read_u8()?;
 		match r#type {
@@ -176,11 +178,11 @@ fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3
 			_ => None,
 		}
 	};
-	r.read_u32::<BigEndian>()?; // ???
-	let offense_ratio = r.read_f32::<BigEndian>()?;
-	let defense_ratio = r.read_f32::<BigEndian>()?;
-	let model_scale = r.read_f32::<BigEndian>()?;
-	r.read_u32::<BigEndian>()?; // ???
+	r.read_u32::<BE>()?; // ???
+	let offense_ratio = r.read_f32::<BE>()?;
+	let defense_ratio = r.read_f32::<BE>()?;
+	let model_scale = r.read_f32::<BE>()?;
+	r.read_u32::<BE>()?; // ???
 	// total bytes: 0x24
 
 	#[cfg(v1_0)] let v1_0 = player_v1_0(v1_0.unwrap(), v1_3)?;
@@ -266,22 +268,22 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 		buf[2] = r.read_u8()?; // bitfield 3
 		buf
 	};
-	r.read_u32::<BigEndian>()?; // ???
+	r.read_u32::<BE>()?; // ???
 	let is_teams = r.read_u8()? != 0;
-	r.read_u16::<BigEndian>()?; // ???
+	r.read_u16::<BE>()?; // ???
 	let item_spawn_frequency = r.read_i8()?;
 	let self_destruct_score = r.read_i8()?;
 	r.read_u8()?; // ???
-	let stage = stage::Stage(r.read_u16::<BigEndian>()?);
-	let timer = r.read_u32::<BigEndian>()?;
+	let stage = stage::Stage(r.read_u16::<BE>()?);
+	let timer = r.read_u32::<BE>()?;
 	r.read_exact(&mut [0; 15])?; // ???
 	let item_spawn_bitfield = {
 		let mut buf = [0; 5];
 		r.read_exact(&mut buf)?;
 		buf
 	};
-	r.read_u64::<BigEndian>()?; // ???
-	let damage_ratio = r.read_f32::<BigEndian>()?;
+	r.read_u64::<BE>()?; // ???
+	let damage_ratio = r.read_f32::<BE>()?;
 	r.read_exact(&mut [0; 44])?; // ???
 	// @0x65
 	let mut players_v0 = [[0; 36]; 4];
@@ -291,7 +293,7 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 	// @0xf5
 	r.read_exact(&mut [0; 72])?; // ???
 	// @0x13d
-	let random_seed = r.read_u32::<BigEndian>()?;
+	let random_seed = r.read_u32::<BE>()?;
 
 	let players_v1_0 = match !cfg!(v1_0) && r.is_empty() {
 		true => [None, None, None, None],
@@ -350,24 +352,24 @@ fn game_end(r: &mut &[u8]) -> Result<game::End> {
 }
 
 fn frame_start(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Start>> {
-	let id = FrameId { index: r.read_i32::<BigEndian>()? };
+	let id = FrameId { index: r.read_i32::<BE>()? };
 	trace!("Frame Start: {:?}", id);
 	Ok(FrameEvent {
 		id: id,
 		event: frame::Start {
-			random_seed: r.read_u32::<BigEndian>()?,
+			random_seed: r.read_u32::<BE>()?,
 		},
 	})
 }
 
 fn frame_end_v3_7(r: &mut &[u8]) -> Result<frame::EndV3_7> {
 	Ok(frame::EndV3_7 {
-		latest_finalized_frame: r.read_i32::<BigEndian>()?,
+		latest_finalized_frame: r.read_i32::<BE>()?,
 	})
 }
 
 fn frame_end(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::End>> {
-	let id = FrameId { index: r.read_i32::<BigEndian>()? };
+	let id = FrameId { index: r.read_i32::<BE>()? };
 	trace!("Frame End: {:?}", id);
 	Ok(FrameEvent {
 		id: id,
@@ -399,26 +401,26 @@ fn item_v3_2(r: &mut &[u8]) -> Result<frame::ItemV3_2> {
 }
 
 fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Item>> {
-	let id = FrameId { index: r.read_i32::<BigEndian>()? };
+	let id = FrameId { index: r.read_i32::<BE>()? };
 	trace!("Item Update: {:?}", id);
-	let item_type = item::Item(r.read_u16::<BigEndian>()?);
+	let item_type = item::Item(r.read_u16::<BE>()?);
 	Ok(FrameEvent {
 		id: id,
 		event: frame::Item {
 			r#type: item_type,
 			state: r.read_u8()?,
-			direction: direction(r.read_f32::<BigEndian>()?)?,
+			direction: direction(r.read_f32::<BE>()?)?,
 			velocity: Velocity {
-				x: r.read_f32::<BigEndian>()?,
-				y: r.read_f32::<BigEndian>()?,
+				x: r.read_f32::<BE>()?,
+				y: r.read_f32::<BE>()?,
 			},
 			position: Position {
-				x: r.read_f32::<BigEndian>()?,
-				y: r.read_f32::<BigEndian>()?,
+				x: r.read_f32::<BE>()?,
+				y: r.read_f32::<BE>()?,
 			},
-			damage: r.read_u16::<BigEndian>()?,
-			timer: r.read_f32::<BigEndian>()?,
-			id: r.read_u32::<BigEndian>()?,
+			damage: r.read_u16::<BE>()?,
+			timer: r.read_f32::<BE>()?,
+			id: r.read_u32::<BE>()?,
 			#[cfg(v3_2)] v3_2: item_v3_2(r)?,
 			#[cfg(not(v3_2))] v3_2: match r.is_empty() {
 				true => None,
@@ -451,7 +453,7 @@ fn predict_character(id: PortId, last_char_states: &[CharState; NUM_PORTS]) -> I
 
 fn frame_pre_v1_4(r: &mut &[u8]) -> Result<frame::PreV1_4> {
 	Ok(frame::PreV1_4 {
-		damage: r.read_f32::<BigEndian>()?,
+		damage: r.read_f32::<BE>()?,
 	})
 }
 
@@ -468,7 +470,7 @@ fn frame_pre_v1_2(r: &mut &[u8]) -> Result<frame::PreV1_2> {
 
 fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result<FrameEvent<PortId, Pre>> {
 	let id = PortId {
-		index: r.read_i32::<BigEndian>()?,
+		index: r.read_i32::<BE>()?,
 		port: Port::try_from(r.read_u8()?).map_err(|e| err!("invalid port: {:?}", e))?,
 		is_follower: r.read_u8()? != 0,
 	};
@@ -480,32 +482,32 @@ fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result
 	// `TRANSFORM_GROUND` during the *previous* frame.
 	let character = predict_character(id, last_char_states);
 
-	let random_seed = r.read_u32::<BigEndian>()?;
-	let state = State::from(r.read_u16::<BigEndian>()?, character);
+	let random_seed = r.read_u32::<BE>()?;
+	let state = State::from(r.read_u16::<BE>()?, character);
 
 	let position = Position {
-		x: r.read_f32::<BigEndian>()?,
-		y: r.read_f32::<BigEndian>()?,
+		x: r.read_f32::<BE>()?,
+		y: r.read_f32::<BE>()?,
 	};
-	let direction = direction(r.read_f32::<BigEndian>()?)?;
+	let direction = direction(r.read_f32::<BE>()?)?;
 	let joystick = Position {
-		x: r.read_f32::<BigEndian>()?,
-		y: r.read_f32::<BigEndian>()?,
+		x: r.read_f32::<BE>()?,
+		y: r.read_f32::<BE>()?,
 	};
 	let cstick = Position {
-		x: r.read_f32::<BigEndian>()?,
-		y: r.read_f32::<BigEndian>()?,
+		x: r.read_f32::<BE>()?,
+		y: r.read_f32::<BE>()?,
 	};
-	let trigger_logical = r.read_f32::<BigEndian>()?;
+	let trigger_logical = r.read_f32::<BE>()?;
 	let buttons = frame::Buttons {
-		logical: buttons::Logical(r.read_u32::<BigEndian>()?),
-		physical: buttons::Physical(r.read_u16::<BigEndian>()?),
+		logical: buttons::Logical(r.read_u32::<BE>()?),
+		physical: buttons::Physical(r.read_u16::<BE>()?),
 	};
 	let triggers = frame::Triggers {
 		logical: trigger_logical,
 		physical: triggers::Physical {
-			l: r.read_f32::<BigEndian>()?,
-			r: r.read_f32::<BigEndian>()?,
+			l: r.read_f32::<BE>()?,
+			r: r.read_f32::<BE>()?,
 		},
 	};
 
@@ -587,13 +589,13 @@ fn update_last_char_state(id: PortId, character: Internal, state: State, last_ch
 }
 
 fn frame_post_v3_5(r: &mut &[u8], airborne: bool) -> Result<frame::PostV3_5> {
-	let autogenous_air_x_speed = r.read_f32::<BigEndian>()?;
-	let autogenous_y_speed = r.read_f32::<BigEndian>()?;
+	let autogenous_air_x_speed = r.read_f32::<BE>()?;
+	let autogenous_y_speed = r.read_f32::<BE>()?;
 	let knockback_velocity = Velocity {
-		x: r.read_f32::<BigEndian>()?,
-		y: r.read_f32::<BigEndian>()?,
+		x: r.read_f32::<BE>()?,
+		y: r.read_f32::<BE>()?,
 	};
-	let autogenous_ground_x_speed = r.read_f32::<BigEndian>()?;
+	let autogenous_ground_x_speed = r.read_f32::<BE>()?;
 
 	Ok(frame::PostV3_5 {
 		velocities: frame::Velocities {
@@ -626,9 +628,9 @@ fn frame_post_v2_0(r: &mut &[u8]) -> Result<frame::PostV2_0> {
 		r.read_exact(&mut buf)?;
 		flags(&buf)
 	};
-	let misc_as = r.read_f32::<BigEndian>()?;
+	let misc_as = r.read_f32::<BE>()?;
 	let airborne = r.read_u8()? != 0;
-	let ground = r.read_u16::<BigEndian>()?;
+	let ground = r.read_u16::<BE>()?;
 	let jumps = r.read_u8()?;
 	let l_cancel = match r.read_u8()? {
 		0 => None,
@@ -654,7 +656,7 @@ fn frame_post_v2_0(r: &mut &[u8]) -> Result<frame::PostV2_0> {
 
 fn frame_post_v0_2(r: &mut &[u8]) -> Result<frame::PostV0_2> {
 	Ok(frame::PostV0_2 {
-		state_age: r.read_f32::<BigEndian>()?,
+		state_age: r.read_f32::<BE>()?,
 		#[cfg(v2_0)] v2_0: frame_post_v2_0(r)?,
 		#[cfg(not(v2_0))] v2_0: match r.is_empty() {
 			true => None,
@@ -665,21 +667,21 @@ fn frame_post_v0_2(r: &mut &[u8]) -> Result<frame::PostV0_2> {
 
 fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> Result<FrameEvent<PortId, Post>> {
 	let id = PortId {
-		index: r.read_i32::<BigEndian>()?,
+		index: r.read_i32::<BE>()?,
 		port: Port::try_from(r.read_u8()?).map_err(|e| err!("invalid port: {:?}", e))?,
 		is_follower: r.read_u8()? != 0,
 	};
 	trace!("Post-Frame Update: {:?}", id);
 
 	let character = Internal(r.read_u8()?);
-	let state = State::from(r.read_u16::<BigEndian>()?, character);
+	let state = State::from(r.read_u16::<BE>()?, character);
 	let position = Position {
-		x: r.read_f32::<BigEndian>()?,
-		y: r.read_f32::<BigEndian>()?,
+		x: r.read_f32::<BE>()?,
+		y: r.read_f32::<BE>()?,
 	};
-	let direction = direction(r.read_f32::<BigEndian>()?)?;
-	let damage = r.read_f32::<BigEndian>()?;
-	let shield = r.read_f32::<BigEndian>()?;
+	let direction = direction(r.read_f32::<BE>()?)?;
+	let damage = r.read_f32::<BE>()?;
+	let shield = r.read_f32::<BE>()?;
 	let last_attack_landed = {
 		let attack = r.read_u8()?;
 		match attack {
@@ -776,7 +778,7 @@ pub fn parse<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H) -> Result<()
 		// top-level opening brace, `raw` key & type ("{U\x03raw[$U#l")
 		&[0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c])?;
 
-	let raw_len = r.read_u32::<BigEndian>()? as usize;
+	let raw_len = r.read_u32::<BE>()? as usize;
 	let (mut bytes_read, payload_sizes) = payload_sizes(&mut r)?;
 	let mut last_char_states = [DEFAULT_CHAR_STATE; NUM_PORTS];
 	let mut last_event: Option<Event> = None;
