@@ -4,6 +4,9 @@ use clap::{App, Arg};
 use jmespatch::ToJmespath;
 use log::{error};
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn inspect(paths: &[&str], config: &peppi::Config) -> Result<(), String> {
 	for path in paths {
 		let path = path::Path::new(path);
