@@ -4,6 +4,8 @@ Peppi is a Rust parser for [.slp](https://github.com/project-slippi/slippi-wiki/
 
 Peppi is fairly full-featured already, but still under active development. **APIs are still subject to breaking change** until version 1.0 is released.
 
+⚠ The [`const-generics`](https://github.com/hohav/peppi/tree/const-generics) branch contains significant changes that I plan to merge once Rust's [`min_const_generics`](https://github.com/rust-lang/rust/issues/74878) feature stabilizes (or possibly sooner). I don't anticipate major changes to the branch before then, so if you're just starting with peppi and can use Rust nightly, consider using it to avoid the churn.
+
 ## Installation
 
 In your `Cargo.toml`:
