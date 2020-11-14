@@ -16,6 +16,18 @@ pub enum Port {
 	P4 = 3,
 }
 
+impl fmt::Display for Port {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		use Port::*;
+		match *self {
+			P1 => write!(f, "P1"),
+			P2 => write!(f, "P2"),
+			P3 => write!(f, "P3"),
+			P4 => write!(f, "P4"),
+		}
+	}
+}
+
 #[derive(Debug, PartialEq, Serialize)]
 pub struct SlippiVersion(pub u8, pub u8, pub u8);
 
