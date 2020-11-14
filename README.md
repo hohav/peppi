@@ -34,13 +34,13 @@ fn main() {
 ```rust
 use std::{fs, io};
 
-use peppi::parse::{Handlers, FrameEvent};
+use peppi::parse::{Handlers, FrameEvent, PortId};
 use peppi::frame;
 
 struct FramePrinter {}
 
 impl Handlers for FramePrinter {
-    fn frame_post(&mut self, post: FrameEvent<frame::Post>) -> io::Result<()> {
+    fn frame_post(&mut self, post: FrameEvent<PortId, frame::Post>) -> io::Result<()> {
         println!("{}:{}", post.id.port, post.id.index);
         Ok(())
     }
