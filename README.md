@@ -23,9 +23,9 @@ peppi = { git = "https://github.com/hohav/peppi" }
 use std::path::Path;
 
 fn main() {
-	let path = Path::new("game.slp");
-	let game = peppi::game(path).unwrap();
-	println!("{:#?}", game);
+    let path = Path::new("game.slp");
+    let game = peppi::game(path).unwrap();
+    println!("{:#?}", game);
 }
 ```
 
@@ -40,18 +40,18 @@ use peppi::frame;
 struct FramePrinter {}
 
 impl Handlers for FramePrinter {
-	fn frame_post(&mut self, post: FrameEvent<frame::Post>) -> io::Result<()> {
-		println!("{}:{}", post.id.port, post.id.index);
-		Ok(())
-	}
+    fn frame_post(&mut self, post: FrameEvent<frame::Post>) -> io::Result<()> {
+        println!("{}:{}", post.id.port, post.id.index);
+        Ok(())
+    }
 }
 
 fn main() {
-	let f = fs::File::open("game.slp").unwrap();
-	let mut r = io::BufReader::new(f);
-	let mut handlers = FramePrinter {};
+    let f = fs::File::open("game.slp").unwrap();
+    let mut r = io::BufReader::new(f);
+    let mut handlers = FramePrinter {};
 
-	peppi::parse(&mut r, &mut handlers).unwrap();
+    peppi::parse(&mut r, &mut handlers).unwrap();
 }
 ```
 
