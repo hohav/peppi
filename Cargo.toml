@@ -7,20 +7,22 @@ edition = "2018"
 [dependencies]
 byteorder = "1"
 chrono = { version = "0.4", features = ["serde"] }
-clap = "2.33"
+clap = { version = "2.33", optional = true }
 encoding_rs = "0.8"
-jmespatch = { version = "0.3.0", features = ["specialized"] }
+jmespatch = { version = "0.3.0", features = ["specialized"], optional = true }
 log = "0.4"
-mimalloc = { version = "0.1.22", default-features = false }
+mimalloc = { version = "0.1.22", default-features = false, optional = true }
 num_enum = "0.4"
-pretty_env_logger = "0.4"
-regex = "1.3"
+pretty_env_logger = { version = "0.4", optional = true }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde_json = { version = "1.0", optional = true }
 
 [lib]
 name = "peppi"
 path = "src/lib.rs"
+
+[features]
+build-binary = ["clap", "jmespatch", "mimalloc", "pretty_env_logger", "serde_json"]
 
 [profile.release]
 opt-level = 3
@@ -36,3 +38,4 @@ rpath = false
 [[bin]]
 name = "slp"
 path = "src/bin.rs"
+required-features = ["build-binary"]
