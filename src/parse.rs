@@ -240,7 +240,7 @@ fn game_start_v2_0(r: &mut &[u8]) -> Result<game::StartV2_0> {
 	Ok(game::StartV2_0 {
 		is_frozen_ps: r.read_u8()? != 0,
 		v3_7: {
-			#[cfg(v3_7)] { game_start_v3_7()? }
+			#[cfg(v3_7)] { game_start_v3_7(r)? }
 			#[cfg(not(v3_7))] match r.is_empty() {
 				true => None,
 				_ => Some(game_start_v3_7(r)?),
@@ -253,7 +253,7 @@ fn game_start_v1_5(r: &mut &[u8]) -> Result<game::StartV1_5> {
 	Ok(game::StartV1_5 {
 		is_pal: r.read_u8()? != 0,
 		v2_0: {
-			#[cfg(v2_0)] { game_start_v2_0()? }
+			#[cfg(v2_0)] { game_start_v2_0(r)? }
 			#[cfg(not(v2_0))] match r.is_empty() {
 				true => None,
 				_ => Some(game_start_v2_0(r)?),
