@@ -250,12 +250,6 @@ pub type Frame3 = Frame<3>;
 pub type Frame4 = Frame<4>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct ChargeShot {
-	pub power: u8,
-	pub is_released: bool,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct ItemV3_6 {
 	pub owner: Option<game::Port>,
 }
