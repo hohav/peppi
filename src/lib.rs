@@ -19,7 +19,7 @@ pub struct Config {
 // TODO: use serde_state to pass this config to the serializers?
 pub static mut CONFIG: Config = Config {
 	json: false,
-	frames: false,
+	frames: true,
 	enum_names: false,
 	query: None,
 };
