@@ -9,9 +9,9 @@ byteorder = "1"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "2.33", optional = true }
 encoding_rs = "0.8"
-jmespatch = { version = "0.3.0", features = ["specialized"], optional = true }
+jmespatch = { version = "0.3", features = ["specialized"], optional = true }
 log = "0.4"
-mimalloc = { version = "0.1.22", default-features = false, optional = true }
+mimalloc = { version = "0.1", default-features = false, optional = true }
 num_enum = "0.5"
 pretty_env_logger = { version = "0.4", optional = true }
 serde = { version = "1.0", features = ["derive"] }
