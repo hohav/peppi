@@ -58,13 +58,13 @@ macro_rules! into_game {
 		for n in 0 .. frame_count {
 			frames.push(Frame {
 				start: {
-                    #[cfg(v2_2)] { $gp.frames_start[n] }
-				    #[cfg(not(v2_2))] { $gp.frames_start.get(n).copied() }
-                },
+					#[cfg(v2_2)] { $gp.frames_start[n] }
+					#[cfg(not(v2_2))] { $gp.frames_start.get(n).copied() }
+				},
 				end: {
-                    #[cfg(v2_2)] { $gp.frames_end[n] }
-				    #[cfg(not(v2_2))] { $gp.frames_end.get(n).copied() }
-                },
+					#[cfg(v2_2)] { $gp.frames_end[n] }
+					#[cfg(not(v2_2))] { $gp.frames_end.get(n).copied() }
+				},
 				ports: [ $(
 					Port {
 						leader: frame::Data {
