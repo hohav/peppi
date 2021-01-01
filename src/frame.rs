@@ -1,38 +1,8 @@
-use std::fmt;
-
 use serde::Serialize;
 use serde::ser::SerializeStruct;
 
 use super::{action_state, attack, buttons, character, game, item, triggers};
-
-pseudo_enum!(Direction: i8 {
-	-1 => LEFT,
-	1 => RIGHT,
-});
-
-#[derive(Copy, Clone, PartialEq, Serialize)]
-pub struct Position {
-	pub x: f32,
-	pub y: f32,
-}
-
-impl fmt::Debug for Position {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "({}, {})", self.x, self.y)
-	}
-}
-
-#[derive(Copy, Clone, PartialEq, Serialize)]
-pub struct Velocity {
-	pub x: f32,
-	pub y: f32,
-}
-
-impl fmt::Debug for Velocity {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "({}, {})", self.x, self.y)
-	}
-}
+use super::primitives::{Direction, Position, Velocity};
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Buttons {

@@ -37,6 +37,7 @@ pub mod game_parser;
 pub mod item;
 pub mod metadata;
 pub mod parse;
+pub mod primitives;
 pub mod stage;
 pub mod triggers;
 pub mod ubjson;

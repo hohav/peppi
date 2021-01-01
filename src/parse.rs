@@ -13,8 +13,9 @@ use super::{action_state, buttons, character, frame, game, item, stage, triggers
 use super::action_state::{Common, State};
 use super::attack::Attack;
 use super::character::Internal;
-use super::frame::{Pre, Post, Direction, Position, Velocity};
+use super::frame::{Pre, Post};
 use super::game::{NUM_PORTS, Player, PlayerType, Port};
+use super::primitives::{Direction, Position, Velocity};
 
 const ZELDA_TRANSFORM_FRAME: u32 = 43;
 const SHEIK_TRANSFORM_FRAME: u32 = 36;
