@@ -1,4 +1,4 @@
-use std::path;
+use std::{fs, io};
 
 use clap::{App, Arg};
 use jmespatch::ToJmespath;
@@ -9,8 +9,9 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn inspect(paths: &[&str], config: &peppi::Config) -> Result<(), String> {
 	for path in paths {
-		let path = path::Path::new(path);
-		let game = peppi::game(path).map_err(|e| format!("{:?}", e))?;
+		let mut buf = io::BufReader::new(
+			fs::File::open(path).map_err(|e| format!("{:?}", e))?);
+		let game = peppi::game(&mut buf).map_err(|e| format!("{:?}", e))?;
 		if let Some(query) = &config.query {
 			let query = jmespatch::compile(query).map_err(|e| format!("{:?}", e))?;
 			let jmes = game.to_jmespath().map_err(|e| format!("{:?}", e))?;

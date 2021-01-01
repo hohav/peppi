@@ -44,7 +44,7 @@ pub mod ubjson;
 
 #[cfg(test)] mod test;
 
-use std::{error, fmt, fs, io, path};
+use std::{error, fmt, io};
 
 #[derive(Debug)]
 pub struct ParseError {
@@ -93,11 +93,9 @@ pub fn parse<R: io::Read, H: parse::Handlers>(r: &mut R, handlers: &mut H) -> st
 		.map_err(|e| ParseError { error: e, pos: Some(r.bytes_read) })
 }
 
-/// Parses the Slippi replay file at `path`, returning a `game::Game` object.
-pub fn game(path: &path::Path) -> std::result::Result<game::Game, ParseError> {
-	let f = fs::File::open(path).map_err(|e| ParseError { error: e, pos: None })?;
-	let mut r = io::BufReader::new(f);
+/// Parses a Slippi replay file from `r`, returning a `game::Game` object.
+pub fn game<R: io::Read>(r: &mut R) -> Result<game::Game, ParseError> {
 	let mut game_parser: game_parser::GameParser = Default::default();
-	parse(&mut r, &mut game_parser)
+	parse(r, &mut game_parser)
 		.and_then(|_| game_parser.into_game().map_err(|e| ParseError { pos: None, error: e }))
 }

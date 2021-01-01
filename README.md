@@ -23,8 +23,9 @@ peppi = { git = "https://github.com/hohav/peppi" }
 use std::path::Path;
 
 fn main() {
-    let path = Path::new("game.slp");
-    let game = peppi::game(path).unwrap();
+    let mut buf = io::BufReader::new(
+        fs::File::open("game.slp").unwrap());
+    let game = peppi::game(&mut buf).unwrap();
     println!("{:#?}", game);
 }
 ```
