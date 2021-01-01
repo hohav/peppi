@@ -69,9 +69,45 @@ impl State {
 				Internal::YOSHI => State::Yoshi(Yoshi(value)),
 				Internal::YOUNG_LINK => State::YoungLink(YoungLink(value)),
 				Internal::ZELDA => State::Zelda(Zelda(value)),
-
 				_ => State::Unknown(value),
 			}
+		}
+	}
+}
+
+impl Into<u16> for State {
+	fn into(self) -> u16 {
+		use State::*;
+		match self {
+			Common(s) => s.0,
+			Bowser(s) => s.0,
+			CaptainFalcon(s) => s.0,
+			DonkeyKong(s) => s.0,
+			DrMario(s) => s.0,
+			Falco(s) => s.0,
+			Fox(s) => s.0,
+			GameAndWatch(s) => s.0,
+			Ganondorf(s) => s.0,
+			Jigglypuff(s) => s.0,
+			Kirby(s) => s.0,
+			Link(s) => s.0,
+			Luigi(s) => s.0,
+			Mario(s) => s.0,
+			Marth(s) => s.0,
+			Mewtwo(s) => s.0,
+			Nana(s) => s.0,
+			Ness(s) => s.0,
+			Peach(s) => s.0,
+			Pichu(s) => s.0,
+			Pikachu(s) => s.0,
+			Popo(s) => s.0,
+			Roy(s) => s.0,
+			Samus(s) => s.0,
+			Sheik(s) => s.0,
+			Yoshi(s) => s.0,
+			YoungLink(s) => s.0,
+			Zelda(s) => s.0,
+			Unknown(s) => s,
 		}
 	}
 }
