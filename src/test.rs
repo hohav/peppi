@@ -1,5 +1,5 @@
 use std::collections::{HashMap};
-use std::path;
+use std::{fs, io};
 
 use chrono::{DateTime, Utc};
 
@@ -14,7 +14,9 @@ use super::stage::Stage;
 use super::metadata;
 
 fn game(name: &str) -> Result<Game, String> {
-	super::game(path::Path::new(&format!("test/replays/{}.slp", name))).map_err(|e| format!("couldn't parse game: {:?}", e))
+	let mut buf = io::BufReader::new(
+		fs::File::open(&format!("test/replays/{}.slp", name)).unwrap());
+	super::game(&mut buf).map_err(|e| format!("couldn't parse game: {:?}", e))
 }
 
 fn button_seq(game:&Game) -> Result<Vec<Buttons>, String> {
