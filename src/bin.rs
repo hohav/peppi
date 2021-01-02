@@ -2,26 +2,21 @@ use std::{fs, io};
 
 use clap::{App, Arg};
 use jmespatch::ToJmespath;
-use log::{error};
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-fn inspect(paths: &[&str], config: &peppi::Config) -> Result<(), String> {
-	for path in paths {
-		let mut buf = io::BufReader::new(
-			fs::File::open(path).map_err(|e| format!("{:?}", e))?);
-		let game = peppi::game(&mut buf).map_err(|e| format!("{:?}", e))?;
-		if let Some(query) = &config.query {
-			let query = jmespatch::compile(query).map_err(|e| format!("{:?}", e))?;
-			let jmes = game.to_jmespath().map_err(|e| format!("{:?}", e))?;
-			let result = query.search(jmes).map_err(|e| format!("{:?}", e))?;
-			println!("{}", serde_json::to_string(&result).map_err(|e| format!("{:?}", e))?);
-		} else if config.json {
-			println!("{}", serde_json::to_string(&game).map_err(|e| format!("{:?}", e))?);
-		} else {
-			println!("{:#?}", game);
-		}
+fn inspect<R: io::Read>(buf: &mut R, config: &peppi::Config) -> Result<(), String> {
+	let game = peppi::game(buf).map_err(|e| format!("{:?}", e))?;
+	if let Some(query) = &config.query {
+		let query = jmespatch::compile(query).map_err(|e| format!("{:?}", e))?;
+		let jmes = game.to_jmespath().map_err(|e| format!("{:?}", e))?;
+		let result = query.search(jmes).map_err(|e| format!("{:?}", e))?;
+		println!("{}", serde_json::to_string(&result).map_err(|e| format!("{:?}", e))?);
+	} else if config.json {
+		println!("{}", serde_json::to_string(&game).map_err(|e| format!("{:?}", e))?);
+	} else {
+		println!("{:#?}", game);
 	}
 	Ok(())
 }
@@ -51,12 +46,11 @@ fn main() {
 			.short("n")
 			.long("names"))
 		.arg(Arg::with_name("FILE")
-			.help("Replay file to parse")
-			.required(true)
+			.help("Replay file to parse (`-` for STDIN)")
 			.index(1))
 		.get_matches();
 
-	let path = matches.value_of("FILE").unwrap().to_string();
+	let path = matches.value_of("FILE").unwrap_or("-");
 
 	let config = peppi::Config {
 		json: matches.is_present("json"),
@@ -67,7 +61,11 @@ fn main() {
 
 	unsafe { peppi::CONFIG = config.clone() };
 
-	if let Err(e) = inspect(&[&path], &config) {
-		error!("{}", e);
+	if path == "-" {
+		inspect(&mut io::stdin(), &config).unwrap();
+	} else {
+		let mut buf = io::BufReader::new(
+			fs::File::open(path).unwrap());
+		inspect(&mut buf, &config).unwrap();
 	}
 }
