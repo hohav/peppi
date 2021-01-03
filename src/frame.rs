@@ -52,7 +52,6 @@ pub struct End {
 	#[cfg(v3_7)] #[serde(flatten)]
 	pub v3_7: EndV3_7,
 	#[cfg(not(v3_7))] #[serde(flatten)]
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v3_7: Option<EndV3_7>,
 }
 
@@ -68,7 +67,6 @@ pub struct PreV1_2 {
 	#[cfg(v1_4)] #[serde(flatten)]
 	pub v1_4: PreV1_4,
 	#[cfg(not(v1_4))] #[serde(flatten)]
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v1_4: Option<PreV1_4>,
 }
 
@@ -86,7 +84,6 @@ pub struct Pre {
 	#[cfg(v1_2)] #[serde(flatten)]
 	pub v1_2: PreV1_2,
 	#[cfg(not(v1_2))] #[serde(flatten)]
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v1_2: Option<PreV1_2>,
 }
 
@@ -108,7 +105,6 @@ pub struct PostV2_1 {
 	#[cfg(v3_5)] #[serde(flatten)]
 	pub v3_5: PostV3_5,
 	#[cfg(not(v3_5))] #[serde(flatten)]
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v3_5: Option<PostV3_5>,
 }
 
@@ -124,7 +120,6 @@ pub struct PostV2_0 {
 	#[cfg(v2_1)] #[serde(flatten)]
 	pub v2_1: PostV2_1,
 	#[cfg(not(v2_1))] #[serde(flatten)]
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v2_1: Option<PostV2_1>,
 }
 
@@ -135,7 +130,6 @@ pub struct PostV0_2 {
 	#[cfg(v2_0)] #[serde(flatten)]
 	pub v2_0: PostV2_0,
 	#[cfg(not(v2_0))] #[serde(flatten)]
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v2_0: Option<PostV2_0>,
 }
 
@@ -155,7 +149,6 @@ pub struct Post {
 	#[cfg(v0_2)] #[serde(flatten)]
 	pub v0_2: PostV0_2,
 	#[cfg(not(v0_2))] #[serde(flatten)]
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v0_2: Option<PostV0_2>,
 }
 
@@ -174,15 +167,11 @@ pub struct Port {
 
 #[derive(Debug, PartialEq)]
 pub struct Frame<const N: usize> {
-	#[cfg(v2_2)]
-	pub start: Start,
-	#[cfg(not(v2_2))]
-	pub start: Option<Start>,
+	#[cfg(v2_2)] pub start: Start,
+	#[cfg(not(v2_2))] pub start: Option<Start>,
 
-	#[cfg(v3_0)]
-	pub end: End,
-	#[cfg(not(v3_0))]
-	pub end: Option<End>,
+	#[cfg(v3_0)] pub end: End,
+	#[cfg(not(v3_0))] pub end: Option<End>,
 
 	pub ports: [Port; N],
 	pub items: Vec<Item>,
@@ -231,7 +220,6 @@ pub struct ItemV3_2 {
 	#[cfg(v3_6)] #[serde(flatten)]
 	pub v3_6: ItemV3_6,
 	#[cfg(not(v3_6))] #[serde(flatten)]
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v3_6: Option<ItemV3_6>,
 }
 
@@ -249,6 +237,5 @@ pub struct Item {
 	#[cfg(v3_2)] #[serde(flatten)]
 	pub v3_2: ItemV3_2,
 	#[cfg(not(v3_2))] #[serde(flatten)]
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub v3_2: Option<ItemV3_2>,
 }
