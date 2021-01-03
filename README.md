@@ -58,7 +58,9 @@ fn main() {
 
 ## Inspector
 
-You can build `slp`, a binary inspector for Slippi files, with `cargo build --release --features build-binary`. For example, this command shows you the post-frame action state for each port (player) on the last frame of the game:
+You can build `slp`, an inspector for Slippi files, with `cargo build --release --features slp`.
+
+For example, this command shows you the post-frame action state for each port (player) on the last frame of the game:
 
 ```bash
 $ slp -nq frames[-1].ports[].leader.post.state game.slp

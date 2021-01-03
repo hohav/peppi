@@ -24,7 +24,7 @@ name = "peppi"
 path = "src/lib.rs"
 
 [features]
-build-binary = ["clap", "jmespatch", "mimalloc", "pretty_env_logger", "serde_json"]
+slp = ["clap", "jmespatch", "mimalloc", "pretty_env_logger", "serde_json"]
 
 [profile.release]
 opt-level = 3
@@ -40,4 +40,4 @@ rpath = false
 [[bin]]
 name = "slp"
 path = "src/bin.rs"
-required-features = ["build-binary"]
+required-features = ["slp"]
