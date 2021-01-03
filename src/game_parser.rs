@@ -62,8 +62,8 @@ macro_rules! into_game {
 					#[cfg(not(v2_2))] { $gp.frames_start.get(n).copied() }
 				},
 				end: {
-					#[cfg(v2_2)] { $gp.frames_end[n] }
-					#[cfg(not(v2_2))] { $gp.frames_end.get(n).copied() }
+					#[cfg(v3_0)] { $gp.frames_end[n] }
+					#[cfg(not(v3_0))] { $gp.frames_end.get(n).copied() }
 				},
 				ports: [ $(
 					Port {

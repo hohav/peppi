@@ -128,7 +128,7 @@ pub struct StartV3_7 {
 pub struct StartV2_0 {
 	pub is_frozen_ps: bool,
 
-	#[cfg(v2_0)] #[serde(flatten)]
+	#[cfg(v3_7)] #[serde(flatten)]
 	pub v3_7: StartV3_7,
 	#[cfg(not(v3_7))] #[serde(flatten)]
 	pub v3_7: Option<StartV3_7>,
