@@ -85,7 +85,10 @@ macro_rules! into_game {
 						},
 					},
 				)* ],
-				items: $gp.items[n].clone(),
+				items: {
+					#[cfg(v3_0)] { $gp.items[n].clone() }
+					#[cfg(not(v3_0))] { $gp.items.get(n).cloned() }
+				},
 			});
 		}
 

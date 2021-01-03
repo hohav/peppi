@@ -167,14 +167,16 @@ pub struct Port {
 
 #[derive(Debug, PartialEq)]
 pub struct Frame<const N: usize> {
+	pub ports: [Port; N],
+
 	#[cfg(v2_2)] pub start: Start,
 	#[cfg(not(v2_2))] pub start: Option<Start>,
 
 	#[cfg(v3_0)] pub end: End,
 	#[cfg(not(v3_0))] pub end: Option<End>,
 
-	pub ports: [Port; N],
-	pub items: Vec<Item>,
+	#[cfg(v3_0)] pub items: Vec<Item>,
+	#[cfg(not(v3_0))] pub items: Option<Vec<Item>>,
 }
 
 // workaround for Serde not supporting const generics
@@ -197,7 +199,13 @@ impl<const N: usize> Serialize for Frame<N> {
 		}
 
 		state.serialize_field("ports", &self.ports[..])?;
-		state.serialize_field("items", &self.items[..])?;
+
+		#[cfg(v3_0)]
+		state.serialize_field("items", &self.items)?;
+		#[cfg(not(v3_0))]
+		if let Some(items) = &self.items {
+			state.serialize_field("items", &items)?;
+		}
 
 		state.end()
 	}
