@@ -10,18 +10,14 @@ macro_rules! err {
 
 #[derive(Clone, Debug)]
 pub struct Config {
-	pub json: bool,
 	pub frames: bool,
 	pub enum_names: bool,
-	pub query: Option<String>,
 }
 
 // TODO: use serde_state to pass this config to the serializers?
 pub static mut CONFIG: Config = Config {
-	json: false,
 	frames: true,
 	enum_names: false,
-	query: None,
 };
 
 #[macro_use] pub mod pseudo_bitmask;

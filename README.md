@@ -58,13 +58,4 @@ fn main() {
 
 ## Inspector
 
-You can build `slp`, an inspector for Slippi files, with `cargo build --release --features slp`.
-
-For example, this command shows you the post-frame action state for each port (player) on the last frame of the game:
-
-```bash
-$ slp -nq frames[-1].ports[].leader.post.state game.slp
-["14:WAIT","1:DEAD_LEFT"]
-```
-
-Run `slp --help` for more info.
+⚠ The `slp` tool has moved to the [peppi-slp](https://github.com/hohav/peppi-slp) crate.
