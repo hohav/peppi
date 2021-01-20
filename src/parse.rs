@@ -573,40 +573,26 @@ fn update_last_char_state(id: PortId, character: Internal, state: State, last_ch
 	last_char_states[id.port as usize] = CharState {
 		character: character,
 		state: state,
-		age: match state {
-			s if s == prev.state => prev.age + 1,
+		age: match (prev.state, state) {
+			(s0, s1) if s0 == s1 => prev.age + 1,
 			// `TRANSFORM_AIR` can transition into `TRANSFORM_GROUND`
-            // without interruption, so conflate them for age purposes
-			State::Zelda(action_state::Zelda::TRANSFORM_GROUND) =>
-				match prev.state {
-					State::Zelda(action_state::Zelda::TRANSFORM_AIR) =>
-						// If you land on the frame where you would have transitioned from
-						// `TRANSFORM_AIR` to `TRANSFORM_AIR_ENDING`, you instead transition to
-						// `TRANSFORM_GROUND` for one frame before going to
-						// `TRANSFORM_GROUND_ENDING` on the next frame. This delays the character
-						// switch by one frame, so we cap `age` at its previous value so as not to
-						// confuse `predict_character`.
-						min(ZELDA_TRANSFORM_FRAME - 1, prev.age + 1),
-					_ => 0,
-				},
-			State::Zelda(action_state::Zelda::TRANSFORM_AIR) =>
-				match prev.state {
-					State::Zelda(action_state::Zelda::TRANSFORM_GROUND) =>
-						min(ZELDA_TRANSFORM_FRAME - 1, prev.age + 1),
-					_ => 0,
-				},
-			State::Sheik(action_state::Sheik::TRANSFORM_GROUND) =>
-				match prev.state {
-					State::Sheik(action_state::Sheik::TRANSFORM_AIR) =>
-						min(SHEIK_TRANSFORM_FRAME - 1, prev.age + 1),
-					_ => 0,
-				},
-			State::Sheik(action_state::Sheik::TRANSFORM_AIR) =>
-				match prev.state {
-					State::Sheik(action_state::Sheik::TRANSFORM_GROUND) =>
-						min(SHEIK_TRANSFORM_FRAME - 1, prev.age + 1),
-					_ => 0,
-				},
+			// without interruption, so conflate them for age purposes.
+			// Note: if you land on the frame where you would have transitioned from
+			// `TRANSFORM_AIR` to `TRANSFORM_AIR_ENDING`, you instead transition to
+			// `TRANSFORM_GROUND` for one frame before going to
+			// `TRANSFORM_GROUND_ENDING` on the next frame. This delays the character
+			// switch by one frame, so we cap `age` at its previous value so as not to
+			// confuse `predict_character`.
+			(State::Zelda(action_state::Zelda::TRANSFORM_AIR),
+			 State::Zelda(action_state::Zelda::TRANSFORM_GROUND)) |
+			(State::Zelda(action_state::Zelda::TRANSFORM_GROUND),
+			 State::Zelda(action_state::Zelda::TRANSFORM_AIR)) =>
+				min(ZELDA_TRANSFORM_FRAME - 1, prev.age + 1),
+			(State::Sheik(action_state::Sheik::TRANSFORM_AIR),
+			 State::Sheik(action_state::Sheik::TRANSFORM_GROUND)) |
+			(State::Sheik(action_state::Sheik::TRANSFORM_GROUND),
+			 State::Sheik(action_state::Sheik::TRANSFORM_AIR)) =>
+				min(SHEIK_TRANSFORM_FRAME - 1, prev.age + 1),
 			_ => 0,
 		},
 	};
