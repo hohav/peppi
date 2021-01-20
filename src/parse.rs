@@ -497,9 +497,10 @@ fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result
 	};
 	trace!("Pre-Frame Update: {:?}", id);
 
-	// We need to know the character to interpret the action state properly, but for Sheik/Zelda we
-	// don't know whether they transformed this frame untilwe get the corresponding frame::Post
-	// event. So we predict based on whether we were on the last frame of `TRANSFORM_AIR` or
+	// We need to know the character to interpret the action state properly,
+	// but for Sheik/Zelda we don't know whether they transformed this frame
+	// until we get the corresponding `frame::Post` event. So we predict based
+	// on whether we were on the last frame of `TRANSFORM_AIR` or
 	// `TRANSFORM_GROUND` during the *previous* frame.
 	let character = predict_character(id, last_char_states);
 
@@ -574,8 +575,8 @@ fn update_last_char_state(id: PortId, character: Internal, state: State, last_ch
 		state: state,
 		age: match state {
 			s if s == prev.state => prev.age + 1,
-			// `TRANSFORM_GROUND` and TRANSFORM_AIR can transition into each other without
-			// interrupting the transformation, so treat them the same for age purposes
+			// `TRANSFORM_AIR` can transition into `TRANSFORM_GROUND`
+            // without interruption, so conflate them for age purposes
 			State::Zelda(action_state::Zelda::TRANSFORM_GROUND) =>
 				match prev.state {
 					State::Zelda(action_state::Zelda::TRANSFORM_AIR) =>
