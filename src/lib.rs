@@ -10,13 +10,13 @@ macro_rules! err {
 
 #[derive(Clone, Debug)]
 pub struct Config {
-	pub frames: bool,
+	pub skip_frames: bool,
 	pub enum_names: bool,
 }
 
 // TODO: use serde_state to pass this config to the serializers?
 pub static mut CONFIG: Config = Config {
-	frames: true,
+	skip_frames: false,
 	enum_names: false,
 };
 

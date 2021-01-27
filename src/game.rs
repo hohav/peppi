@@ -188,10 +188,10 @@ pub struct End {
 }
 
 fn skip_frames<T>(_: &T) -> bool {
-	!unsafe { super::CONFIG.frames }
+	unsafe { super::CONFIG.skip_frames }
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Frames {
 	P1(Vec<frame::Frame1>),
@@ -211,6 +211,20 @@ impl Frames {
 	}
 }
 
+impl fmt::Debug for Frames {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match unsafe { super::CONFIG.skip_frames } {
+			true => f.debug_list().finish(),
+			_ => match self {
+				Self::P1(frames) => f.debug_list().entries(frames.iter()).finish(),
+				Self::P2(frames) => f.debug_list().entries(frames.iter()).finish(),
+				Self::P3(frames) => f.debug_list().entries(frames.iter()).finish(),
+				Self::P4(frames) => f.debug_list().entries(frames.iter()).finish(),
+			}
+		}
+	}
+}
+
 #[derive(PartialEq, Serialize)]
 pub struct Game {
 	pub start: Start,
@@ -222,19 +236,11 @@ pub struct Game {
 
 impl fmt::Debug for Game {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match unsafe { super::CONFIG.frames } {
-			true => f.debug_struct("Frames")
-				.field("metadata", &self.metadata)
-				.field("start", &self.start)
-				.field("end", &self.end)
-				.field("frames", &self.frames)
-				.finish(),
-			_ => f.debug_struct("Frames")
-				.field("metadata", &self.metadata)
-				.field("start", &self.start)
-				.field("end", &self.end)
-				.field("frames", &self.frames.len())
-				.finish(),
-		}
+		f.debug_struct("Game")
+			.field("metadata", &self.metadata)
+			.field("start", &self.start)
+			.field("end", &self.end)
+			.field("frames", &self.frames)
+			.finish()
 	}
 }
