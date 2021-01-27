@@ -1,6 +1,3 @@
-#![allow(incomplete_features)]
-#![feature(const_generics)]
-
 #[macro_export]
 macro_rules! err {
 	($( $arg: expr ),*) => {
