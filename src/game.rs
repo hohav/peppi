@@ -29,8 +29,14 @@ impl Display for Port {
 	}
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, PartialOrd, Serialize)]
 pub struct SlippiVersion(pub u8, pub u8, pub u8);
+
+impl Display for SlippiVersion {
+	fn fmt(&self, f: &mut Formatter) -> Result {
+		write!(f, "{}.{}.{}", self.0, self.1, self.2)
+	}
+}
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Slippi {
