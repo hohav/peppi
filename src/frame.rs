@@ -94,8 +94,18 @@ pub struct Velocities {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct PostV3_8 {
+	pub hitlag: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct PostV3_5 {
 	pub velocities: Velocities,
+
+	#[cfg(v3_8)] #[serde(flatten)]
+	pub v3_8: PostV3_8,
+	#[cfg(not(v3_8))] #[serde(flatten)]
+	pub v3_8: Option<PostV3_8>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]

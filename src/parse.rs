@@ -598,6 +598,12 @@ fn update_last_char_state(id: PortId, character: Internal, state: State, last_ch
 	};
 }
 
+fn frame_post_v3_8(r: &mut &[u8]) -> Result<frame::PostV3_8> {
+	Ok(frame::PostV3_8 {
+		hitlag: r.read_f32::<BE>()?,
+	})
+}
+
 fn frame_post_v3_5(r: &mut &[u8], airborne: bool) -> Result<frame::PostV3_5> {
 	let autogenous_air_x_speed = r.read_f32::<BE>()?;
 	let autogenous_y_speed = r.read_f32::<BE>()?;
@@ -617,6 +623,13 @@ fn frame_post_v3_5(r: &mut &[u8], airborne: bool) -> Result<frame::PostV3_5> {
 				y: autogenous_y_speed,
 			},
 			knockback: knockback_velocity,
+		},
+		v3_8: {
+			#[cfg(v3_8)] { frame_post_v3_8(r)? }
+			#[cfg(not(v3_8))] match r.is_empty() {
+				true => None,
+				_ => Some(frame_post_v3_8(r)?),
+			}
 		},
 	})
 }
