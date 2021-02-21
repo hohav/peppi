@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{Debug, Display, Formatter, Result};
 use std::collections::HashMap;
 
 use serde::Serialize;
@@ -17,8 +17,8 @@ pub enum Port {
 	P4 = 3,
 }
 
-impl fmt::Display for Port {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for Port {
+	fn fmt(&self, f: &mut Formatter) -> Result {
 		use Port::*;
 		match *self {
 			P1 => write!(f, "P1"),
@@ -212,8 +212,8 @@ impl Frames {
 	}
 }
 
-impl fmt::Debug for Frames {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Debug for Frames {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
 		match unsafe { super::CONFIG.skip_frames } {
 			true => f.debug_list().finish(),
 			_ => match self {
@@ -236,8 +236,8 @@ pub struct Game {
 	pub metadata_raw: HashMap<String, ubjson::Object>,
 }
 
-impl fmt::Debug for Game {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Debug for Game {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
 		f.debug_struct("Game")
 			.field("metadata", &self.metadata)
 			.field("start", &self.start)
