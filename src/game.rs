@@ -1,13 +1,13 @@
 use std::fmt::{Debug, Display, Formatter, Result};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::{character, frame, metadata, stage};
 
 pub const NUM_PORTS: usize = 4;
 pub const FIRST_FRAME_INDEX: i32 = -123;
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, num_enum::TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize, num_enum::TryFromPrimitive)]
 #[repr(u8)]
 pub enum Port {
 	P1 = 0,
@@ -28,7 +28,7 @@ impl Display for Port {
 	}
 }
 
-#[derive(Debug, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub struct SlippiVersion(pub u8, pub u8, pub u8);
 
 impl Display for SlippiVersion {
@@ -37,7 +37,7 @@ impl Display for SlippiVersion {
 	}
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Slippi {
 	pub version: SlippiVersion,
 }
@@ -60,7 +60,7 @@ pseudo_enum!(TeamShade: u8 {
 	2 => DARK,
 });
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Team {
 	pub color: TeamColor,
 	pub shade: TeamShade,
@@ -76,18 +76,18 @@ pseudo_enum!(ShieldDrop: u32 {
 	2 => ARDUINO,
 });
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Ucf {
 	pub dash_back: Option<DashBack>,
 	pub shield_drop: Option<ShieldDrop>,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct PlayerV1_3 {
 	pub name_tag: String,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct PlayerV1_0 {
 	pub ucf: Ucf,
 
@@ -97,7 +97,7 @@ pub struct PlayerV1_0 {
 	pub v1_3: Option<PlayerV1_3>,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Player {
 	pub port: Port,
 
@@ -119,18 +119,18 @@ pub struct Player {
 	pub v1_0: Option<PlayerV1_0>,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Scene {
 	pub minor: u8,
 	pub major: u8,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct StartV3_7 {
 	pub scene: Scene,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct StartV2_0 {
 	pub is_frozen_ps: bool,
 
@@ -140,7 +140,7 @@ pub struct StartV2_0 {
 	pub v3_7: Option<StartV3_7>,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct StartV1_5 {
 	pub is_pal: bool,
 
@@ -150,7 +150,7 @@ pub struct StartV1_5 {
 	pub v2_0: Option<StartV2_0>,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Start {
 	pub slippi: Slippi,
 	pub bitfield: [u8; 3],
@@ -178,12 +178,12 @@ pseudo_enum!(EndMethod: u8 {
 	7 => NO_CONTEST,
 });
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct EndV2_0 {
 	pub lras_initiator: Option<Port>,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct End {
 	pub method: EndMethod,
 

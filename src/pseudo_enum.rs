@@ -14,7 +14,8 @@ impl std::error::Error for ConversionError { }
 
 macro_rules! pseudo_enum {
 	($name: ident : $type: ty { $( $value: expr => $variant: ident ),* $(,)? }) => {
-		#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+		#[derive(Copy, Clone, PartialEq, Eq, Hash, serde::Deserialize)]
+		#[serde(transparent)]
 		pub struct $name(pub $type);
 
 		impl $name {
