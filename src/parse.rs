@@ -758,7 +758,7 @@ pub trait Handlers {
 	fn frame_post(&mut self, _: FrameEvent<PortId, Post>) -> Result<()> { Ok(()) }
 	fn frame_end(&mut self, _: FrameEvent<FrameId, frame::End>) -> Result<()> { Ok(()) }
 	fn item(&mut self, _: FrameEvent<FrameId, frame::Item>) -> Result<()> { Ok(()) }
-	fn metadata(&mut self, _: HashMap<String, ubjson::Object>) -> Result<()> { Ok(()) }
+	fn metadata(&mut self, _: serde_json::Map<String, serde_json::Value>) -> Result<()> { Ok(()) }
 	fn finalize(&mut self) -> Result<()> { Ok(()) }
 }
 

@@ -1,7 +1,8 @@
 use std::io::Result;
-use std::collections::HashMap;
 
-use super::{frame, game, metadata, parse, ubjson};
+use serde_json::{Map, Value};
+
+use super::{frame, game, metadata, parse};
 use super::frame::{Frame, Port};
 use super::game::{Frames, Game, NUM_PORTS};
 use super::parse::Indexed;
@@ -21,7 +22,7 @@ pub struct GameParser {
 	pub frames_leaders: FrameEvents,
 	pub frames_followers: FrameEvents,
 	pub items: Vec<Vec<frame::Item>>,
-	pub metadata: Option<HashMap<String, ubjson::Object>>,
+	pub metadata: Option<Map<String, Value>>,
 }
 
 macro_rules! into_game {
@@ -198,7 +199,7 @@ impl parse::Handlers for GameParser {
 		Ok(())
 	}
 
-	fn metadata(&mut self, metadata: HashMap<String, ubjson::Object>) -> Result<()> {
+	fn metadata(&mut self, metadata: Map<String, Value>) -> Result<()> {
 		self.metadata = Some(metadata);
 		Ok(())
 	}

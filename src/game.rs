@@ -1,9 +1,8 @@
 use std::fmt::{Debug, Display, Formatter, Result};
-use std::collections::HashMap;
 
 use serde::Serialize;
 
-use super::{character, frame, metadata, stage, ubjson};
+use super::{character, frame, metadata, stage};
 
 pub const NUM_PORTS: usize = 4;
 pub const FIRST_FRAME_INDEX: i32 = -123;
@@ -239,7 +238,7 @@ pub struct Game {
 	#[serde(skip_serializing_if = "skip_frames")]
 	pub frames: Frames,
 	pub metadata: metadata::Metadata,
-	pub metadata_raw: HashMap<String, ubjson::Object>,
+	pub metadata_raw: serde_json::Map<String, serde_json::Value>,
 }
 
 impl Debug for Game {
