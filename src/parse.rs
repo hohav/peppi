@@ -451,8 +451,8 @@ fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Item>> {
 
 fn direction(value: f32) -> Result<Direction> {
 	match value {
-		v if v < 0.0 => Ok(Direction::LEFT),
-		v if v > 0.0 => Ok(Direction::RIGHT),
+		v if v < 0.0 => Ok(Direction::Left),
+		v if v > 0.0 => Ok(Direction::Right),
 		_ => Err(err!("direction == 0")),
 	}
 }
