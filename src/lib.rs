@@ -17,6 +17,7 @@ pub static mut CONFIG: Config = Config {
 	enum_names: false,
 };
 
+#[macro_use] pub mod frame_data;
 #[macro_use] pub mod pseudo_bitmask;
 #[macro_use] pub mod pseudo_enum;
 

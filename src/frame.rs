@@ -37,130 +37,78 @@ pseudo_enum!(HurtboxState: u8 {
 	2 => INTANGIBLE,
 });
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct Start {
-	pub random_seed: u32,
-}
+frame_data!(Start, StartCol {
+	random_seed: u32,
+});
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct EndV3_7 {
-	pub latest_finalized_frame: i32,
-}
+frame_data!(EndV3_7, EndV3_7Col {
+	latest_finalized_frame: i32,
+});
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct End {
-	#[cfg(v3_7)] #[serde(flatten)]
-	pub v3_7: EndV3_7,
-	#[cfg(not(v3_7))] #[serde(flatten)]
-	pub v3_7: Option<EndV3_7>,
-}
+frame_data!(End, EndCol {
+}, v3_7: EndV3_7, EndV3_7Col);
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct PreV1_4 {
-	pub damage: f32,
-}
+port_data!(PreV1_4, PreV1_4Col {
+	damage: f32,
+});
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct PreV1_2 {
-	pub raw_analog_x: u8,
+port_data!(PreV1_2, PreV1_2Col {
+	raw_analog_x: u8,
+}, v1_4: PreV1_4, PreV1_4Col);
 
-	#[cfg(v1_4)] #[serde(flatten)]
-	pub v1_4: PreV1_4,
-	#[cfg(not(v1_4))] #[serde(flatten)]
-	pub v1_4: Option<PreV1_4>,
-}
+port_data!(Pre, PreCol {
+	position: Position,
+	direction: Direction,
+	joystick: Position,
+	cstick: Position,
+	triggers: Triggers,
+	random_seed: u32,
+	buttons: Buttons,
+	state: action_state::State,
+}, v1_2: PreV1_2, PreV1_2Col);
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct Pre {
-	pub position: Position,
-	pub direction: Direction,
-	pub joystick: Position,
-	pub cstick: Position,
-	pub triggers: Triggers,
-	pub random_seed: u32,
-	pub buttons: Buttons,
-	pub state: action_state::State,
+port_data!(Velocities, VelocitiesCol {
+	autogenous: Velocity,
+	knockback: Velocity,
+});
 
-	#[cfg(v1_2)] #[serde(flatten)]
-	pub v1_2: PreV1_2,
-	#[cfg(not(v1_2))] #[serde(flatten)]
-	pub v1_2: Option<PreV1_2>,
-}
+port_data!(PostV3_8, PostV3_8Col {
+	hitlag: f32,
+});
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
-pub struct Velocities {
-	pub autogenous: Velocity,
-	pub knockback: Velocity,
-}
+port_data!(PostV3_5, PostV3_5Col {
+	velocities: Velocities,
+}, v3_8: PostV3_8, PostV3_8Col);
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct PostV3_8 {
-	pub hitlag: f32,
-}
+port_data!(PostV2_1, PostV2_1Col {
+	hurtbox_state: HurtboxState,
+}, v3_5: PostV3_5, PostV3_5Col);
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct PostV3_5 {
-	pub velocities: Velocities,
+port_data!(PostV2_0, PostV2_0Col {
+	flags: StateFlags,
+	misc_as: f32,
+	airborne: bool,
+	ground: u16,
+	jumps: u8,
+	l_cancel: Option<bool>,
+}, v2_1: PostV2_1, PostV2_1Col);
 
-	#[cfg(v3_8)] #[serde(flatten)]
-	pub v3_8: PostV3_8,
-	#[cfg(not(v3_8))] #[serde(flatten)]
-	pub v3_8: Option<PostV3_8>,
-}
+port_data!(PostV0_2, PostV0_2Col {
+	state_age: f32,
+}, v2_0: PostV2_0, PostV2_0Col);
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct PostV2_1 {
-	pub hurtbox_state: HurtboxState,
-
-	#[cfg(v3_5)] #[serde(flatten)]
-	pub v3_5: PostV3_5,
-	#[cfg(not(v3_5))] #[serde(flatten)]
-	pub v3_5: Option<PostV3_5>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct PostV2_0 {
-	pub flags: StateFlags,
-	pub misc_as: f32,
-	pub airborne: bool,
-	pub ground: u16,
-	pub jumps: u8,
-	pub l_cancel: Option<bool>,
-
-	#[cfg(v2_1)] #[serde(flatten)]
-	pub v2_1: PostV2_1,
-	#[cfg(not(v2_1))] #[serde(flatten)]
-	pub v2_1: Option<PostV2_1>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct PostV0_2 {
-	pub state_age: f32,
-
-	#[cfg(v2_0)] #[serde(flatten)]
-	pub v2_0: PostV2_0,
-	#[cfg(not(v2_0))] #[serde(flatten)]
-	pub v2_0: Option<PostV2_0>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct Post {
-	pub position: Position,
-	pub direction: Direction,
-	pub damage: f32,
-	pub shield: f32,
-	pub state: action_state::State,
-	pub character: character::Internal,
-	pub last_attack_landed: Option<attack::Attack>,
-	pub combo_count: u8,
-	pub last_hit_by: Option<game::Port>,
-	pub stocks: u8,
-
-	#[cfg(v0_2)] #[serde(flatten)]
-	pub v0_2: PostV0_2,
-	#[cfg(not(v0_2))] #[serde(flatten)]
-	pub v0_2: Option<PostV0_2>,
-}
+port_data!(Post, PostCol {
+	position: Position,
+	direction: Direction,
+	damage: f32,
+	shield: f32,
+	state: action_state::State,
+	character: character::Internal,
+	last_attack_landed: Option<attack::Attack>,
+	combo_count: u8,
+	last_hit_by: Option<game::Port>,
+	stocks: u8,
+}, v0_2: PostV0_2, PostV0_2Col);
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Data {
@@ -174,6 +122,25 @@ pub struct Port {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub follower: Option<Box<Data>>,
 }
+
+item_data!(ItemV3_6, ItemV3_6Col {
+	owner: Option<game::Port>,
+});
+
+item_data!(ItemV3_2, ItemV3_2Col {
+	misc: [u8; 4],
+}, v3_6: ItemV3_6, ItemV3_6Col);
+
+item_data!(Item, ItemCol {
+	id: u32,
+	r#type: item::Item,
+	state: u8,
+	direction: Direction,
+	position: Position,
+	velocity: Velocity,
+	damage: u16,
+	timer: f32,
+}, v3_2: ItemV3_2, ItemV3_2Col);
 
 #[derive(Debug, PartialEq)]
 pub struct Frame<const N: usize> {
@@ -225,35 +192,3 @@ pub type Frame1 = Frame<1>;
 pub type Frame2 = Frame<2>;
 pub type Frame3 = Frame<3>;
 pub type Frame4 = Frame<4>;
-
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct ItemV3_6 {
-	pub owner: Option<game::Port>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct ItemV3_2 {
-	pub misc: [u8; 4],
-
-	#[cfg(v3_6)] #[serde(flatten)]
-	pub v3_6: ItemV3_6,
-	#[cfg(not(v3_6))] #[serde(flatten)]
-	pub v3_6: Option<ItemV3_6>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct Item {
-	pub id: u32,
-	pub r#type: item::Item,
-	pub state: u8,
-	pub direction: Direction,
-	pub position: Position,
-	pub velocity: Velocity,
-	pub damage: u16,
-	pub timer: f32,
-
-	#[cfg(v3_2)] #[serde(flatten)]
-	pub v3_2: ItemV3_2,
-	#[cfg(not(v3_2))] #[serde(flatten)]
-	pub v3_2: Option<ItemV3_2>,
-}
