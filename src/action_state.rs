@@ -75,10 +75,10 @@ impl State {
 	}
 }
 
-impl Into<u16> for State {
-	fn into(self) -> u16 {
+impl From<State> for u16 {
+	fn from(state: State) -> u16 {
 		use State::*;
-		match self {
+		match state {
 			Common(s) => s.0,
 			Bowser(s) => s.0,
 			CaptainFalcon(s) => s.0,
