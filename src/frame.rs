@@ -145,15 +145,9 @@ item_data!(Item, ItemCol {
 #[derive(Debug, PartialEq)]
 pub struct Frame<const N: usize> {
 	pub ports: [Port; N],
-
-	#[cfg(v2_2)] pub start: Start,
-	#[cfg(not(v2_2))] pub start: Option<Start>,
-
-	#[cfg(v3_0)] pub end: End,
-	#[cfg(not(v3_0))] pub end: Option<End>,
-
-	#[cfg(v3_0)] pub items: Vec<Item>,
-	#[cfg(not(v3_0))] pub items: Option<Vec<Item>>,
+	pub start: Option<Start>,
+	pub end: Option<End>,
+	pub items: Option<Vec<Item>>,
 }
 
 // workaround for Serde not supporting const generics
@@ -161,25 +155,16 @@ impl<const N: usize> Serialize for Frame<N> {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
 		let mut state = serializer.serialize_struct("Frame", 1)?;
 
-		#[cfg(v2_2)]
-		state.serialize_field("start", &self.start)?;
-		#[cfg(not(v2_2))]
 		if let Some(start) = self.start {
 			state.serialize_field("start", &start)?;
 		}
 
-		#[cfg(v3_0)]
-		state.serialize_field("end", &self.end)?;
-		#[cfg(not(v3_0))]
 		if let Some(end) = self.end {
 			state.serialize_field("end", &end)?;
 		}
 
 		state.serialize_field("ports", &self.ports[..])?;
 
-		#[cfg(v3_0)]
-		state.serialize_field("items", &self.items)?;
-		#[cfg(not(v3_0))]
 		if let Some(items) = &self.items {
 			state.serialize_field("items", &items)?;
 		}

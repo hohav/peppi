@@ -91,9 +91,7 @@ pub struct PlayerV1_3 {
 pub struct PlayerV1_0 {
 	pub ucf: Ucf,
 
-	#[cfg(v1_3)] #[serde(flatten)]
-	pub v1_3: PlayerV1_3,
-	#[cfg(not(v1_3))] #[serde(flatten)]
+	#[serde(flatten)]
 	pub v1_3: Option<PlayerV1_3>,
 }
 
@@ -113,9 +111,7 @@ pub struct Player {
 	pub defense_ratio: f32,
 	pub model_scale: f32,
 
-	#[cfg(v1_0)] #[serde(flatten)]
-	pub v1_0: PlayerV1_0,
-	#[cfg(not(v1_0))] #[serde(flatten)]
+	#[serde(flatten)]
 	pub v1_0: Option<PlayerV1_0>,
 }
 
@@ -134,9 +130,7 @@ pub struct StartV3_7 {
 pub struct StartV2_0 {
 	pub is_frozen_ps: bool,
 
-	#[cfg(v3_7)] #[serde(flatten)]
-	pub v3_7: StartV3_7,
-	#[cfg(not(v3_7))] #[serde(flatten)]
+	#[serde(flatten)]
 	pub v3_7: Option<StartV3_7>,
 }
 
@@ -144,9 +138,7 @@ pub struct StartV2_0 {
 pub struct StartV1_5 {
 	pub is_pal: bool,
 
-	#[cfg(v2_0)] #[serde(flatten)]
-	pub v2_0: StartV2_0,
-	#[cfg(not(v2_0))] #[serde(flatten)]
+	#[serde(flatten)]
 	pub v2_0: Option<StartV2_0>,
 }
 
@@ -164,9 +156,7 @@ pub struct Start {
 	pub players: Vec<Player>,
 	pub random_seed: u32,
 
-	#[cfg(v1_5)] #[serde(flatten)]
-	pub v1_5: StartV1_5,
-	#[cfg(not(v1_5))] #[serde(flatten)]
+	#[serde(flatten)]
 	pub v1_5: Option<StartV1_5>,
 }
 
@@ -187,9 +177,7 @@ pub struct EndV2_0 {
 pub struct End {
 	pub method: EndMethod,
 
-	#[cfg(v2_0)] #[serde(flatten)]
-	pub v2_0: EndV2_0,
-	#[cfg(not(v2_0))] #[serde(flatten)]
+	#[serde(flatten)]
 	pub v2_0: Option<EndV2_0>,
 }
 

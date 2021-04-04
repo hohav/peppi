@@ -142,12 +142,9 @@ fn player_v1_0(r: [u8; 8], v1_3: Option<[u8; 16]>) -> Result<game::PlayerV1_0> {
 				sd => Some(game::ShieldDrop(sd)),
 			},
 		},
-		v1_3: {
-			#[cfg(v1_3)] { player_v1_3(v1_3.unwrap())? }
-			#[cfg(not(v1_3))] match v1_3 {
-				Some(v1_3) => Some(player_v1_3(v1_3)?),
-				None => None,
-			}
+		v1_3: match v1_3 {
+			Some(v1_3) => Some(player_v1_3(v1_3)?),
+			None => None,
 		},
 	})
 }
@@ -188,12 +185,9 @@ fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3
 	r.read_u32::<BE>()?; // ???
 	// total bytes: 0x24
 
-	let v1_0 = {
-		#[cfg(v1_0)] { player_v1_0(v1_0.unwrap(), v1_3)? }
-		#[cfg(not(v1_0))] match v1_0 {
-			Some(v1_0) => Some(player_v1_0(v1_0, v1_3)?),
-			None => None,
-		}
+	let v1_0 = match v1_0 {
+		Some(v1_0) => Some(player_v1_0(v1_0, v1_3)?),
+		None => None,
 	};
 
 	Ok(match r#type {
@@ -240,12 +234,9 @@ fn game_start_v3_7(r: &mut &[u8]) -> Result<game::StartV3_7> {
 fn game_start_v2_0(r: &mut &[u8]) -> Result<game::StartV2_0> {
 	Ok(game::StartV2_0 {
 		is_frozen_ps: r.read_u8()? != 0,
-		v3_7: {
-			#[cfg(v3_7)] { game_start_v3_7(r)? }
-			#[cfg(not(v3_7))] match r.is_empty() {
-				true => None,
-				_ => Some(game_start_v3_7(r)?),
-			}
+		v3_7: match r.is_empty() {
+			true => None,
+			_ => Some(game_start_v3_7(r)?),
 		},
 	})
 }
@@ -253,12 +244,9 @@ fn game_start_v2_0(r: &mut &[u8]) -> Result<game::StartV2_0> {
 fn game_start_v1_5(r: &mut &[u8]) -> Result<game::StartV1_5> {
 	Ok(game::StartV1_5 {
 		is_pal: r.read_u8()? != 0,
-		v2_0: {
-			#[cfg(v2_0)] { game_start_v2_0(r)? }
-			#[cfg(not(v2_0))] match r.is_empty() {
-				true => None,
-				_ => Some(game_start_v2_0(r)?),
-			}
+		v2_0: match r.is_empty() {
+			true => None,
+			_ => Some(game_start_v2_0(r)?),
 		},
 	})
 }
@@ -304,12 +292,12 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 	// @0x13d
 	let random_seed = r.read_u32::<BE>()?;
 
-	let players_v1_0 = match !cfg!(v1_0) && r.is_empty() {
+	let players_v1_0 = match r.is_empty() {
 		true => [None, None, None, None],
 		_ => [Some(player_bytes_v1_0(&mut r)?), Some(player_bytes_v1_0(&mut r)?), Some(player_bytes_v1_0(&mut r)?), Some(player_bytes_v1_0(&mut r)?)],
 	};
 
-	let players_v1_3 = match !cfg!(v1_3) && r.is_empty() {
+	let players_v1_3 = match r.is_empty() {
 		true => [None, None, None, None],
 		_ => [Some(player_bytes_v1_3(&mut r)?), Some(player_bytes_v1_3(&mut r)?), Some(player_bytes_v1_3(&mut r)?), Some(player_bytes_v1_3(&mut r)?)],
 	};
@@ -321,12 +309,9 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 		}
 	}
 
-	let v1_5 = {
-		#[cfg(v1_5)] { game_start_v1_5(r)? }
-		#[cfg(not(v1_5))] match r.is_empty() {
-			true => None,
-			_ => Some(game_start_v1_5(r)?),
-		}
+	let v1_5 = match r.is_empty() {
+		true => None,
+		_ => Some(game_start_v1_5(r)?),
 	};
 
 	Ok(game::Start {
@@ -354,12 +339,9 @@ fn game_end_v2_0(r: &mut &[u8]) -> Result<game::EndV2_0> {
 fn game_end(r: &mut &[u8]) -> Result<game::End> {
 	Ok(game::End {
 		method: game::EndMethod(r.read_u8()?),
-		v2_0: {
-			#[cfg(v2_0)] { game_end_v2_0(r)? }
-			#[cfg(not(v2_0))] match r.is_empty() {
-				true => None,
-				_ => Some(game_end_v2_0(r)?),
-			}
+		v2_0: match r.is_empty() {
+			true => None,
+			_ => Some(game_end_v2_0(r)?),
 		},
 	})
 }
@@ -387,12 +369,9 @@ fn frame_end(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::End>> {
 	Ok(FrameEvent {
 		id: id,
 		event: frame::End {
-			v3_7: {
-				#[cfg(v3_7)] { frame_end_v3_7(r)? }
-				#[cfg(not(v3_7))] match r.is_empty() {
-					true => None,
-					_ => Some(frame_end_v3_7(r)?),
-				}
+			v3_7: match r.is_empty() {
+				true => None,
+				_ => Some(frame_end_v3_7(r)?),
 			},
 		},
 	})
@@ -407,12 +386,9 @@ fn item_v3_6(r: &mut &[u8]) -> Result<frame::ItemV3_6> {
 fn item_v3_2(r: &mut &[u8]) -> Result<frame::ItemV3_2> {
 	Ok(frame::ItemV3_2 {
 		misc: [r.read_u8()?, r.read_u8()?, r.read_u8()?, r.read_u8()?],
-		v3_6: {
-			#[cfg(v3_6)] { item_v3_6(r)? }
-			#[cfg(not(v3_6))] match r.is_empty() {
-				true => None,
-				_ => Some(item_v3_6(r)?),
-			}
+		v3_6: match r.is_empty() {
+			true => None,
+			_ => Some(item_v3_6(r)?),
 		},
 	})
 }
@@ -438,12 +414,9 @@ fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Item>> {
 			damage: r.read_u16::<BE>()?,
 			timer: r.read_f32::<BE>()?,
 			id: r.read_u32::<BE>()?,
-			v3_2: {
-				#[cfg(v3_2)] { item_v3_2(r)? }
-				#[cfg(not(v3_2))] match r.is_empty() {
-					true => None,
-					_ => Some(item_v3_2(r)?),
-				}
+			v3_2: match r.is_empty() {
+				true => None,
+				_ => Some(item_v3_2(r)?),
 			},
 		},
 	})
@@ -479,12 +452,9 @@ fn frame_pre_v1_4(r: &mut &[u8]) -> Result<frame::PreV1_4> {
 fn frame_pre_v1_2(r: &mut &[u8]) -> Result<frame::PreV1_2> {
 	Ok(frame::PreV1_2 {
 		raw_analog_x: r.read_u8()?,
-		v1_4: {
-			#[cfg(v1_4)] { frame_pre_v1_4(r)? }
-			#[cfg(not(v1_4))] match r.is_empty() {
-				true => None,
-				_ => Some(frame_pre_v1_4(r)?),
-			}
+		v1_4: match r.is_empty() {
+			true => None,
+			_ => Some(frame_pre_v1_4(r)?),
 		},
 	})
 }
@@ -533,12 +503,9 @@ fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result
 		},
 	};
 
-	let v1_2 = {
-		#[cfg(v1_2)] { frame_pre_v1_2(r)? }
-		#[cfg(not(v1_2))] match r.is_empty() {
-			true => None,
-			_ => Some(frame_pre_v1_2(r)?),
-		}
+	let v1_2 = match r.is_empty() {
+		true => None,
+		_ => Some(frame_pre_v1_2(r)?),
 	};
 
 	Ok(FrameEvent {
@@ -624,12 +591,9 @@ fn frame_post_v3_5(r: &mut &[u8], airborne: bool) -> Result<frame::PostV3_5> {
 			},
 			knockback: knockback_velocity,
 		},
-		v3_8: {
-			#[cfg(v3_8)] { frame_post_v3_8(r)? }
-			#[cfg(not(v3_8))] match r.is_empty() {
-				true => None,
-				_ => Some(frame_post_v3_8(r)?),
-			}
+		v3_8: match r.is_empty() {
+			true => None,
+			_ => Some(frame_post_v3_8(r)?),
 		},
 	})
 }
@@ -637,12 +601,9 @@ fn frame_post_v3_5(r: &mut &[u8], airborne: bool) -> Result<frame::PostV3_5> {
 fn frame_post_v2_1(r: &mut &[u8], airborne: bool) -> Result<frame::PostV2_1> {
 	Ok(frame::PostV2_1 {
 		hurtbox_state: frame::HurtboxState(r.read_u8()?),
-		v3_5: {
-			#[cfg(v3_5)] { frame_post_v3_5(r, airborne)? }
-			#[cfg(not(v3_5))] match r.is_empty() {
-				true => None,
-				_ => Some(frame_post_v3_5(r, airborne)?),
-			}
+		v3_5: match r.is_empty() {
+			true => None,
+			_ => Some(frame_post_v3_5(r, airborne)?),
 		},
 	})
 }
@@ -671,12 +632,9 @@ fn frame_post_v2_0(r: &mut &[u8]) -> Result<frame::PostV2_0> {
 		ground: ground,
 		jumps: jumps,
 		l_cancel: l_cancel,
-		v2_1: {
-			#[cfg(v2_1)] { frame_post_v2_1(r, airborne)? }
-			#[cfg(not(v2_1))] match r.is_empty() {
-				true => None,
-				_ => Some(frame_post_v2_1(r, airborne)?),
-			}
+		v2_1: match r.is_empty() {
+			true => None,
+			_ => Some(frame_post_v2_1(r, airborne)?),
 		},
 	})
 }
@@ -684,12 +642,9 @@ fn frame_post_v2_0(r: &mut &[u8]) -> Result<frame::PostV2_0> {
 fn frame_post_v0_2(r: &mut &[u8]) -> Result<frame::PostV0_2> {
 	Ok(frame::PostV0_2 {
 		state_age: r.read_f32::<BE>()?,
-		v2_0: {
-			#[cfg(v2_0)] { frame_post_v2_0(r)? }
-			#[cfg(not(v2_0))] match r.is_empty() {
-				true => None,
-				_ => Some(frame_post_v2_0(r)?),
-			}
+		v2_0: match r.is_empty() {
+			true => None,
+			_ => Some(frame_post_v2_0(r)?),
 		},
 	})
 }
@@ -722,12 +677,9 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 	let last_hit_by = Port::try_from(r.read_u8()?).ok();
 	let stocks = r.read_u8()?;
 
-	let v0_2 = {
-		#[cfg(v0_2)] { frame_post_v0_2(r)? }
-		#[cfg(not(v0_2))] match r.is_empty() {
-			true => None,
-			_ => Some(frame_post_v0_2(r)?),
-		}
+	let v0_2 = match r.is_empty() {
+		true => None,
+		_ => Some(frame_post_v0_2(r)?),
 	};
 
 	update_last_char_state(id, character, state, last_char_states);
