@@ -3,13 +3,18 @@ use std::{fs, io};
 
 use chrono::{DateTime, Utc};
 
-use super::action_state::{State, Zelda};
-use super::buttons::{Logical, Physical};
-use super::character::{Internal, External};
-use super::frame::Buttons;
-use super::game::{DashBack, End, EndMethod, Frames, Game, Player, PlayerType, PlayerV1_0, Port, Start, ShieldDrop, Slippi, SlippiVersion, Ucf};
-use super::metadata::Metadata;
-use super::stage::Stage;
+use super::{
+	action_state::{State, Zelda},
+	buttons::{Logical, Physical},
+	character::{Internal, External},
+	frame,
+	frame::Buttons,
+	game::{DashBack, End, EndMethod, Frames, Game, Player, PlayerType, PlayerV1_0, Port, Start, ShieldDrop, Slippi, SlippiVersion, Ucf},
+	item::Item,
+	metadata::Metadata,
+	primitives::{Direction, Position, Velocity},
+	stage::Stage,
+};
 
 use super::metadata;
 
@@ -365,6 +370,73 @@ fn zelda_sheik_transformation() -> Result<(), String> {
 	let game = game("transform")?;
 	match game.frames {
 		Frames::P2(frames) => assert_eq!(frames[400].ports[1].leader.pre.state, State::Zelda(Zelda::TRANSFORM_GROUND)),
+		_ => Err("wrong number of ports")?,
+	};
+	Ok(())
+}
+
+#[test]
+fn items() -> Result<(), String> {
+	let game = game("items")?;
+	match game.frames {
+		Frames::P2(frames) => {
+			let mut items: HashMap<u32, frame::Item> = HashMap::new();
+			for f in frames {
+				for i in f.items.unwrap() {
+					if !items.contains_key(&i.id) {
+						items.insert(i.id, i);
+					}
+				}
+			}
+			assert_eq!(items[&0], frame::Item {
+				id: 0,
+				damage: 0,
+				direction: Direction::Right,
+				position: Position { x: -62.7096061706543, y: -1.4932749271392822 },
+				state: 0,
+				timer: 140.0,
+				r#type: Item::PEACH_TURNIP,
+				velocity: Velocity { x: 0.0, y: 0.0 },
+				v3_2: Some(frame::ItemV3_2 {
+					misc: [5, 5, 5, 5],
+					v3_6: Some(frame::ItemV3_6 {
+						owner: Some(Port::P1),
+					}),
+				}),
+			});
+			assert_eq!(items[&1], frame::Item {
+				id: 1,
+				damage: 0,
+				direction: Direction::Left,
+				position: Position { x: 20.395559310913086, y: -1.4932749271392822 },
+				state: 0,
+				timer: 140.0,
+				r#type: Item::PEACH_TURNIP,
+				velocity: Velocity { x: 0.0, y: 0.0 },
+				v3_2: Some(frame::ItemV3_2 {
+					misc: [5, 0, 5, 5],
+					v3_6: Some(frame::ItemV3_6 {
+						owner: Some(Port::P1),
+					}),
+				}),
+			});
+			assert_eq!(items[&2], frame::Item {
+				id: 2,
+				damage: 0,
+				direction: Direction::Right,
+				position: Position { x: -3.982539176940918, y: -1.4932749271392822 },
+				state: 0,
+				timer: 140.0,
+				r#type: Item::PEACH_TURNIP,
+				velocity: Velocity { x: 0.0, y: 0.0 },
+				v3_2: Some(frame::ItemV3_2 {
+					misc: [5, 0, 5, 5],
+					v3_6: Some(frame::ItemV3_6 {
+						owner: Some(Port::P1),
+					}),
+				}),
+			});
+		},
 		_ => Err("wrong number of ports")?,
 	};
 	Ok(())
