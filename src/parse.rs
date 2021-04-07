@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
-use std::io::{Read, Result};
+use std::io::{Read, Result, Seek, SeekFrom};
 
 use byteorder::ReadBytesExt;
 use encoding_rs::SHIFT_JIS;
@@ -714,7 +714,7 @@ fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_
 }
 
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn parse<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H) -> Result<()> {
+pub fn parse<R: Read + Seek, H: Handlers>(mut r: &mut R, handlers: &mut H, skip_frames: bool) -> Result<()> {
 	// For speed, assume the `raw` element comes first and handle it manually.
 	// The official JS parser does this too, so it should be reliable.
 	expect_bytes(&mut r,
@@ -728,6 +728,11 @@ pub fn parse<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H) -> Result<()
 
 	// `raw_len` will be 0 for an in-progress replay
 	while (raw_len == 0 || bytes_read < raw_len) && last_event != Some(Event::GameEnd) {
+		if skip_frames && last_event == Some(Event::GameStart) {
+			let skip = raw_len - bytes_read - payload_sizes[&(Event::GameEnd as u8)] as usize - 1;
+			r.seek(SeekFrom::Current(skip as i64))?;
+			bytes_read += skip;
+		}
 		let (bytes, event) = event(r.by_ref(), &payload_sizes, &mut last_char_states, handlers)?;
 		bytes_read += bytes;
 		last_event = event;

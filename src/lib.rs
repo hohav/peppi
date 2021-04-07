@@ -7,13 +7,11 @@ macro_rules! err {
 
 #[derive(Clone, Debug)]
 pub struct Config {
-	pub skip_frames: bool,
 	pub enum_names: bool,
 }
 
 // TODO: use serde_state to pass this config to the serializers?
 pub static mut CONFIG: Config = Config {
-	skip_frames: false,
 	enum_names: false,
 };
 
@@ -39,10 +37,11 @@ pub mod ubjson;
 #[cfg(test)] mod test;
 
 use std::{error, fmt, io};
+use std::io::{Read, Seek, SeekFrom};
 
 #[derive(Debug)]
 pub struct ParseError {
-	pub pos: Option<usize>,
+	pub pos: Option<u64>,
 	pub error: io::Error,
 }
 
@@ -62,34 +61,47 @@ impl error::Error for ParseError {
 	}
 }
 
-pub struct TrackingReader<R> {
+pub struct SkippingReader<R> {
 	reader: R,
-	bytes_read: usize,
+	pos: u64,
 }
 
-impl<R: io::Read> io::Read for TrackingReader<R> {
+impl<R: Read> Read for SkippingReader<R> {
 	fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
 		let result = self.reader.read(buf);
-		if let Ok(bytes) = result {
-			self.bytes_read += bytes;
+		if let Ok(read) = result {
+			self.pos += read as u64;
 		}
 		result
 	}
 }
 
+impl<R: Read> Seek for SkippingReader<R> {
+	fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+		match pos {
+			SeekFrom::Current(skip) if skip >= 0 => {
+				io::copy(&mut self.reader.by_ref().take(skip as u64), &mut io::sink())?;
+				self.pos += skip as u64;
+				Ok(self.pos)
+			},
+			_ => unimplemented!(),
+		}
+	}
+}
+
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn parse<R: io::Read, H: parse::Handlers>(r: &mut R, handlers: &mut H) -> std::result::Result<(), ParseError> {
-	let mut r = TrackingReader {
-		bytes_read: 0,
+pub fn parse<R: Read, H: parse::Handlers>(r: &mut R, handlers: &mut H, skip_frames: bool) -> std::result::Result<(), ParseError> {
+	let mut r = SkippingReader {
+		pos: 0,
 		reader: r,
 	};
-	parse::parse(&mut r, handlers)
-		.map_err(|e| ParseError { error: e, pos: Some(r.bytes_read) })
+	parse::parse(&mut r, handlers, skip_frames)
+		.map_err(|e| ParseError { error: e, pos: r.stream_position().ok() })
 }
 
 /// Parses a Slippi replay file from `r`, returning a `game::Game` object.
-pub fn game<R: io::Read>(r: &mut R) -> Result<game::Game, ParseError> {
+pub fn game<R: Read>(r: &mut R, skip_frames: bool) -> Result<game::Game, ParseError> {
 	let mut game_parser: game_parser::GameParser = Default::default();
-	parse(r, &mut game_parser)
-		.and_then(|_| game_parser.into_game().map_err(|e| ParseError { pos: None, error: e }))
+	parse(r, &mut game_parser, skip_frames)
+		.and_then(|_| game_parser.into_game().map_err(|e| ParseError { error: e, pos: None }))
 }

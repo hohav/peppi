@@ -181,11 +181,7 @@ pub struct End {
 	pub v2_0: Option<EndV2_0>,
 }
 
-fn skip_frames<T>(_: &T) -> bool {
-	unsafe { super::CONFIG.skip_frames }
-}
-
-#[derive(PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Frames {
 	P1(Vec<frame::Frame1>),
@@ -205,25 +201,10 @@ impl Frames {
 	}
 }
 
-impl Debug for Frames {
-	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-		match unsafe { super::CONFIG.skip_frames } {
-			true => f.debug_list().finish(),
-			_ => match self {
-				Self::P1(frames) => f.debug_list().entries(frames.iter()).finish(),
-				Self::P2(frames) => f.debug_list().entries(frames.iter()).finish(),
-				Self::P3(frames) => f.debug_list().entries(frames.iter()).finish(),
-				Self::P4(frames) => f.debug_list().entries(frames.iter()).finish(),
-			}
-		}
-	}
-}
-
 #[derive(PartialEq, Serialize)]
 pub struct Game {
 	pub start: Start,
 	pub end: End,
-	#[serde(skip_serializing_if = "skip_frames")]
 	pub frames: Frames,
 	pub metadata: metadata::Metadata,
 	pub metadata_raw: serde_json::Map<String, serde_json::Value>,

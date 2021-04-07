@@ -21,7 +21,7 @@ use super::metadata;
 fn game(name: &str) -> Result<Game, String> {
 	let mut buf = io::BufReader::new(
 		fs::File::open(&format!("test/replays/{}.slp", name)).unwrap());
-	super::game(&mut buf).map_err(|e| format!("couldn't parse game: {:?}", e))
+	super::game(&mut buf, false).map_err(|e| format!("couldn't parse game: {:?}", e))
 }
 
 fn button_seq(game:&Game) -> Result<Vec<Buttons>, String> {
