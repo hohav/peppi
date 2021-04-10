@@ -713,6 +713,14 @@ fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_
 	Ok((1 + size as usize, event)) // +1 byte for the event code
 }
 
+/// Options for parsing replays.
+#[derive(Clone, Copy, Debug)]
+pub struct Opts {
+	/// Skip all frame data when parsing a replay for speed
+	/// (when you only need start/end/metadata).
+	pub skip_frames: bool,
+}
+
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
 pub fn parse<R: Read + Seek, H: Handlers>(mut r: &mut R, handlers: &mut H, skip_frames: bool) -> Result<()> {
 	// For speed, assume the `raw` element comes first and handle it manually.
@@ -725,6 +733,7 @@ pub fn parse<R: Read + Seek, H: Handlers>(mut r: &mut R, handlers: &mut H, skip_
 	let (mut bytes_read, payload_sizes) = payload_sizes(&mut r)?;
 	let mut last_char_states = [DEFAULT_CHAR_STATE; NUM_PORTS];
 	let mut last_event: Option<Event> = None;
+	let skip_frames = opts.map(|o| o.skip_frames).unwrap_or(false);
 
 	// `raw_len` will be 0 for an in-progress replay
 	while (raw_len == 0 || bytes_read < raw_len) && last_event != Some(Event::GameEnd) {

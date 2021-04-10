@@ -5,13 +5,16 @@ macro_rules! err {
 	}
 }
 
-#[derive(Clone, Debug)]
-pub struct Config {
+#[derive(Clone, Copy, Debug)]
+pub struct SerializationConfig {
+	/// Print enum names with numeric values (e.g. `14:WAIT`).
 	pub enum_names: bool,
 }
 
-// TODO: use serde_state to pass this config to the serializers?
-pub static mut CONFIG: Config = Config {
+// TODO: replace with `serde_state`?
+/// Global singleton, a hack to smuggle config into serializers.
+/// You probably don't care about this unless you're serializing with Serde.
+pub static mut SERIALIZATION_CONFIG: SerializationConfig = SerializationConfig {
 	enum_names: false,
 };
 
@@ -90,18 +93,18 @@ impl<R: Read> Seek for SkippingReader<R> {
 }
 
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn parse<R: Read, H: parse::Handlers>(r: &mut R, handlers: &mut H, skip_frames: bool) -> std::result::Result<(), ParseError> {
+pub fn parse<R: Read, H: parse::Handlers>(r: &mut R, handlers: &mut H, opts: Option<parse::Opts>) -> std::result::Result<(), ParseError> {
 	let mut r = SkippingReader {
 		pos: 0,
 		reader: r,
 	};
-	parse::parse(&mut r, handlers, skip_frames)
+	parse::parse(&mut r, handlers, opts)
 		.map_err(|e| ParseError { error: e, pos: r.stream_position().ok() })
 }
 
 /// Parses a Slippi replay file from `r`, returning a `game::Game` object.
-pub fn game<R: Read>(r: &mut R, skip_frames: bool) -> Result<game::Game, ParseError> {
+pub fn game<R: Read>(r: &mut R, opts: Option<parse::Opts>) -> Result<game::Game, ParseError> {
 	let mut game_parser: game_parser::GameParser = Default::default();
-	parse(r, &mut game_parser, skip_frames)
+	parse(r, &mut game_parser, opts)
 		.and_then(|_| game_parser.into_game().map_err(|e| ParseError { error: e, pos: None }))
 }

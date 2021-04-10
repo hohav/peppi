@@ -9,7 +9,7 @@ macro_rules! pseudo_bitmask {
 
 		impl std::fmt::Debug for $name {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-				match unsafe { super::CONFIG.enum_names } {
+				match unsafe { super::SERIALIZATION_CONFIG.enum_names } {
 					true => {
 						let mut named_values: Vec<&str> = Vec::new();
 						$( if (self.0 & $value) > 0 {
