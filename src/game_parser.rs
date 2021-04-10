@@ -2,10 +2,12 @@ use std::io::Result;
 
 use serde_json::{Map, Value};
 
-use super::{frame, game, metadata, parse};
-use super::frame::{Frame, Port};
-use super::game::{Frames, Game, NUM_PORTS};
-use super::parse::Indexed;
+use super::{
+	frame::{self, Frame, Port},
+	game::{self, Frames, Game, NUM_PORTS},
+	metadata,
+	parse::{self, Indexed},
+};
 
 #[derive(Debug, Default)]
 pub struct FrameEvents {

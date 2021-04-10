@@ -1,8 +1,18 @@
-use serde::Serialize;
-use serde::ser::SerializeStruct;
+use serde::{
+	Serialize,
+	ser::SerializeStruct,
+};
 
-use super::{action_state, attack, buttons, character, game, item, triggers};
-use super::primitives::{Direction, Position, Velocity};
+use super::{
+	action_state,
+	attack,
+	buttons,
+	character,
+	game,
+	item,
+	primitives::{Direction, Position, Velocity},
+	triggers,
+};
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Buttons {

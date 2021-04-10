@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::character::{Internal};
+use super::character::Internal;
 
 #[derive(Copy, Clone, PartialEq, serde::Serialize)]
 #[serde(untagged)]

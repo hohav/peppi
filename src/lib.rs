@@ -39,8 +39,11 @@ pub mod ubjson;
 
 #[cfg(test)] mod test;
 
-use std::{error, fmt, io};
-use std::io::Read;
+use std::{
+	error,
+	fmt,
+	io::{self, Read},
+};
 
 #[derive(Debug)]
 pub struct ParseError {

@@ -1,5 +1,8 @@
-use std::collections::{HashMap};
-use std::{fs, io};
+use std::{
+	collections::HashMap,
+	fs,
+	io,
+};
 
 use chrono::{DateTime, Utc};
 
@@ -7,16 +10,13 @@ use super::{
 	action_state::{State, Zelda},
 	buttons::{Logical, Physical},
 	character::{Internal, External},
-	frame,
-	frame::Buttons,
+	frame::{self, Buttons},
 	game::{DashBack, End, EndMethod, Frames, Game, Player, PlayerType, PlayerV1_0, Port, Start, ShieldDrop, Slippi, SlippiVersion, Ucf},
 	item::Item,
-	metadata::Metadata,
+	metadata::{self, Metadata},
 	primitives::{Direction, Position, Velocity},
 	stage::Stage,
 };
-
-use super::metadata;
 
 fn game(name: &str) -> Result<Game, String> {
 	let mut buf = io::BufReader::new(

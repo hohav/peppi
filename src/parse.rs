@@ -1,8 +1,9 @@
-use std::cmp::min;
-use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
-use std::io;
-use std::io::{Read, Result};
+use std::{
+	cmp::min,
+	collections::HashMap,
+	convert::{TryFrom, TryInto},
+	io::{self, Read, Result},
+};
 
 use byteorder::ReadBytesExt;
 use encoding_rs::SHIFT_JIS;
@@ -10,13 +11,19 @@ use log::{debug, trace};
 
 type BE = byteorder::BigEndian;
 
-use super::{action_state, buttons, character, frame, game, item, stage, triggers, ubjson};
-use super::action_state::{Common, State};
-use super::attack::Attack;
-use super::character::Internal;
-use super::frame::{Pre, Post};
-use super::game::{NUM_PORTS, Player, PlayerType, Port};
-use super::primitives::{Direction, Position, Velocity};
+use super::{
+	action_state::{self, Common, State},
+	attack::Attack,
+	buttons,
+	character::{self, Internal},
+	frame::{self, Pre, Post},
+	game::{self, NUM_PORTS, Player, PlayerType, Port},
+	item,
+	primitives::{Direction, Position, Velocity},
+	stage,
+	triggers,
+	ubjson,
+};
 
 const ZELDA_TRANSFORM_FRAME: u32 = 43;
 const SHEIK_TRANSFORM_FRAME: u32 = 36;

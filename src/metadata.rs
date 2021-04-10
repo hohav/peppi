@@ -1,15 +1,21 @@
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::io::Result;
+use std::{
+	collections::HashMap,
+	convert::TryFrom,
+	io::Result,
+};
 
 use chrono::{DateTime, Utc};
 use log::warn;
-use serde::Serialize;
-use serde::ser::SerializeMap;
+use serde::{
+	Serialize,
+	ser::SerializeMap,
+};
 use serde_json::{Map, Value};
 
-use super::character;
-use super::game::{FIRST_FRAME_INDEX, Port};
+use super::{
+	character,
+	game::{FIRST_FRAME_INDEX, Port},
+};
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Metadata {
