@@ -1,7 +1,8 @@
 use std::cmp::min;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
-use std::io::{Read, Result, Seek, SeekFrom};
+use std::io;
+use std::io::{Read, Result};
 
 use byteorder::ReadBytesExt;
 use encoding_rs::SHIFT_JIS;
@@ -722,7 +723,7 @@ pub struct Opts {
 }
 
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn parse<R: Read + Seek, H: Handlers>(mut r: &mut R, handlers: &mut H, skip_frames: bool) -> Result<()> {
+pub fn parse<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: Option<Opts>) -> Result<()> {
 	// For speed, assume the `raw` element comes first and handle it manually.
 	// The official JS parser does this too, so it should be reliable.
 	expect_bytes(&mut r,
@@ -738,8 +739,11 @@ pub fn parse<R: Read + Seek, H: Handlers>(mut r: &mut R, handlers: &mut H, skip_
 	// `raw_len` will be 0 for an in-progress replay
 	while (raw_len == 0 || bytes_read < raw_len) && last_event != Some(Event::GameEnd) {
 		if skip_frames && last_event == Some(Event::GameStart) {
+			// Skip to GameEnd, which we assume is the last event in the stream!
 			let skip = raw_len - bytes_read - payload_sizes[&(Event::GameEnd as u8)] as usize - 1;
-			r.seek(SeekFrom::Current(skip as i64))?;
+			// In theory we should seek() if `r` is Seekable, but it's not much
+			// faster and is very awkward to implement without specialization.
+			io::copy(&mut r.by_ref().take(skip as u64), &mut io::sink())?;
 			bytes_read += skip;
 		}
 		let (bytes, event) = event(r.by_ref(), &payload_sizes, &mut last_char_states, handlers)?;

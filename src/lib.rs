@@ -40,7 +40,7 @@ pub mod ubjson;
 #[cfg(test)] mod test;
 
 use std::{error, fmt, io};
-use std::io::{Read, Seek, SeekFrom};
+use std::io::Read;
 
 #[derive(Debug)]
 pub struct ParseError {
@@ -64,12 +64,14 @@ impl error::Error for ParseError {
 	}
 }
 
-pub struct SkippingReader<R> {
+/// Since we support non-seekable readers, we use this wrapper to track
+/// position for better error reporting.
+pub struct TrackingReader<R> {
 	reader: R,
 	pos: u64,
 }
 
-impl<R: Read> Read for SkippingReader<R> {
+impl<R: Read> Read for TrackingReader<R> {
 	fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
 		let result = self.reader.read(buf);
 		if let Ok(read) = result {
@@ -79,27 +81,14 @@ impl<R: Read> Read for SkippingReader<R> {
 	}
 }
 
-impl<R: Read> Seek for SkippingReader<R> {
-	fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-		match pos {
-			SeekFrom::Current(skip) if skip >= 0 => {
-				io::copy(&mut self.reader.by_ref().take(skip as u64), &mut io::sink())?;
-				self.pos += skip as u64;
-				Ok(self.pos)
-			},
-			_ => unimplemented!(),
-		}
-	}
-}
-
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
 pub fn parse<R: Read, H: parse::Handlers>(r: &mut R, handlers: &mut H, opts: Option<parse::Opts>) -> std::result::Result<(), ParseError> {
-	let mut r = SkippingReader {
+	let mut r = TrackingReader {
 		pos: 0,
 		reader: r,
 	};
 	parse::parse(&mut r, handlers, opts)
-		.map_err(|e| ParseError { error: e, pos: r.stream_position().ok() })
+		.map_err(|e| ParseError { error: e, pos: Some(r.pos) })
 }
 
 /// Parses a Slippi replay file from `r`, returning a `game::Game` object.
