@@ -47,7 +47,7 @@ const PAYLOADS_EVENT_CODE: u8 = 0x35;
 
 #[derive(Clone, Copy, Debug, PartialEq, num_enum::TryFromPrimitive)]
 #[repr(u8)]
-pub enum Event {
+enum Event {
 	GameStart = 0x36,
 	FramePre = 0x37,
 	FramePost = 0x38,

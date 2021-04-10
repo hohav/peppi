@@ -1,4 +1,3 @@
-#[macro_export]
 macro_rules! err {
 	($( $arg: expr ),*) => {
 		std::io::Error::new(std::io::ErrorKind::InvalidData, format!($( $arg ),*))
@@ -18,9 +17,9 @@ pub static mut SERIALIZATION_CONFIG: SerializationConfig = SerializationConfig {
 	enum_names: false,
 };
 
-#[macro_use] pub mod frame_data;
-#[macro_use] pub mod pseudo_bitmask;
-#[macro_use] pub mod pseudo_enum;
+#[macro_use] mod frame_data;
+#[macro_use] mod pseudo_bitmask;
+#[macro_use] mod pseudo_enum;
 
 pub mod action_state;
 pub mod attack;
@@ -69,7 +68,7 @@ impl error::Error for ParseError {
 
 /// Since we support non-seekable readers, we use this wrapper to track
 /// position for better error reporting.
-pub struct TrackingReader<R> {
+struct TrackingReader<R> {
 	reader: R,
 	pos: u64,
 }
