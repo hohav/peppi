@@ -83,8 +83,17 @@ pub struct Ucf {
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct PlayerV3_9 {
+	pub display_name: String,
+	pub connect_code: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct PlayerV1_3 {
 	pub name_tag: String,
+
+	#[serde(flatten)]
+	pub v3_9: Option<PlayerV3_9>,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
