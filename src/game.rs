@@ -201,6 +201,9 @@ impl Frames {
 	}
 }
 
+/// Replay data for a single game of Melee.
+///
+/// See https://github.com/project-slippi/slippi-wiki/blob/master/SPEC.md.
 #[derive(PartialEq, Serialize)]
 pub struct Game {
 	pub start: Start,

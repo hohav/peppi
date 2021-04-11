@@ -83,7 +83,7 @@ impl<R: Read> Read for TrackingReader<R> {
 	}
 }
 
-/// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
+/// Parse a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
 pub fn parse<R: Read, H: parse::Handlers>(r: &mut R, handlers: &mut H, opts: Option<parse::Opts>) -> std::result::Result<(), ParseError> {
 	let mut r = TrackingReader {
 		pos: 0,
@@ -93,7 +93,7 @@ pub fn parse<R: Read, H: parse::Handlers>(r: &mut R, handlers: &mut H, opts: Opt
 		.map_err(|e| ParseError { error: e, pos: Some(r.pos) })
 }
 
-/// Parses a Slippi replay file from `r`, returning a `game::Game` object.
+/// Parse a Slippi replay from `r`, returning a `game::Game` object.
 pub fn game<R: Read>(r: &mut R, opts: Option<parse::Opts>) -> Result<game::Game, ParseError> {
 	let mut game_parser: game_parser::GameParser = Default::default();
 	parse(r, &mut game_parser, opts)
