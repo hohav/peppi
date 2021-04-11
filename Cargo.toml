@@ -1,8 +1,11 @@
 [package]
-name = "peppi"
-version = "0.1.0"
 authors = ["melkor <hohav@fastmail.com>"]
+description = "Parser for Slippi replay files"
 edition = "2018"
+license = "MIT"
+name = "peppi"
+repository = "https://github.com/hohav/peppi"
+version = "0.1.0"
 
 [dependencies]
 byteorder = "1"
