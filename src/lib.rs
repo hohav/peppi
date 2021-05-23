@@ -17,11 +17,12 @@ pub static mut SERIALIZATION_CONFIG: SerializationConfig = SerializationConfig {
 	enum_names: false,
 };
 
-#[macro_use] mod frame_data;
-#[macro_use] mod pseudo_bitmask;
-#[macro_use] mod pseudo_enum;
+#[macro_use] #[doc(hidden)] pub mod frame_data;
+#[macro_use] #[doc(hidden)] pub mod pseudo_bitmask;
+#[macro_use] #[doc(hidden)] pub mod pseudo_enum;
 
 pub mod action_state;
+pub mod arrow;
 pub mod attack;
 pub mod buttons;
 pub mod character;

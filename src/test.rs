@@ -11,10 +11,10 @@ use super::{
 	buttons::{Logical, Physical},
 	character::{Internal, External},
 	frame::{self, Buttons},
-	game::{DashBack, End, EndMethod, Frames, Game, Player, PlayerType, PlayerV1_0, Port, Start, ShieldDrop, Slippi, SlippiVersion, Ucf},
+	game::{DashBack, End, EndMethod, Frames, Game, Player, PlayerType, Start, ShieldDrop, Slippi, SlippiVersion, Ucf},
 	item::Item,
 	metadata::{self, Metadata},
-	primitives::{Direction, Position, Velocity},
+	primitives::{Direction, Port, Position, Velocity},
 	stage::Stage,
 };
 
@@ -112,13 +112,12 @@ fn basic_game() -> Result<(), String> {
 				offense_ratio: 0.0,
 				defense_ratio: 1.0,
 				model_scale: 1.0,
-				v1_0: Some(PlayerV1_0 {
-					ucf: Ucf {
-						dash_back: None,
-						shield_drop: None
-					},
-					v1_3: None
+				ucf: Some(Ucf {
+					dash_back: None,
+					shield_drop: None,
 				}),
+				name_tag: None,
+				netplay: None,
 			},
 			Player {
 				port: Port::P2,
@@ -133,22 +132,23 @@ fn basic_game() -> Result<(), String> {
 				offense_ratio: 0.0,
 				defense_ratio: 1.0,
 				model_scale: 1.0,
-				v1_0: Some(PlayerV1_0 {
-					ucf: Ucf {
-						dash_back: None,
-						shield_drop: None
-					},
-					v1_3: None
+				ucf: Some(Ucf {
+					dash_back: None,
+					shield_drop: None,
 				}),
+				name_tag: None,
+				netplay: None,
 			},
 		],
 		random_seed: 3803194226,
-		v1_5: None,
+		is_pal: None,
+		is_frozen_ps: None,
+		scene: None,
 	});
 
 	assert_eq!(game.end, End {
 		method: EndMethod::RESOLVED,
-		v2_0: None,
+		lras_initiator: None,
 	});
 
 	match game.frames {
@@ -193,10 +193,10 @@ fn ics() -> Result<(), String> {
 
 #[test]
 fn ucf() -> Result<(), String> {
-	assert_eq!(game("shield_drop")?.start.players[0].v1_0.as_ref().ok_or("missing players[0].v1_0")?.ucf,
-		Ucf { dash_back: None, shield_drop: Some(ShieldDrop::UCF) });
-	assert_eq!(game("dash_back")?.start.players[0].v1_0.as_ref().ok_or("missing players[0].v1_0")?.ucf,
-		Ucf { dash_back: Some(DashBack::UCF), shield_drop: None });
+	assert_eq!(game("shield_drop")?.start.players[0].ucf,
+		Some(Ucf { dash_back: None, shield_drop: Some(ShieldDrop::UCF) }));
+	assert_eq!(game("dash_back")?.start.players[0].ucf,
+		Some(Ucf { dash_back: Some(DashBack::UCF), shield_drop: None }));
 	Ok(())
 }
 
@@ -397,12 +397,8 @@ fn items() -> Result<(), String> {
 				timer: 140.0,
 				r#type: Item::PEACH_TURNIP,
 				velocity: Velocity { x: 0.0, y: 0.0 },
-				v3_2: Some(frame::ItemV3_2 {
-					misc: [5, 5, 5, 5],
-					v3_6: Some(frame::ItemV3_6 {
-						owner: Some(Port::P1),
-					}),
-				}),
+				misc: Some([5, 5, 5, 5]),
+				owner: Some(Some(Port::P1)),
 			});
 			assert_eq!(items[&1], frame::Item {
 				id: 1,
@@ -413,12 +409,8 @@ fn items() -> Result<(), String> {
 				timer: 140.0,
 				r#type: Item::PEACH_TURNIP,
 				velocity: Velocity { x: 0.0, y: 0.0 },
-				v3_2: Some(frame::ItemV3_2 {
-					misc: [5, 0, 5, 5],
-					v3_6: Some(frame::ItemV3_6 {
-						owner: Some(Port::P1),
-					}),
-				}),
+				misc: Some([5, 0, 5, 5]),
+				owner: Some(Some(Port::P1)),
 			});
 			assert_eq!(items[&2], frame::Item {
 				id: 2,
@@ -429,12 +421,8 @@ fn items() -> Result<(), String> {
 				timer: 140.0,
 				r#type: Item::PEACH_TURNIP,
 				velocity: Velocity { x: 0.0, y: 0.0 },
-				v3_2: Some(frame::ItemV3_2 {
-					misc: [5, 0, 5, 5],
-					v3_6: Some(frame::ItemV3_6 {
-						owner: Some(Port::P1),
-					}),
-				}),
+				misc: Some([5, 0, 5, 5]),
+				owner: Some(Some(Port::P1)),
 			});
 		},
 		_ => Err("wrong number of ports")?,

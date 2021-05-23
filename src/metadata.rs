@@ -14,7 +14,8 @@ use serde_json::{Map, Value};
 
 use super::{
 	character,
-	game::{FIRST_FRAME_INDEX, Port},
+	game::FIRST_FRAME_INDEX,
+	primitives::Port,
 };
 
 #[derive(Debug, PartialEq, Serialize)]

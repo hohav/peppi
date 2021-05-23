@@ -17,9 +17,9 @@ use super::{
 	buttons,
 	character::{self, Internal},
 	frame::{self, Pre, Post},
-	game::{self, NUM_PORTS, Player, PlayerType, Port},
+	game::{self, NUM_PORTS, Netplay, Player, PlayerType},
 	item,
-	primitives::{Direction, Position, Velocity},
+	primitives::{Direction, Port, Position, Velocity},
 	stage,
 	triggers,
 	ubjson,
@@ -141,47 +141,6 @@ fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, HashMap<u8, u16>)> {
 	Ok((1 + size as usize, sizes)) // +1 byte for the event code
 }
 
-fn player_v3_9(r: [u8; 41]) -> Result<game::PlayerV3_9> {
-	Ok(game::PlayerV3_9 {
-		display_name: {
-			let first_null = r.iter().position(|&x| x == 0).unwrap_or(31);
-			SHIFT_JIS.decode_without_bom_handling(&r[0..first_null]).0.to_string()
-		},
-		connect_code: {
-			let first_null = r.iter().position(|&x| x == 0).unwrap_or(10);
-			SHIFT_JIS.decode_without_bom_handling(&r[0..first_null]).0.to_string()
-		},
-	})
-}
-
-fn player_v1_3(r: [u8; 16], v3_9: Option<[u8; 41]>) -> Result<game::PlayerV1_3> {
-	let (name_tag, _) = {
-		let first_null = r.iter().position(|&x| x == 0).unwrap_or(16);
-		SHIFT_JIS.decode_without_bom_handling(&r[0..first_null])
-	};
-	Ok(game::PlayerV1_3 {
-		name_tag: name_tag.to_string(),
-		v3_9: v3_9.map(player_v3_9).transpose()?,
-	})
-}
-
-fn player_v1_0(r: [u8; 8], v1_3: Option<[u8; 16]>, v3_9: Option<[u8; 41]>) -> Result<game::PlayerV1_0> {
-	let mut r = &r[..];
-	Ok(game::PlayerV1_0 {
-		ucf: game::Ucf {
-			dash_back: match r.read_u32::<BE>()? {
-				0 => None,
-				db => Some(game::DashBack(db)),
-			},
-			shield_drop: match r.read_u32::<BE>()? {
-				0 => None,
-				sd => Some(game::ShieldDrop(sd)),
-			},
-		},
-		v1_3: v1_3.map(|v1_3| player_v1_3(v1_3, v3_9)).transpose()?,
-	})
-}
-
 fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3: Option<[u8; 16]>, v3_9: Option<[u8; 41]>) -> Result<Option<Player>> {
 	let mut r = &v0[..];
 	let character = character::External(r.read_u8()?);
@@ -218,7 +177,44 @@ fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3
 	r.read_u32::<BE>()?; // ???
 	// total bytes: 0x24
 
-	let v1_0 = v1_0.map(|v1_0| player_v1_0(v1_0, v1_3, v3_9)).transpose()?;
+	// v1.0
+	let ucf = match v1_0 {
+		Some(v1_0) => {
+			let mut r = &v1_0[..];
+			Some(game::Ucf {
+				dash_back: match r.read_u32::<BE>()? {
+					0 => None,
+					db => Some(game::DashBack(db)),
+				},
+				shield_drop: match r.read_u32::<BE>()? {
+					0 => None,
+					sd => Some(game::ShieldDrop(sd)),
+				},
+			})
+		},
+		_ => None,
+	};
+
+	// v1_3
+	let name_tag = v1_3.map(|v1_3| {
+		let first_null = v1_3.iter().position(|&x| x == 0).unwrap_or(16);
+		SHIFT_JIS.decode_without_bom_handling(&v1_3[0..first_null]).0.to_string()
+	});
+
+	// v3.9
+	let netplay = v3_9.map(|v3_9| {
+		let r = &v3_9[..];
+		Netplay {
+			name: {
+				let first_null = r.iter().position(|&x| x == 0).unwrap_or(31);
+				SHIFT_JIS.decode_without_bom_handling(&r[0..first_null]).0.to_string()
+			},
+			code: {
+				let first_null = r.iter().position(|&x| x == 0).unwrap_or(10);
+				SHIFT_JIS.decode_without_bom_handling(&r[0..first_null]).0.to_string()
+			},
+		}
+	});
 
 	Ok(match r#type {
 		PlayerType::HUMAN | PlayerType::CPU | PlayerType::DEMO => Some(Player {
@@ -234,9 +230,14 @@ fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3
 			offense_ratio: offense_ratio,
 			defense_ratio: defense_ratio,
 			model_scale: model_scale,
-			v1_0: v1_0,
+			// v1_0
+			ucf: ucf,
+			// v1_3
+			name_tag: name_tag,
+			// v3.9
+			netplay: netplay,
 		}),
-		_ => None
+		_ => None,
 	})
 }
 
@@ -256,29 +257,6 @@ fn player_bytes_v1_0(r: &mut &[u8]) -> Result<[u8; 8]> {
 	let mut buf = [0; 8];
 	r.read_exact(&mut buf)?;
 	Ok(buf)
-}
-
-fn game_start_v3_7(r: &mut &[u8]) -> Result<game::StartV3_7> {
-	Ok(game::StartV3_7 {
-		scene: game::Scene {
-			minor: r.read_u8()?,
-			major: r.read_u8()?,
-		},
-	})
-}
-
-fn game_start_v2_0(r: &mut &[u8]) -> Result<game::StartV2_0> {
-	Ok(game::StartV2_0 {
-		is_frozen_ps: r.read_u8()? != 0,
-		v3_7: if_more(r, game_start_v3_7)?,
-	})
-}
-
-fn game_start_v1_5(r: &mut &[u8]) -> Result<game::StartV1_5> {
-	Ok(game::StartV1_5 {
-		is_pal: r.read_u8()? != 0,
-		v2_0: if_more(r, game_start_v2_0)?,
-	})
 }
 
 fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
@@ -342,7 +320,12 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 		],
 	};
 
-	let v1_5 = if_more(r, game_start_v1_5)?;
+	let is_pal = if_more(r, |r| Ok(r.read_u8()? != 0))?;
+	let is_frozen_ps = if_more(r, |r| Ok(r.read_u8()? != 0))?;
+	let scene = if_more(r, |r| Ok(game::Scene {
+		minor: r.read_u8()?,
+		major: r.read_u8()?,
+	}))?;
 
 	let players_v3_9 = match r.is_empty() {
 		true => [None, None, None, None],
@@ -373,20 +356,20 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 		damage_ratio: damage_ratio,
 		players: players,
 		random_seed: random_seed,
-		v1_5: v1_5,
-	})
-}
-
-fn game_end_v2_0(r: &mut &[u8]) -> Result<game::EndV2_0> {
-	Ok(game::EndV2_0 {
-		lras_initiator: Port::try_from(r.read_u8()?).ok(),
+		// v1.5
+		is_pal: is_pal,
+		// v2.0
+		is_frozen_ps: is_frozen_ps,
+		// v3.7
+		scene: scene,
 	})
 }
 
 fn game_end(r: &mut &[u8]) -> Result<game::End> {
 	Ok(game::End {
 		method: game::EndMethod(r.read_u8()?),
-		v2_0: if_more(r, game_end_v2_0)?,
+		// v2.0
+		lras_initiator: if_more(r, |r| Ok(Port::try_from(r.read_u8()?).ok()))?,
 	})
 }
 
@@ -401,33 +384,14 @@ fn frame_start(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Start>> {
 	})
 }
 
-fn frame_end_v3_7(r: &mut &[u8]) -> Result<frame::EndV3_7> {
-	Ok(frame::EndV3_7 {
-		latest_finalized_frame: r.read_i32::<BE>()?,
-	})
-}
-
 fn frame_end(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::End>> {
 	let id = FrameId { index: r.read_i32::<BE>()? };
 	trace!("Frame End: {:?}", id);
 	Ok(FrameEvent {
 		id: id,
 		event: frame::End {
-			v3_7: if_more(r, frame_end_v3_7)?,
+			latest_finalized_frame: if_more(r, |r| r.read_i32::<BE>())?,
 		},
-	})
-}
-
-fn item_v3_6(r: &mut &[u8]) -> Result<frame::ItemV3_6> {
-	Ok(frame::ItemV3_6 {
-		owner: Port::try_from(r.read_u8()?).ok(),
-	})
-}
-
-fn item_v3_2(r: &mut &[u8]) -> Result<frame::ItemV3_2> {
-	Ok(frame::ItemV3_2 {
-		misc: [r.read_u8()?, r.read_u8()?, r.read_u8()?, r.read_u8()?],
-		v3_6: if_more(r, item_v3_6)?,
 	})
 }
 
@@ -452,7 +416,10 @@ fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Item>> {
 			damage: r.read_u16::<BE>()?,
 			timer: r.read_f32::<BE>()?,
 			id: r.read_u32::<BE>()?,
-			v3_2: if_more(r, item_v3_2)?,
+			// v3.2
+			misc: if_more(r, |r| Ok([r.read_u8()?, r.read_u8()?, r.read_u8()?, r.read_u8()?]))?,
+			// v3.6
+			owner: if_more(r, |r| Ok(Port::try_from(r.read_u8()?).ok()))?
 		},
 	})
 }
@@ -465,6 +432,11 @@ fn direction(value: f32) -> Result<Direction> {
 	}
 }
 
+/// We need to know the character to interpret the action state properly,
+/// but for Sheik/Zelda we don't know whether they transformed this frame
+/// until we get the corresponding `frame::Post` event. So we predict based
+/// on whether we were on the last frame of `TRANSFORM_AIR` or
+/// `TRANSFORM_GROUND` during the *previous* frame.
 fn predict_character(id: PortId, last_char_states: &[CharState; NUM_PORTS]) -> Internal {
 	let prev = last_char_states[id.port as usize];
 	match prev.state {
@@ -478,19 +450,6 @@ fn predict_character(id: PortId, last_char_states: &[CharState; NUM_PORTS]) -> I
 	}
 }
 
-fn frame_pre_v1_4(r: &mut &[u8]) -> Result<frame::PreV1_4> {
-	Ok(frame::PreV1_4 {
-		damage: r.read_f32::<BE>()?,
-	})
-}
-
-fn frame_pre_v1_2(r: &mut &[u8]) -> Result<frame::PreV1_2> {
-	Ok(frame::PreV1_2 {
-		raw_analog_x: r.read_u8()?,
-		v1_4: if_more(r, frame_pre_v1_4)?,
-	})
-}
-
 fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result<FrameEvent<PortId, Pre>> {
 	let id = PortId {
 		index: r.read_i32::<BE>()?,
@@ -499,11 +458,6 @@ fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result
 	};
 	trace!("Pre-Frame Update: {:?}", id);
 
-	// We need to know the character to interpret the action state properly,
-	// but for Sheik/Zelda we don't know whether they transformed this frame
-	// until we get the corresponding `frame::Post` event. So we predict based
-	// on whether we were on the last frame of `TRANSFORM_AIR` or
-	// `TRANSFORM_GROUND` during the *previous* frame.
 	let character = predict_character(id, last_char_states);
 
 	let random_seed = r.read_u32::<BE>()?;
@@ -535,8 +489,6 @@ fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result
 		},
 	};
 
-	let v1_2 = if_more(r, frame_pre_v1_2)?;
-
 	Ok(FrameEvent {
 		id: id,
 		event: Pre {
@@ -548,7 +500,10 @@ fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result
 			cstick: cstick,
 			triggers: triggers,
 			buttons: buttons,
-			v1_2: v1_2,
+			// v1.2
+			raw_analog_x: if_more(r, |r| r.read_u8())?,
+			// v1.4
+			damage: if_more(r, |r| r.read_f32::<BE>())?,
 		}
 	})
 }
@@ -564,8 +519,11 @@ fn flags(buf: &[u8; 5]) -> frame::StateFlags {
 }
 
 fn update_last_char_state(id: PortId, character: Internal, state: State, last_char_states: &mut [CharState; NUM_PORTS]) {
+	const Z_AIR: State = State::Zelda(action_state::Zelda::TRANSFORM_AIR);
+	const Z_GROUND: State = State::Zelda(action_state::Zelda::TRANSFORM_GROUND);
+	const S_AIR: State = State::Sheik(action_state::Sheik::TRANSFORM_AIR);
+	const S_GROUND: State = State::Sheik(action_state::Sheik::TRANSFORM_GROUND);
 	let prev = last_char_states[id.port as usize];
-
 	last_char_states[id.port as usize] = CharState {
 		character: character,
 		state: state,
@@ -579,91 +537,13 @@ fn update_last_char_state(id: PortId, character: Internal, state: State, last_ch
 			// `TRANSFORM_GROUND_ENDING` on the next frame. This delays the character
 			// switch by one frame, so we cap `age` at its previous value so as not to
 			// confuse `predict_character`.
-			(State::Zelda(action_state::Zelda::TRANSFORM_AIR),
-			 State::Zelda(action_state::Zelda::TRANSFORM_GROUND)) |
-			(State::Zelda(action_state::Zelda::TRANSFORM_GROUND),
-			 State::Zelda(action_state::Zelda::TRANSFORM_AIR)) =>
+			(Z_AIR, Z_GROUND) | (Z_GROUND, Z_AIR) =>
 				min(ZELDA_TRANSFORM_FRAME - 1, prev.age + 1),
-			(State::Sheik(action_state::Sheik::TRANSFORM_AIR),
-			 State::Sheik(action_state::Sheik::TRANSFORM_GROUND)) |
-			(State::Sheik(action_state::Sheik::TRANSFORM_GROUND),
-			 State::Sheik(action_state::Sheik::TRANSFORM_AIR)) =>
+			(S_AIR, S_GROUND) | (S_GROUND, S_AIR) =>
 				min(SHEIK_TRANSFORM_FRAME - 1, prev.age + 1),
 			_ => 0,
 		},
 	};
-}
-
-fn frame_post_v3_8(r: &mut &[u8]) -> Result<frame::PostV3_8> {
-	Ok(frame::PostV3_8 {
-		hitlag: r.read_f32::<BE>()?,
-	})
-}
-
-fn frame_post_v3_5(r: &mut &[u8], airborne: bool) -> Result<frame::PostV3_5> {
-	let autogenous_air_x_speed = r.read_f32::<BE>()?;
-	let autogenous_y_speed = r.read_f32::<BE>()?;
-	let knockback_velocity = Velocity {
-		x: r.read_f32::<BE>()?,
-		y: r.read_f32::<BE>()?,
-	};
-	let autogenous_ground_x_speed = r.read_f32::<BE>()?;
-
-	Ok(frame::PostV3_5 {
-		velocities: frame::Velocities {
-			autogenous: Velocity {
-				x: match airborne {
-					true => autogenous_air_x_speed,
-					_ => autogenous_ground_x_speed,
-				},
-				y: autogenous_y_speed,
-			},
-			knockback: knockback_velocity,
-		},
-		v3_8: if_more(r, frame_post_v3_8)?,
-	})
-}
-
-fn frame_post_v2_1(r: &mut &[u8], airborne: bool) -> Result<frame::PostV2_1> {
-	Ok(frame::PostV2_1 {
-		hurtbox_state: frame::HurtboxState(r.read_u8()?),
-		v3_5: if_more(r, |r| frame_post_v3_5(r, airborne))?,
-	})
-}
-
-fn frame_post_v2_0(r: &mut &[u8]) -> Result<frame::PostV2_0> {
-	let flags = {
-		let mut buf = [0; 5];
-		r.read_exact(&mut buf)?;
-		flags(&buf)
-	};
-	let misc_as = r.read_f32::<BE>()?;
-	let airborne = r.read_u8()? != 0;
-	let ground = r.read_u16::<BE>()?;
-	let jumps = r.read_u8()?;
-	let l_cancel = match r.read_u8()? {
-		0 => None,
-		1 => Some(true),
-		2 => Some(false),
-		i => Err(err!("invalid L-Cancel value: {}", i))?,
-	};
-
-	Ok(frame::PostV2_0 {
-		flags: flags,
-		misc_as: misc_as,
-		airborne: airborne,
-		ground: ground,
-		jumps: jumps,
-		l_cancel: l_cancel,
-		v2_1: if_more(r, |r| frame_post_v2_1(r, airborne))?,
-	})
-}
-
-fn frame_post_v0_2(r: &mut &[u8]) -> Result<frame::PostV0_2> {
-	Ok(frame::PostV0_2 {
-		state_age: r.read_f32::<BE>()?,
-		v2_0: if_more(r, frame_post_v2_0)?,
-	})
 }
 
 fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> Result<FrameEvent<PortId, Post>> {
@@ -694,7 +574,55 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 	let last_hit_by = Port::try_from(r.read_u8()?).ok();
 	let stocks = r.read_u8()?;
 
-	let v0_2 = if_more(r, frame_post_v0_2)?;
+	// v0.2
+	let state_age = if_more(r, |r| r.read_f32::<BE>())?;
+
+	// v2.0
+	let flags = if_more(r, |r| {
+		let mut buf = [0; 5];
+		r.read_exact(&mut buf)?;
+		Ok(flags(&buf))
+	})?;
+	let misc_as = if_more(r, |r| r.read_f32::<BE>())?;
+	let airborne = if_more(r, |r| Ok(r.read_u8()? != 0))?;
+	let ground = if_more(r, |r| r.read_u16::<BE>())?;
+	let jumps = if_more(r, |r| r.read_u8())?;
+	let l_cancel = if_more(r, |r| Ok(
+		match r.read_u8()? {
+			0 => None,
+			1 => Some(true),
+			2 => Some(false),
+			i => Err(err!("invalid L-Cancel value: {}", i))?,
+		}
+	))?;
+
+	// v2.1
+	let hurtbox_state = if_more(r, |r| Ok(frame::HurtboxState(r.read_u8()?)))?;
+
+	// v3.5
+	let velocities = if_more(r, |r| Ok({
+		let autogenous_air_x = r.read_f32::<BE>()?;
+		let autogenous_y = r.read_f32::<BE>()?;
+		let knockback_x = r.read_f32::<BE>()?;
+		let knockback_y = r.read_f32::<BE>()?;
+		let autogenous_ground_x = r.read_f32::<BE>()?;
+		frame::Velocities {
+			autogenous: Velocity {
+				x: match airborne.unwrap() {
+					true => autogenous_air_x,
+					_ => autogenous_ground_x,
+				},
+				y: autogenous_y,
+			},
+			knockback: Velocity {
+				x: knockback_x,
+				y: knockback_y,
+			},
+		}
+	}))?;
+
+	// v3.8
+	let hitlag = if_more(r, |r| r.read_f32::<BE>())?;
 
 	update_last_char_state(id, character, state, last_char_states);
 
@@ -711,14 +639,29 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 			combo_count: combo_count,
 			last_hit_by: last_hit_by,
 			stocks: stocks,
-			v0_2: v0_2,
+			// v0.2
+			state_age: state_age,
+			// v2.0
+			flags: flags,
+			misc_as: misc_as,
+			airborne: airborne,
+			ground: ground,
+			jumps: jumps,
+			l_cancel: l_cancel,
+			// v2.1
+			hurtbox_state: hurtbox_state,
+			// v3.5
+			velocities: velocities,
+			// v3.8
+			hitlag: hitlag,
 		},
 	})
 }
 
 /// Callbacks for events encountered while parsing a replay.
 ///
-/// For frame events, there will be one event per frame per character (Ice Climbers are two characters).
+/// For frame events, there will be one event per frame per character
+/// (Ice Climbers are two characters).
 pub trait Handlers {
 	// Descriptions below partially copied from the Slippi spec:
 	// https://github.com/project-slippi/slippi-wiki/blob/master/SPEC.md
@@ -759,6 +702,7 @@ fn expect_bytes<R: Read>(r: &mut R, expected: &[u8]) -> Result<()> {
 /// Parses a single event from the raw stream. If the event is one of the
 /// supported `Event` types, calls the corresponding `Handler` callback with
 /// the parsed event.
+///
 /// Returns the number of bytes read by this function.
 fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_char_states: &mut [CharState; NUM_PORTS], handlers: &mut H) -> Result<(usize, Option<Event>)> {
 	let code = r.read_u8()?;
@@ -773,12 +717,12 @@ fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_
 		use Event::*;
 		match event {
 			GameStart => handlers.game_start(game_start(&mut &*buf)?)?,
+			GameEnd => handlers.game_end(game_end(&mut &*buf)?)?,
 			FrameStart => handlers.frame_start(frame_start(&mut &*buf)?)?,
 			FramePre => handlers.frame_pre(frame_pre(&mut &*buf, last_char_states)?)?,
 			FramePost => handlers.frame_post(frame_post(&mut &*buf, last_char_states)?)?,
 			FrameEnd => handlers.frame_end(frame_end(&mut &*buf)?)?,
 			Item => handlers.item(item(&mut &*buf)?)?,
-			GameEnd => handlers.game_end(game_end(&mut &*buf)?)?,
 		};
 	}
 

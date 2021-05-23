@@ -1,152 +1,98 @@
 use std::fmt;
 
+use ::arrow::datatypes;
+
 use super::character::Internal;
 
-#[derive(Copy, Clone, PartialEq, serde::Serialize)]
-#[serde(untagged)]
-pub enum State {
-	Common(Common),
-	Bowser(Bowser),
-	CaptainFalcon(CaptainFalcon),
-	DonkeyKong(DonkeyKong),
-	DrMario(DrMario),
-	Falco(Falco),
-	Fox(Fox),
-	GameAndWatch(GameAndWatch),
-	Ganondorf(Ganondorf),
-	Jigglypuff(Jigglypuff),
-	Kirby(Kirby),
-	Link(Link),
-	Luigi(Luigi),
-	Mario(Mario),
-	Marth(Marth),
-	Mewtwo(Mewtwo),
-	Nana(Nana),
-	Ness(Ness),
-	Peach(Peach),
-	Pichu(Pichu),
-	Pikachu(Pikachu),
-	Popo(Popo),
-	Roy(Roy),
-	Samus(Samus),
-	Sheik(Sheik),
-	Yoshi(Yoshi),
-	YoungLink(YoungLink),
-	Zelda(Zelda),
-	Unknown(u16),
-}
+macro_rules! state {
+	($name: ident {
+		$unknown: ident,
+		$common: ident ( $common_type: ident ),
+		$( $variant: ident ( $variant_type: ident ) => $internal: ident ),* $(,)?
+	}) => {
+		#[derive(Copy, Clone, PartialEq, Eq, serde::Serialize)]
+		#[serde(untagged)]
+		pub enum $name {
+			$common($common_type),
+			$unknown(u16),
+			$( $variant($variant_type), )*
+		}
 
-impl State {
-	pub fn from(value: u16, character: Internal) -> State {
-		if value <= 340 {
-			State::Common(Common(value))
-		} else {
-			match character {
-				Internal::BOWSER => State::Bowser(Bowser(value)),
-				Internal::CAPTAIN_FALCON => State::CaptainFalcon(CaptainFalcon(value)),
-				Internal::DONKEY_KONG => State::DonkeyKong(DonkeyKong(value)),
-				Internal::DR_MARIO => State::DrMario(DrMario(value)),
-				Internal::FALCO => State::Falco(Falco(value)),
-				Internal::FOX => State::Fox(Fox(value)),
-				Internal::GAME_AND_WATCH => State::GameAndWatch(GameAndWatch(value)),
-				Internal::GANONDORF => State::Ganondorf(Ganondorf(value)),
-				Internal::JIGGLYPUFF => State::Jigglypuff(Jigglypuff(value)),
-				Internal::KIRBY => State::Kirby(Kirby(value)),
-				Internal::LINK => State::Link(Link(value)),
-				Internal::LUIGI => State::Luigi(Luigi(value)),
-				Internal::MARIO => State::Mario(Mario(value)),
-				Internal::MARTH => State::Marth(Marth(value)),
-				Internal::MEWTWO => State::Mewtwo(Mewtwo(value)),
-				Internal::NANA => State::Nana(Nana(value)),
-				Internal::NESS => State::Ness(Ness(value)),
-				Internal::PEACH => State::Peach(Peach(value)),
-				Internal::PICHU => State::Pichu(Pichu(value)),
-				Internal::PIKACHU => State::Pikachu(Pikachu(value)),
-				Internal::POPO => State::Popo(Popo(value)),
-				Internal::ROY => State::Roy(Roy(value)),
-				Internal::SAMUS => State::Samus(Samus(value)),
-				Internal::SHEIK => State::Sheik(Sheik(value)),
-				Internal::YOSHI => State::Yoshi(Yoshi(value)),
-				Internal::YOUNG_LINK => State::YoungLink(YoungLink(value)),
-				Internal::ZELDA => State::Zelda(Zelda(value)),
-				_ => State::Unknown(value),
+		impl $name {
+			pub fn from(value: u16, character: Internal) -> $name {
+				if value <= 340 {
+					$name::$common($common_type(value))
+				} else {
+					match character {
+						$( Internal::$internal => $name::$variant($variant_type(value)), )*
+						_ => $name::$unknown(value),
+					}
+				}
+			}
+		}
+
+		impl From<$name> for u16 {
+			fn from(state: $name) -> u16 {
+				match state {
+					$name::$unknown(s) => s,
+					$name::$common(s) => s.0,
+					$( $name::$variant(s) => s.0, )*
+				}
+			}
+		}
+
+		impl fmt::Debug for $name {
+			fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+				 match *self {
+					$name::$unknown(s) => write!(f, "{:?}", s),
+					$name::$common(s) => write!(f, "{:?}", s),
+					$( $name::$variant(s) => write!(f, "{:?}", s), )*
+				}
+			}
+		}
+
+		impl super::arrow::ArrowPrimitive for State {
+			type ArrowNativeType = u16;
+			type ArrowType = datatypes::UInt16Type;
+			const ARROW_DATA_TYPE: datatypes::DataType = datatypes::DataType::UInt16;
+			fn into_arrow_native(self) -> Self::ArrowNativeType {
+				u16::from(self)
 			}
 		}
 	}
 }
 
-impl From<State> for u16 {
-	fn from(state: State) -> u16 {
-		use State::*;
-		match state {
-			Common(s) => s.0,
-			Bowser(s) => s.0,
-			CaptainFalcon(s) => s.0,
-			DonkeyKong(s) => s.0,
-			DrMario(s) => s.0,
-			Falco(s) => s.0,
-			Fox(s) => s.0,
-			GameAndWatch(s) => s.0,
-			Ganondorf(s) => s.0,
-			Jigglypuff(s) => s.0,
-			Kirby(s) => s.0,
-			Link(s) => s.0,
-			Luigi(s) => s.0,
-			Mario(s) => s.0,
-			Marth(s) => s.0,
-			Mewtwo(s) => s.0,
-			Nana(s) => s.0,
-			Ness(s) => s.0,
-			Peach(s) => s.0,
-			Pichu(s) => s.0,
-			Pikachu(s) => s.0,
-			Popo(s) => s.0,
-			Roy(s) => s.0,
-			Samus(s) => s.0,
-			Sheik(s) => s.0,
-			Yoshi(s) => s.0,
-			YoungLink(s) => s.0,
-			Zelda(s) => s.0,
-			Unknown(s) => s,
-		}
-	}
-}
-
-impl fmt::Debug for State {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		 match *self {
-			State::Common(s) => write!(f, "{:?}", s),
-			State::Bowser(s) => write!(f, "{:?}", s),
-			State::CaptainFalcon(s) => write!(f, "{:?}", s),
-			State::DonkeyKong(s) => write!(f, "{:?}", s),
-			State::DrMario(s) => write!(f, "{:?}", s),
-			State::Falco(s) => write!(f, "{:?}", s),
-			State::Fox(s) => write!(f, "{:?}", s),
-			State::GameAndWatch(s) => write!(f, "{:?}", s),
-			State::Ganondorf(s) => write!(f, "{:?}", s),
-			State::Jigglypuff(s) => write!(f, "{:?}", s),
-			State::Kirby(s) => write!(f, "{:?}", s),
-			State::Link(s) => write!(f, "{:?}", s),
-			State::Luigi(s) => write!(f, "{:?}", s),
-			State::Mario(s) => write!(f, "{:?}", s),
-			State::Marth(s) => write!(f, "{:?}", s),
-			State::Mewtwo(s) => write!(f, "{:?}", s),
-			State::Nana(s) => write!(f, "{:?}", s),
-			State::Ness(s) => write!(f, "{:?}", s),
-			State::Peach(s) => write!(f, "{:?}", s),
-			State::Pichu(s) => write!(f, "{:?}", s),
-			State::Pikachu(s) => write!(f, "{:?}", s),
-			State::Popo(s) => write!(f, "{:?}", s),
-			State::Roy(s) => write!(f, "{:?}", s),
-			State::Samus(s) => write!(f, "{:?}", s),
-			State::Sheik(s) => write!(f, "{:?}", s),
-			State::Yoshi(s) => write!(f, "{:?}", s),
-			State::YoungLink(s) => write!(f, "{:?}", s),
-			State::Zelda(s) => write!(f, "{:?}", s),
-			State::Unknown(s) => write!(f, "{:?}", s),
-		}
-	}
-}
+state!(State {
+	Unknown,
+	Common(Common),
+	Bowser(Bowser) => BOWSER,
+	CaptainFalcon(CaptainFalcon) => CAPTAIN_FALCON,
+	DonkeyKong(DonkeyKong) => DONKEY_KONG,
+	DrMario(DrMario) => DR_MARIO,
+	Falco(Falco) => FALCO,
+	Fox(Fox) => FOX,
+	GameAndWatch(GameAndWatch) => GAME_AND_WATCH,
+	Ganondorf(Ganondorf) => GANONDORF,
+	Jigglypuff(Jigglypuff) => JIGGLYPUFF,
+	Kirby(Kirby) => KIRBY,
+	Link(Link) => LINK,
+	Luigi(Luigi) => LUIGI,
+	Mario(Mario) => MARIO,
+	Marth(Marth) => MARTH,
+	Mewtwo(Mewtwo) => MEWTWO,
+	Nana(Nana) => NANA,
+	Ness(Ness) => NESS,
+	Peach(Peach) => PEACH,
+	Pichu(Pichu) => PICHU,
+	Pikachu(Pikachu) => PIKACHU,
+	Popo(Popo) => POPO,
+	Roy(Roy) => ROY,
+	Samus(Samus) => SAMUS,
+	Sheik(Sheik) => SHEIK,
+	Yoshi(Yoshi) => YOSHI,
+	YoungLink(YoungLink) => YOUNG_LINK,
+	Zelda(Zelda) => ZELDA,
+});
 
 pseudo_enum!(Common: u16 {
 	000 => DEAD_DOWN,

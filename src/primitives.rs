@@ -1,30 +1,37 @@
-use std::fmt::{Debug, Formatter, Result};
+use std::fmt::{Debug, Display, Formatter, Result};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize, num_enum::TryFromPrimitive)]
+#[repr(u8)]
+pub enum Port {
+	P1 = 0,
+	P2 = 1,
+	P3 = 2,
+	P4 = 3,
+}
+
+impl Display for Port {
+	fn fmt(&self, f: &mut Formatter) -> Result {
+		use Port::*;
+		match *self {
+			P1 => write!(f, "P1"),
+			P2 => write!(f, "P2"),
+			P3 => write!(f, "P3"),
+			P4 => write!(f, "P4"),
+		}
+	}
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum Direction { Left, Right }
 
-#[derive(Clone, Copy, PartialEq, Serialize)]
-pub struct Position {
-	pub x: f32,
-	pub y: f32,
-}
+frame_data!(Position {
+	x: f32,
+	y: f32,
+}, { });
 
-impl Debug for Position {
-	fn fmt(&self, f: &mut Formatter) -> Result {
-		write!(f, "({}, {})", self.x, self.y)
-	}
-}
-
-#[derive(Clone, Copy, PartialEq, Serialize)]
-pub struct Velocity {
-	pub x: f32,
-	pub y: f32,
-}
-
-impl Debug for Velocity {
-	fn fmt(&self, f: &mut Formatter) -> Result {
-		write!(f, "({}, {})", self.x, self.y)
-	}
-}
+frame_data!(Velocity {
+	x: f32,
+	y: f32,
+}, { });

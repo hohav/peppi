@@ -3,7 +3,7 @@ use std::io::Result;
 use serde_json::{Map, Value};
 
 use super::{
-	frame::{self, Frame, Port},
+	frame::{self, Frame, PortData},
 	game::{self, Frames, Game, NUM_PORTS},
 	metadata,
 	parse::{self, Indexed},
@@ -64,7 +64,7 @@ macro_rules! into_game {
 				start: $gp.frames_start.get(n).copied(),
 				end: $gp.frames_end.get(n).copied(),
 				ports: [ $(
-					Port {
+					PortData {
 						leader: frame::Data {
 							pre: $gp.frames_leaders.pre[ports[$idx]][n],
 							post: $gp.frames_leaders.post[ports[$idx]][n],

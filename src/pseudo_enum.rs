@@ -55,5 +55,12 @@ macro_rules! pseudo_enum {
 				}
 			}
 		}
+
+		impl super::arrow::ArrowPrimitive for $name {
+			type ArrowNativeType = $type;
+			type ArrowType = <$type as super::arrow::ArrowPrimitive>::ArrowType;
+			const ARROW_DATA_TYPE: ::arrow::datatypes::DataType = <$type>::ARROW_DATA_TYPE;
+			fn into_arrow_native(self) -> Self::ArrowNativeType { self.0 as $type }
+		}
 	}
 }

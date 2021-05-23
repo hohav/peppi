@@ -8,23 +8,20 @@ use super::{
 	attack,
 	buttons,
 	character,
-	game,
 	item,
-	primitives::{Direction, Position, Velocity},
+	primitives::{Direction, Port, Position, Velocity},
 	triggers,
 };
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
-pub struct Buttons {
-	pub logical: buttons::Logical,
-	pub physical: buttons::Physical,
-}
+frame_data!(Buttons {
+	logical: buttons::Logical,
+	physical: buttons::Physical,
+}, { });
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
-pub struct Triggers {
-	pub logical: triggers::Logical,
-	pub physical: triggers::Physical,
-}
+frame_data!(Triggers {
+	logical: triggers::Logical,
+	physical: triggers::Physical,
+}, { });
 
 pseudo_bitmask!(StateFlags: u64 {
 	1u64 << 04 => REFLECT,
@@ -47,26 +44,21 @@ pseudo_enum!(HurtboxState: u8 {
 	2 => INTANGIBLE,
 });
 
-frame_data!(Start, StartCol {
+frame_data!(Start {
 	random_seed: u32,
-});
+}, { });
 
-frame_data!(EndV3_7, EndV3_7Col {
+frame_data!(End {
+}, {
 	latest_finalized_frame: i32,
 });
 
-frame_data!(End, EndCol {
-}, v3_7: EndV3_7, EndV3_7Col);
+frame_data!(Velocities {
+	autogenous: Velocity,
+	knockback: Velocity,
+}, { });
 
-port_data!(PreV1_4, PreV1_4Col {
-	damage: f32,
-});
-
-port_data!(PreV1_2, PreV1_2Col {
-	raw_analog_x: u8,
-}, v1_4: PreV1_4, PreV1_4Col);
-
-port_data!(Pre, PreCol {
+frame_data!(Pre {
 	position: Position,
 	direction: Direction,
 	joystick: Position,
@@ -75,39 +67,14 @@ port_data!(Pre, PreCol {
 	random_seed: u32,
 	buttons: Buttons,
 	state: action_state::State,
-}, v1_2: PreV1_2, PreV1_2Col);
-
-port_data!(Velocities, VelocitiesCol {
-	autogenous: Velocity,
-	knockback: Velocity,
+}, {
+	// v1.2
+	raw_analog_x: u8,
+	// v1.4
+	damage: f32,
 });
 
-port_data!(PostV3_8, PostV3_8Col {
-	hitlag: f32,
-});
-
-port_data!(PostV3_5, PostV3_5Col {
-	velocities: Velocities,
-}, v3_8: PostV3_8, PostV3_8Col);
-
-port_data!(PostV2_1, PostV2_1Col {
-	hurtbox_state: HurtboxState,
-}, v3_5: PostV3_5, PostV3_5Col);
-
-port_data!(PostV2_0, PostV2_0Col {
-	flags: StateFlags,
-	misc_as: f32,
-	airborne: bool,
-	ground: u16,
-	jumps: u8,
-	l_cancel: Option<bool>,
-}, v2_1: PostV2_1, PostV2_1Col);
-
-port_data!(PostV0_2, PostV0_2Col {
-	state_age: f32,
-}, v2_0: PostV2_0, PostV2_0Col);
-
-port_data!(Post, PostCol {
+frame_data!(Post {
 	position: Position,
 	direction: Direction,
 	damage: f32,
@@ -116,32 +83,39 @@ port_data!(Post, PostCol {
 	character: character::Internal,
 	last_attack_landed: Option<attack::Attack>,
 	combo_count: u8,
-	last_hit_by: Option<game::Port>,
+	last_hit_by: Option<Port>,
 	stocks: u8,
-}, v0_2: PostV0_2, PostV0_2Col);
+}, {
+	// v0.2
+	state_age: f32,
+	// v2.0
+	flags: StateFlags,
+	misc_as: f32,
+	airborne: bool,
+	ground: u16,
+	jumps: u8,
+	l_cancel: Option<bool>,
+	// v2.1
+	hurtbox_state: HurtboxState,
+	// v3.5
+	velocities: Velocities,
+	// v3.8
+	hitlag: f32,
+});
+
+frame_data!(Data {
+	pre: Pre,
+	post: Post,
+}, { });
 
 #[derive(Debug, PartialEq, Serialize)]
-pub struct Data {
-	pub pre: Pre,
-	pub post: Post,
-}
-
-#[derive(Debug, PartialEq, Serialize)]
-pub struct Port {
+pub struct PortData {
 	pub leader: Data,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub follower: Option<Box<Data>>,
 }
 
-item_data!(ItemV3_6, ItemV3_6Col {
-	owner: Option<game::Port>,
-});
-
-item_data!(ItemV3_2, ItemV3_2Col {
-	misc: [u8; 4],
-}, v3_6: ItemV3_6, ItemV3_6Col);
-
-item_data!(Item, ItemCol {
+frame_data!(Item {
 	id: u32,
 	r#type: item::Item,
 	state: u8,
@@ -150,11 +124,16 @@ item_data!(Item, ItemCol {
 	velocity: Velocity,
 	damage: u16,
 	timer: f32,
-}, v3_2: ItemV3_2, ItemV3_2Col);
+}, {
+	// v3.2
+	misc: [u8; 4],
+	// v3.6
+	owner: Option<Port>,
+});
 
 #[derive(Debug, PartialEq)]
 pub struct Frame<const N: usize> {
-	pub ports: [Port; N],
+	pub ports: [PortData; N],
 	pub start: Option<Start>,
 	pub end: Option<End>,
 	pub items: Option<Vec<Item>>,

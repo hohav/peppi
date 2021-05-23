@@ -2,31 +2,21 @@ use std::fmt::{Debug, Display, Formatter, Result};
 
 use serde::{Deserialize, Serialize};
 
-use super::{character, frame, metadata, stage};
+use super::{
+	character,
+	frame,
+	metadata,
+	primitives::Port,
+	stage,
+};
 
 pub const NUM_PORTS: usize = 4;
 pub const FIRST_FRAME_INDEX: i32 = -123;
 
-#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize, num_enum::TryFromPrimitive)]
-#[repr(u8)]
-pub enum Port {
-	P1 = 0,
-	P2 = 1,
-	P3 = 2,
-	P4 = 3,
-}
-
-impl Display for Port {
-	fn fmt(&self, f: &mut Formatter) -> Result {
-		use Port::*;
-		match *self {
-			P1 => write!(f, "P1"),
-			P2 => write!(f, "P2"),
-			P3 => write!(f, "P3"),
-			P4 => write!(f, "P4"),
-		}
-	}
-}
+/// We can parse files with higher versions than this, but we won't expose all information.
+/// When converting a replay with a higher version number to another format like Arrow,
+/// the conversion will be lossy.
+pub const MAX_SUPPORTED_VERSION: SlippiVersion = SlippiVersion(3, 9, 0);
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub struct SlippiVersion(pub u8, pub u8, pub u8);
@@ -83,25 +73,9 @@ pub struct Ucf {
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub struct PlayerV3_9 {
-	pub display_name: String,
-	pub connect_code: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub struct PlayerV1_3 {
-	pub name_tag: String,
-
-	#[serde(flatten)]
-	pub v3_9: Option<PlayerV3_9>,
-}
-
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub struct PlayerV1_0 {
-	pub ucf: Ucf,
-
-	#[serde(flatten)]
-	pub v1_3: Option<PlayerV1_3>,
+pub struct Netplay {
+	pub name: String,
+	pub code: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -120,35 +94,21 @@ pub struct Player {
 	pub defense_ratio: f32,
 	pub model_scale: f32,
 
-	#[serde(flatten)]
-	pub v1_0: Option<PlayerV1_0>,
+	// v1_0
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub ucf: Option<Ucf>,
+	// v1_3
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub name_tag: Option<String>,
+	// v3.9
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub netplay: Option<Netplay>,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Scene {
 	pub minor: u8,
 	pub major: u8,
-}
-
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub struct StartV3_7 {
-	pub scene: Scene,
-}
-
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub struct StartV2_0 {
-	pub is_frozen_ps: bool,
-
-	#[serde(flatten)]
-	pub v3_7: Option<StartV3_7>,
-}
-
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub struct StartV1_5 {
-	pub is_pal: bool,
-
-	#[serde(flatten)]
-	pub v2_0: Option<StartV2_0>,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -164,9 +124,15 @@ pub struct Start {
 	pub damage_ratio: f32,
 	pub players: Vec<Player>,
 	pub random_seed: u32,
-
-	#[serde(flatten)]
-	pub v1_5: Option<StartV1_5>,
+	// v1.5
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_pal: Option<bool>,
+	// v2.0
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_frozen_ps: Option<bool>,
+	// v3.7
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub scene: Option<Scene>,
 }
 
 pseudo_enum!(EndMethod: u8 {
@@ -178,16 +144,11 @@ pseudo_enum!(EndMethod: u8 {
 });
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub struct EndV2_0 {
-	pub lras_initiator: Option<Port>,
-}
-
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct End {
 	pub method: EndMethod,
-
-	#[serde(flatten)]
-	pub v2_0: Option<EndV2_0>,
+	// v2.0
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub lras_initiator: Option<Option<Port>>,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
