@@ -37,8 +37,9 @@ pub struct Buffer {
 }
 
 impl Buffer {
-	pub fn into_array(self) -> Arc<dyn array::Array> {
-		let size = match self.data_type {
+	pub fn item_size(&self) -> usize {
+		use datatypes::DataType::*;
+		match self.data_type {
 			Boolean => 1,
 			Int8 | UInt8 => 1,
 			Int16 | UInt16 => 2,
@@ -46,11 +47,13 @@ impl Buffer {
 			Int64 | UInt64 => 8,
 			Float32 => 4,
 			_ => unimplemented!(),
-		};
-		use datatypes::DataType::*;
+		}
+	}
+
+	pub fn into_array(self) -> Arc<dyn array::Array> {
 		use array::*;
 		let mut builder = array::ArrayData::builder(self.data_type.clone())
-			.len(self.buffer.len() / size)
+			.len(self.buffer.len() / self.item_size())
 			.add_buffer(match self.data_type {
 				Boolean => unsafe {
 					buffer::MutableBuffer::from_trusted_len_iter_bool(
@@ -62,7 +65,9 @@ impl Buffer {
 		if let Some(mut validities) = self.validity_buffer {
 			builder = builder.null_bit_buffer(validities.finish());
 		}
+
 		let data = builder.build();
+		use datatypes::DataType::*;
 		match self.data_type {
 			Boolean => Arc::new(BooleanArray::from(data)),
 			Int8 => Arc::new(Int8Array::from(data)),
@@ -138,17 +143,17 @@ impl ArrowPrimitive for Direction {
 }
 
 pub trait Arrow {
-	fn arrow_buffers(&self, name: Option<&str>, len: usize) -> Vec<Buffer>;
+	fn arrow_buffers(&self, name: &str, len: usize) -> Vec<Buffer>;
 	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize) -> usize;
 }
 
 impl<T> Arrow for T where T: ArrowPrimitive {
-	fn arrow_buffers(&self, name: Option<&str>, len: usize) -> Vec<Buffer> {
+	fn arrow_buffers(&self, name: &str, len: usize) -> Vec<Buffer> {
 		vec![Buffer {
 			buffer: buffer::MutableBuffer::new(len * mem::size_of::<T::ArrowNativeType>()),
 			validity_buffer: None,
 			data_type: T::ARROW_DATA_TYPE,
-			name: name.unwrap().to_string(),
+			name: name.to_string(),
 		}]
 	}
 
@@ -159,12 +164,12 @@ impl<T> Arrow for T where T: ArrowPrimitive {
 }
 
 impl<T> Arrow for Option<T> where T: ArrowPrimitive {
-	fn arrow_buffers(&self, name: Option<&str>, len: usize) -> Vec<Buffer> {
+	fn arrow_buffers(&self, name: &str, len: usize) -> Vec<Buffer> {
 		vec![Buffer {
 			buffer: buffer::MutableBuffer::new(len * mem::size_of::<T::ArrowNativeType>()),
 			validity_buffer: Some(array::BooleanBufferBuilder::new(len)),
 			data_type: T::ARROW_DATA_TYPE,
-			name: name.unwrap().to_string(),
+			name: name.to_string(),
 		}]
 	}
 
@@ -184,17 +189,12 @@ impl<T> Arrow for Option<T> where T: ArrowPrimitive {
 	}
 }
 
-pub fn prefix(name: Option<&str>) -> String {
-	//name.map(|n| format!("{}.", n)).unwrap_or("".to_string())
-	format!("{}.", name.unwrap_or(""))
-}
-
 impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
-	fn arrow_buffers(&self, name: Option<&str>, len: usize) -> Vec<Buffer> {
+	fn arrow_buffers(&self, name: &str, len: usize) -> Vec<Buffer> {
 		let mut buffers = Vec::new();
 		for i in 0 .. N {
 			buffers.extend(self[i].arrow_buffers(
-				Some(format!("{}{}", prefix(name), i).as_str()),
+				format!("{}.{}", name, i).as_str(),
 				len));
 		}
 		buffers
@@ -210,14 +210,14 @@ impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
 }
 
 impl Arrow for frame::PortData {
-	fn arrow_buffers(&self, name: Option<&str>, len: usize) -> Vec<Buffer> {
+	fn arrow_buffers(&self, name: &str, len: usize) -> Vec<Buffer> {
 		let mut buffers = self.leader.arrow_buffers(
-			Some(format!("{}{}", prefix(name), "leader").as_str()),
+			format!("{}.{}", name, "leader").as_str(),
 			len
 		);
 		if let Some(f) = &self.follower {
 			buffers.extend(f.arrow_buffers(
-				Some(format!("{}{}", prefix(name), "follower").as_str()),
+				format!("{}.{}", name, "follower").as_str(),
 				len));
 		}
 		buffers
@@ -234,20 +234,20 @@ impl Arrow for frame::PortData {
 }
 
 impl<const N: usize> Arrow for frame::Frame<N> {
-	fn arrow_buffers(&self, name: Option<&str>, len: usize) -> Vec<Buffer> {
+	fn arrow_buffers(&self, name: &str, len: usize) -> Vec<Buffer> {
 		let mut buffers = self.ports.arrow_buffers(
-			Some(format!("{}{}", prefix(name), "ports").as_str()),
+			format!("{}.{}", name, "ports").as_str(),
 			len
 		);
 		if let Some(start) = self.start {
 			buffers.extend(start.arrow_buffers(
-				Some(format!("{}{}", prefix(name), "start").as_str()),
+				format!("{}.{}", name, "start").as_str(),
 				len
 			));
 		}
 		if let Some(end) = self.end {
 			buffers.extend(end.arrow_buffers(
-				Some(format!("{}{}", prefix(name), "end").as_str()),
+				format!("{}.{}", name, "end").as_str(),
 				len
 			))
 		}
@@ -308,7 +308,7 @@ fn struct_array(buffers: Vec<Buffer>) -> error::Result<StructArray> {
 }
 
 fn _frames<const N: usize>(src: &Vec<frame::Frame<N>>) -> error::Result<StructArray> {
-	let mut buffers = src[0].arrow_buffers(None, src.len());
+	let mut buffers = src[0].arrow_buffers("", src.len());
 	for frame in src {
 		frame.arrow_append(&mut buffers, 0);
 	}
@@ -348,7 +348,7 @@ fn _items<const N: usize>(src: &Vec<frame::Frame<N>>) -> error::Result<Option<St
 				name: ".frame_index".to_string(),
 			}
 		];
-		buffers.extend(first_item.arrow_buffers(None, src.len()));
+		buffers.extend(first_item.arrow_buffers("", src.len()));
 		for (idx, frame) in src.iter().enumerate() {
 			for item in frame.items.as_ref().unwrap() {
 				(idx as i32 + game::FIRST_FRAME_INDEX).arrow_append(&mut buffers, 0);
