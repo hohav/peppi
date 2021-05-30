@@ -32,7 +32,7 @@ use super::{
 
 pub struct Buffer {
 	pub buffer: buffer::MutableBuffer,
-	pub validity_buffer: Option<array::BooleanBufferBuilder>,
+	pub validities: Option<array::BooleanBufferBuilder>,
 	pub data_type: datatypes::DataType,
 	pub name: String,
 }
@@ -63,7 +63,7 @@ impl Buffer {
 				},
 				_ => self.buffer.into(),
 			});
-		if let Some(mut validities) = self.validity_buffer {
+		if let Some(mut validities) = self.validities {
 			builder = builder.null_bit_buffer(validities.finish());
 		}
 
@@ -152,7 +152,7 @@ impl<T> Arrow for T where T: ArrowPrimitive {
 	fn arrow_buffers(name: &str, len: usize, _slippi: Slippi) -> Vec<Buffer> {
 		vec![Buffer {
 			buffer: buffer::MutableBuffer::new(len * mem::size_of::<T::ArrowNativeType>()),
-			validity_buffer: None,
+			validities: None,
 			data_type: T::ARROW_DATA_TYPE,
 			name: name.to_string(),
 		}]
@@ -168,7 +168,7 @@ impl<T> Arrow for Option<T> where T: ArrowPrimitive {
 	fn arrow_buffers(name: &str, len: usize, slippi: Slippi) -> Vec<Buffer> {
 		let mut buffers = T::arrow_buffers(name, len, slippi);
 		for mut b in &mut buffers {
-			b.validity_buffer = Some(array::BooleanBufferBuilder::new(len));
+			b.validities = Some(array::BooleanBufferBuilder::new(len));
 		}
 		buffers
 	}
@@ -184,7 +184,7 @@ impl<T> Arrow for Option<T> where T: ArrowPrimitive {
 				false
 			}
 		};
-		buffers[index].validity_buffer.as_mut().unwrap().append(valid);
+		buffers[index].validities.as_mut().unwrap().append(valid);
 		1
 	}
 }
@@ -302,7 +302,7 @@ fn struct_array(buffers: Vec<Buffer>) -> error::Result<StructArray> {
 			datatypes::Field::new(
 				path.last().unwrap(),
 				b.data_type.clone(),
-				b.validity_buffer.is_some(),
+				b.validities.is_some(),
 			),
 			b.into_array(),
 		));
@@ -337,7 +337,7 @@ fn _items<const N: usize>(src: &Vec<frame::Frame<N>>, slippi: Slippi) -> error::
 		let mut buffers = vec![
 			Buffer {
 				buffer: buffer::MutableBuffer::new(len * std::mem::size_of::<i32>()),
-				validity_buffer: None,
+				validities: None,
 				data_type: datatypes::DataType::UInt32,
 				name: ".frame_index".to_string(),
 			}
