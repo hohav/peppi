@@ -26,6 +26,7 @@ use arrow::{
 use super::{
 	frame,
 	game,
+	slippi::{Slippi, Version},
 	primitives::{Direction, Port}
 };
 
@@ -143,12 +144,12 @@ impl ArrowPrimitive for Direction {
 }
 
 pub trait Arrow {
-	fn arrow_buffers(&self, name: &str, len: usize) -> Vec<Buffer>;
-	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize) -> usize;
+	fn arrow_buffers(name: &str, len: usize, slippi: Slippi) -> Vec<Buffer>;
+	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi) -> usize;
 }
 
 impl<T> Arrow for T where T: ArrowPrimitive {
-	fn arrow_buffers(&self, name: &str, len: usize) -> Vec<Buffer> {
+	fn arrow_buffers(name: &str, len: usize, _slippi: Slippi) -> Vec<Buffer> {
 		vec![Buffer {
 			buffer: buffer::MutableBuffer::new(len * mem::size_of::<T::ArrowNativeType>()),
 			validity_buffer: None,
@@ -157,23 +158,22 @@ impl<T> Arrow for T where T: ArrowPrimitive {
 		}]
 	}
 
-	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize) -> usize {
+	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, _slippi: Slippi) -> usize {
 		buffers[index].buffer.push(self.into_arrow_native());
 		1
 	}
 }
 
 impl<T> Arrow for Option<T> where T: ArrowPrimitive {
-	fn arrow_buffers(&self, name: &str, len: usize) -> Vec<Buffer> {
-		vec![Buffer {
-			buffer: buffer::MutableBuffer::new(len * mem::size_of::<T::ArrowNativeType>()),
-			validity_buffer: Some(array::BooleanBufferBuilder::new(len)),
-			data_type: T::ARROW_DATA_TYPE,
-			name: name.to_string(),
-		}]
+	fn arrow_buffers(name: &str, len: usize, slippi: Slippi) -> Vec<Buffer> {
+		let mut buffers = T::arrow_buffers(name, len, slippi);
+		for mut b in &mut buffers {
+			b.validity_buffer = Some(array::BooleanBufferBuilder::new(len));
+		}
+		buffers
 	}
 
-	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize) -> usize {
+	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, _slippi: Slippi) -> usize {
 		let valid = match self {
 			Some(v) => {
 				buffers[index].buffer.push(v.into_arrow_native());
@@ -190,78 +190,84 @@ impl<T> Arrow for Option<T> where T: ArrowPrimitive {
 }
 
 impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
-	fn arrow_buffers(&self, name: &str, len: usize) -> Vec<Buffer> {
+	fn arrow_buffers(name: &str, len: usize, slippi: Slippi) -> Vec<Buffer> {
 		let mut buffers = Vec::new();
 		for i in 0 .. N {
-			buffers.extend(self[i].arrow_buffers(
+			buffers.extend(T::arrow_buffers(
 				format!("{}.{}", name, i).as_str(),
-				len));
+				len,
+				slippi,
+			));
 		}
 		buffers
 	}
 
-	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize) -> usize {
+	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi) -> usize {
 		let mut offset = 0;
 		for i in 0 .. N {
-			offset += self[i].arrow_append(buffers, index + offset);
+			offset += self[i].arrow_append(buffers, index + offset, slippi);
 		}
 		offset
 	}
 }
 
 impl Arrow for frame::PortData {
-	fn arrow_buffers(&self, name: &str, len: usize) -> Vec<Buffer> {
-		let mut buffers = self.leader.arrow_buffers(
+	fn arrow_buffers(name: &str, len: usize, slippi: Slippi) -> Vec<Buffer> {
+		let mut buffers = frame::Data::arrow_buffers(
 			format!("{}.{}", name, "leader").as_str(),
-			len
+			len,
+			slippi,
 		);
-		if let Some(f) = &self.follower {
-			buffers.extend(f.arrow_buffers(
-				format!("{}.{}", name, "follower").as_str(),
-				len));
-		}
+		buffers.extend(frame::Data::arrow_buffers(
+			format!("{}.{}", name, "follower").as_str(),
+			len,
+			slippi,
+		));
 		buffers
 	}
 
-	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize) -> usize {
+	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi) -> usize {
 		let mut offset = 0;
-		offset += self.leader.arrow_append(buffers, index + offset);
+		offset += self.leader.arrow_append(buffers, index + offset, slippi);
 		if let Some(f) = &self.follower {
-			offset += f.arrow_append(buffers, index + offset);
+			offset += f.arrow_append(buffers, index + offset, slippi);
 		}
 		offset
 	}
 }
 
 impl<const N: usize> Arrow for frame::Frame<N> {
-	fn arrow_buffers(&self, name: &str, len: usize) -> Vec<Buffer> {
-		let mut buffers = self.ports.arrow_buffers(
+	fn arrow_buffers(name: &str, len: usize, slippi: Slippi) -> Vec<Buffer> {
+		let mut buffers = frame::PortData::arrow_buffers(
 			format!("{}.{}", name, "ports").as_str(),
-			len
+			len,
+			slippi,
 		);
-		if let Some(start) = self.start {
-			buffers.extend(start.arrow_buffers(
+		if slippi.version >= Version(2, 2, 0) {
+			buffers.extend(frame::Start::arrow_buffers(
 				format!("{}.{}", name, "start").as_str(),
-				len
+				len,
+				slippi,
 			));
 		}
-		if let Some(end) = self.end {
-			buffers.extend(end.arrow_buffers(
+		if slippi.version >= Version(3, 0, 0) {
+			buffers.extend(frame::End::arrow_buffers(
 				format!("{}.{}", name, "end").as_str(),
-				len
+				len,
+				slippi,
 			))
 		}
 		buffers
 	}
 
-	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize) -> usize {
+	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi) -> usize {
 		let mut offset = 0;
-		offset += self.ports.arrow_append(buffers, index + offset);
+		offset += self.ports.arrow_append(buffers, index + offset, slippi);
 		if let Some(start) = &self.start {
-			offset += start.arrow_append(buffers, index + offset);
+			offset += start.arrow_append(buffers, index + offset, slippi);
 		}
 		if let Some(end) = &self.end {
-			offset += end.arrow_append(buffers, index + offset);
+			offset += end.arrow_append(buffers, index + offset, slippi);
 		}
 		offset
 	}
@@ -270,15 +276,15 @@ impl<const N: usize> Arrow for frame::Frame<N> {
 fn pop_to(stack: &mut Vec<(String, Vec<(datatypes::Field, array::ArrayRef)>)>, len: usize) {
 	while stack.len() > len {
 		let (name, fields) = stack.pop().unwrap();
-		let z = Arc::new(StructArray::from(fields));
+		let arr = Arc::new(StructArray::from(fields));
 		let last = stack.last_mut().unwrap();
 		last.1.push((
 			datatypes::Field::new(
 				&name,
-				z.data().data_type().clone(),
+				arr.data().data_type().clone(),
 				false,
 			),
-			z,
+			arr,
 		));
 	}
 }
@@ -307,10 +313,10 @@ fn struct_array(buffers: Vec<Buffer>) -> error::Result<StructArray> {
 	Ok(StructArray::from(root))
 }
 
-fn _frames<const N: usize>(src: &Vec<frame::Frame<N>>) -> error::Result<StructArray> {
-	let mut buffers = src[0].arrow_buffers("", src.len());
+fn _frames<const N: usize>(src: &Vec<frame::Frame<N>>, slippi: Slippi) -> error::Result<StructArray> {
+	let mut buffers = frame::Frame::<N>::arrow_buffers("", src.len(), slippi);
 	for frame in src {
-		frame.arrow_append(&mut buffers, 0);
+		frame.arrow_append(&mut buffers, 0, slippi);
 	}
 	struct_array(buffers)
 }
@@ -318,28 +324,16 @@ fn _frames<const N: usize>(src: &Vec<frame::Frame<N>>) -> error::Result<StructAr
 pub fn frames(game: &game::Game) -> error::Result<StructArray> {
 	use game::Frames::*;
 	match &game.frames {
-		P1(f) => _frames(f),
-		P2(f) => _frames(f),
-		P3(f) => _frames(f),
-		P4(f) => _frames(f),
+		P1(f) => _frames(f, game.start.slippi),
+		P2(f) => _frames(f, game.start.slippi),
+		P3(f) => _frames(f, game.start.slippi),
+		P4(f) => _frames(f, game.start.slippi),
 	}
 }
 
-fn _items<const N: usize>(src: &Vec<frame::Frame<N>>) -> error::Result<Option<StructArray>> {
-	let mut len = 0;
-	let mut first_item = None;
-	for frame in src {
-		if let Some(items) = frame.items.as_ref() {
-			len += items.len();
-			if first_item.is_none() {
-				if let Some(item) = items.iter().nth(0) {
-					first_item = Some(item)
-				}
-			}
-		}
-	}
-
-	if let Some(first_item) = first_item {
+fn _items<const N: usize>(src: &Vec<frame::Frame<N>>, slippi: Slippi) -> error::Result<Option<StructArray>> {
+	if slippi.version >= Version(3, 0, 0) {
+		let len: usize = src.iter().map(|f| f.items.as_ref().unwrap().len()).sum();
 		let mut buffers = vec![
 			Buffer {
 				buffer: buffer::MutableBuffer::new(len * std::mem::size_of::<i32>()),
@@ -348,11 +342,11 @@ fn _items<const N: usize>(src: &Vec<frame::Frame<N>>) -> error::Result<Option<St
 				name: ".frame_index".to_string(),
 			}
 		];
-		buffers.extend(first_item.arrow_buffers("", src.len()));
+		buffers.extend(frame::Item::arrow_buffers("", src.len(), slippi));
 		for (idx, frame) in src.iter().enumerate() {
 			for item in frame.items.as_ref().unwrap() {
-				(idx as i32 + game::FIRST_FRAME_INDEX).arrow_append(&mut buffers, 0);
-				item.arrow_append(&mut buffers, 1);
+				(idx as i32 + game::FIRST_FRAME_INDEX).arrow_append(&mut buffers, 0, slippi);
+				item.arrow_append(&mut buffers, 1, slippi);
 			}
 		}
 		Ok(Some(struct_array(buffers)?))
@@ -364,9 +358,9 @@ fn _items<const N: usize>(src: &Vec<frame::Frame<N>>) -> error::Result<Option<St
 pub fn items(game: &game::Game) -> error::Result<Option<StructArray>> {
 	use game::Frames::*;
 	match &game.frames {
-		P1(f) => _items(f),
-		P2(f) => _items(f),
-		P3(f) => _items(f),
-		P4(f) => _items(f),
+		P1(f) => _items(f, game.start.slippi),
+		P2(f) => _items(f, game.start.slippi),
+		P3(f) => _items(f, game.start.slippi),
+		P4(f) => _items(f, game.start.slippi),
 	}
 }

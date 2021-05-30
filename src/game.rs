@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display, Formatter, Result};
+use std::fmt::{self, Debug};
 
 use serde::{Deserialize, Serialize};
 
@@ -7,6 +7,7 @@ use super::{
 	frame,
 	metadata,
 	primitives::Port,
+	slippi,
 	stage,
 };
 
@@ -16,21 +17,7 @@ pub const FIRST_FRAME_INDEX: i32 = -123;
 /// We can parse files with higher versions than this, but we won't expose all information.
 /// When converting a replay with a higher version number to another format like Arrow,
 /// the conversion will be lossy.
-pub const MAX_SUPPORTED_VERSION: SlippiVersion = SlippiVersion(3, 9, 0);
-
-#[derive(Clone, Debug, PartialEq, PartialOrd, Deserialize, Serialize)]
-pub struct SlippiVersion(pub u8, pub u8, pub u8);
-
-impl Display for SlippiVersion {
-	fn fmt(&self, f: &mut Formatter) -> Result {
-		write!(f, "{}.{}.{}", self.0, self.1, self.2)
-	}
-}
-
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub struct Slippi {
-	pub version: SlippiVersion,
-}
+pub const MAX_SUPPORTED_VERSION: slippi::Version = slippi::Version(3, 9, 0);
 
 pseudo_enum!(PlayerType: u8 {
 	0 => HUMAN,
@@ -50,7 +37,7 @@ pseudo_enum!(TeamShade: u8 {
 	2 => DARK,
 });
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Team {
 	pub color: TeamColor,
 	pub shade: TeamShade,
@@ -66,7 +53,7 @@ pseudo_enum!(ShieldDrop: u32 {
 	2 => ARDUINO,
 });
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Ucf {
 	pub dash_back: Option<DashBack>,
 	pub shield_drop: Option<ShieldDrop>,
@@ -113,7 +100,7 @@ pub struct Scene {
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Start {
-	pub slippi: Slippi,
+	pub slippi: slippi::Slippi,
 	pub bitfield: [u8; 3],
 	pub is_teams: bool,
 	pub item_spawn_frequency: i8,
@@ -184,7 +171,7 @@ pub struct Game {
 }
 
 impl Debug for Game {
-	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("Game")
 			.field("metadata", &self.metadata)
 			.field("start", &self.start)

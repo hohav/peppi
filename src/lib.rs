@@ -33,6 +33,7 @@ pub mod item;
 pub mod metadata;
 pub mod parse;
 pub mod primitives;
+pub mod slippi;
 pub mod stage;
 pub mod triggers;
 pub mod ubjson;

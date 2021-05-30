@@ -10,8 +10,13 @@ use super::{
 	character,
 	item,
 	primitives::{Direction, Port, Position, Velocity},
+	slippi,
 	triggers,
 };
+
+const fn ver(major: u8, minor: u8) -> slippi::Version {
+	slippi::Version(major, minor, 0)
+}
 
 frame_data!(Buttons {
 	logical: buttons::Logical,
@@ -50,7 +55,7 @@ frame_data!(Start {
 
 frame_data!(End {
 }, {
-	latest_finalized_frame: i32,
+	latest_finalized_frame: i32: ver(3, 7),
 });
 
 frame_data!(Velocities {
@@ -68,10 +73,8 @@ frame_data!(Pre {
 	buttons: Buttons,
 	state: action_state::State,
 }, {
-	// v1.2
-	raw_analog_x: u8,
-	// v1.4
-	damage: f32,
+	raw_analog_x: u8: ver(1, 2),
+	damage: f32: ver(1, 4),
 });
 
 frame_data!(Post {
@@ -86,21 +89,16 @@ frame_data!(Post {
 	last_hit_by: Option<Port>,
 	stocks: u8,
 }, {
-	// v0.2
-	state_age: f32,
-	// v2.0
-	flags: StateFlags,
-	misc_as: f32,
-	airborne: bool,
-	ground: u16,
-	jumps: u8,
-	l_cancel: Option<bool>,
-	// v2.1
-	hurtbox_state: HurtboxState,
-	// v3.5
-	velocities: Velocities,
-	// v3.8
-	hitlag: f32,
+	state_age: f32: ver(0, 2),
+	flags: StateFlags: ver(2, 0),
+	misc_as: f32: ver(2, 0),
+	airborne: bool: ver(2, 0),
+	ground: u16: ver(2, 0),
+	jumps: u8: ver(2, 0),
+	l_cancel: Option<bool>: ver(2, 0),
+	hurtbox_state: HurtboxState: ver(2, 1),
+	velocities: Velocities: ver(3, 5),
+	hitlag: f32: ver(3, 8),
 });
 
 frame_data!(Data {
@@ -125,10 +123,8 @@ frame_data!(Item {
 	damage: u16,
 	timer: f32,
 }, {
-	// v3.2
-	misc: [u8; 4],
-	// v3.6
-	owner: Option<Port>,
+	misc: [u8; 4]: ver(3, 2),
+	owner: Option<Port>: ver(3, 5),
 });
 
 #[derive(Debug, PartialEq)]

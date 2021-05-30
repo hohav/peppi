@@ -20,6 +20,7 @@ use super::{
 	game::{self, NUM_PORTS, Netplay, Player, PlayerType},
 	item,
 	primitives::{Direction, Port, Position, Velocity},
+	slippi,
 	stage,
 	triggers,
 	ubjson,
@@ -260,8 +261,8 @@ fn player_bytes_v1_0(r: &mut &[u8]) -> Result<[u8; 8]> {
 }
 
 fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
-	let slippi = game::Slippi {
-		version: game::SlippiVersion(r.read_u8()?, r.read_u8()?, r.read_u8()?),
+	let slippi = slippi::Slippi {
+		version: slippi::Version(r.read_u8()?, r.read_u8()?, r.read_u8()?),
 	};
 
 	r.read_u8()?; // unused (build number)
