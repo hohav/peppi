@@ -11,30 +11,53 @@ macro_rules! frame_data {
 		}
 
 		impl super::arrow::Arrow for $name {
-			fn arrow_buffers(name: &str, len: usize, slippi: super::slippi::Slippi) -> Vec<super::arrow::Buffer> {
-				let mut buffers = Vec::new();
+			fn arrow_buffers(path: &Vec<String>, len: usize, slippi: super::slippi::Slippi, opts: super::arrow::Opts) -> Vec<super::arrow::Buffer> {
+				use ::arrow::datatypes::{DataType, Field};
+
+				let mut buffers = vec![super::arrow::Buffer::new(path, 0, DataType::Null)];
+				let mut fields = vec![];
+
 				$( {
-					buffers.extend(<$type>::arrow_buffers(
-						format!("{}.{}", name, stringify!($field).trim_start_matches("r#")).as_str(),
+					let name = stringify!($field).trim_start_matches("r#");
+					let bufs = <$type>::arrow_buffers(
+						&super::arrow::clone_push(path, name),
 						len,
 						slippi,
-					));
+						opts,
+					);
+					fields.push(Field::new(name, bufs[0].data_type.clone(), false));
+					buffers.extend(bufs);
 				} )*
 				$( if slippi.version >= $slippi_ver {
-					buffers.extend(<$opt_type>::arrow_buffers(
-						format!("{}.{}", name, stringify!($opt_field).trim_start_matches("r#")).as_str(),
+					let name = stringify!($opt_field).trim_start_matches("r#");
+					let bufs = <$opt_type>::arrow_buffers(
+						&super::arrow::clone_push(path, name),
 						len,
 						slippi,
-					));
+						opts,
+					);
+					fields.push(Field::new(name, bufs[0].data_type.clone(), false));
+					buffers.extend(bufs);
 				} )*
+
+				buffers[0].data_type = DataType::Struct(fields);
 				buffers
 			}
 
-			fn arrow_append(&self, buffers: &mut Vec<super::arrow::Buffer>, index: usize, slippi: super::slippi::Slippi) -> usize {
-				let mut offset = 0;
-				$( offset += self.$field.arrow_append(buffers, index + offset, slippi); )*
+			fn arrow_append(&self, buffers: &mut Vec<super::arrow::Buffer>, index: usize, slippi: super::slippi::Slippi, opts: super::arrow::Opts) -> usize {
+				let mut offset = 1;
+				$( offset += self.$field.arrow_append(buffers, index + offset, slippi, opts); )*
 				$( if slippi.version >= $slippi_ver {
-					offset += self.$opt_field.unwrap().arrow_append(buffers, index + offset, slippi);
+					offset += self.$opt_field.as_ref().unwrap().arrow_append(buffers, index + offset, slippi, opts);
+				} )*
+				offset
+			}
+
+			fn arrow_append_null(buffers: &mut Vec<super::arrow::Buffer>, index: usize, slippi: super::slippi::Slippi, opts: super::arrow::Opts) -> usize {
+				let mut offset = 1;
+				$( offset += <$type>::arrow_append_null(buffers, index + offset, slippi, opts); )*
+				$( if slippi.version >= $slippi_ver {
+					offset += <$opt_type>::arrow_append_null(buffers, index + offset, slippi, opts);
 				} )*
 				offset
 			}

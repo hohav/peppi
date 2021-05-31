@@ -1,14 +1,16 @@
 use std::{mem, sync::Arc};
 
 use num_traits::identities::Zero;
+use byteorder::{LittleEndian, ReadBytesExt};
 
 use arrow::{
 	array,
-	array::{Array, StructArray},
+	array::{ArrayData, ArrayRef, StructArray},
 	buffer,
 	datatypes::{
 		self,
 		DataType,
+		Field,
 		BooleanType,
 		Int8Type,
 		UInt8Type,
@@ -20,7 +22,6 @@ use arrow::{
 		UInt64Type,
 		Float32Type,
 	},
-	error,
 };
 
 use super::{
@@ -30,15 +31,30 @@ use super::{
 	primitives::{Direction, Port}
 };
 
-pub struct Buffer {
-	pub buffer: buffer::MutableBuffer,
+#[derive(Clone, Copy, Debug)]
+pub struct Opts {
+	pub avro_compatible: bool,
+	pub skip_items: bool,
+}
+
+pub(super) struct Buffer {
+	pub arrow_buffer: buffer::MutableBuffer,
 	pub validities: Option<array::BooleanBufferBuilder>,
 	pub data_type: datatypes::DataType,
-	pub name: String,
+	pub path: Vec<String>,
 }
 
 impl Buffer {
-	pub fn item_size(&self) -> usize {
+	pub fn new(path: &Vec<String>, size: usize, data_type: DataType) -> Buffer {
+		Buffer {
+			arrow_buffer: buffer::MutableBuffer::new(size),
+			validities: None,
+			data_type: data_type,
+			path: path.clone(),
+		}
+	}
+
+	fn item_size(&self) -> usize {
 		use datatypes::DataType::*;
 		match self.data_type {
 			Boolean => 1,
@@ -51,38 +67,28 @@ impl Buffer {
 		}
 	}
 
-	pub fn into_array(self) -> Arc<dyn array::Array> {
-		use array::*;
-		let mut builder = array::ArrayData::builder(self.data_type.clone())
-			.len(self.buffer.len() / self.item_size())
+	fn into_primitive_array(self) -> ArrayRef {
+		let mut builder = ArrayData::builder(self.data_type.clone())
+			.len(self.arrow_buffer.len() / self.item_size())
 			.add_buffer(match self.data_type {
-				Boolean => unsafe {
+				DataType::Boolean => unsafe {
 					buffer::MutableBuffer::from_trusted_len_iter_bool(
-						self.buffer.into_iter().map(|x| *x != 0))
+						self.arrow_buffer.into_iter().map(|x| *x != 0))
 					.into()
 				},
-				_ => self.buffer.into(),
+				_ => self.arrow_buffer.into(),
 			});
 		if let Some(mut validities) = self.validities {
 			builder = builder.null_bit_buffer(validities.finish());
 		}
-
-		let data = builder.build();
-		use datatypes::DataType::*;
-		match self.data_type {
-			Boolean => Arc::new(BooleanArray::from(data)),
-			Int8 => Arc::new(Int8Array::from(data)),
-			UInt8 => Arc::new(UInt8Array::from(data)),
-			Int16 => Arc::new(Int16Array::from(data)),
-			UInt16 => Arc::new(UInt16Array::from(data)),
-			Int32 => Arc::new(Int32Array::from(data)),
-			UInt32 => Arc::new(UInt32Array::from(data)),
-			Int64 => Arc::new(Int64Array::from(data)),
-			UInt64 => Arc::new(UInt64Array::from(data)),
-			Float32 => Arc::new(Float32Array::from(data)),
-			_ => unimplemented!(),
-		}
+		array::make_array(builder.build())
 	}
+}
+
+pub fn clone_push<S: AsRef<str>>(path: &Vec<String>, s: S) -> Vec<String> {
+	let mut path = path.clone();
+	path.push(s.as_ref().to_string());
+	path
 }
 
 pub trait ArrowPrimitive: Copy + Sized {
@@ -143,224 +149,335 @@ impl ArrowPrimitive for Direction {
 	fn into_arrow_native(self) -> Self::ArrowNativeType { self as u8 }
 }
 
-pub trait Arrow {
-	fn arrow_buffers(name: &str, len: usize, slippi: Slippi) -> Vec<Buffer>;
-	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi) -> usize;
+pub(super) trait Arrow {
+	fn arrow_buffers(path: &Vec<String>, len: usize, slippi: Slippi, opts: Opts) -> Vec<Buffer>;
+	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi, opts: Opts) -> usize;
+	fn arrow_append_null(buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi, opts: Opts) -> usize;
 }
 
 impl<T> Arrow for T where T: ArrowPrimitive {
-	fn arrow_buffers(name: &str, len: usize, _slippi: Slippi) -> Vec<Buffer> {
-		vec![Buffer {
-			buffer: buffer::MutableBuffer::new(len * mem::size_of::<T::ArrowNativeType>()),
-			validities: None,
-			data_type: T::ARROW_DATA_TYPE,
-			name: name.to_string(),
-		}]
+	fn arrow_buffers(path: &Vec<String>, len: usize, _slippi: Slippi, _opts: Opts) -> Vec<Buffer> {
+		vec![Buffer::new(path, len * mem::size_of::<T::ArrowNativeType>(), T::ARROW_DATA_TYPE)]
 	}
 
-	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, _slippi: Slippi) -> usize {
-		buffers[index].buffer.push(self.into_arrow_native());
+	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, _slippi: Slippi, _opts: Opts) -> usize {
+		buffers[index].arrow_buffer.push(self.into_arrow_native());
+		1
+	}
+
+	fn arrow_append_null(buffers: &mut Vec<Buffer>, index: usize, _slippi: Slippi, _opts: Opts) -> usize {
+		buffers[index].arrow_buffer.extend_zeros(
+			mem::size_of::<T::ArrowNativeType>()
+		);
 		1
 	}
 }
 
-impl<T> Arrow for Option<T> where T: ArrowPrimitive {
-	fn arrow_buffers(name: &str, len: usize, slippi: Slippi) -> Vec<Buffer> {
-		let mut buffers = T::arrow_buffers(name, len, slippi);
-		for mut b in &mut buffers {
-			b.validities = Some(array::BooleanBufferBuilder::new(len));
-		}
+impl<T> Arrow for Option<T> where T: Arrow {
+	fn arrow_buffers(path: &Vec<String>, len: usize, slippi: Slippi, opts: Opts) -> Vec<Buffer> {
+		let mut buffers = T::arrow_buffers(path, len, slippi, opts);
+		buffers[0].validities = Some(array::BooleanBufferBuilder::new(len));
 		buffers
 	}
 
-	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, _slippi: Slippi) -> usize {
-		let valid = match self {
-			Some(v) => {
-				buffers[index].buffer.push(v.into_arrow_native());
-				true
-			},
-			_ => {
-				buffers[index].buffer.push(T::ArrowNativeType::zero());
-				false
-			}
-		};
-		buffers[index].validities.as_mut().unwrap().append(valid);
-		1
+	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi, opts: Opts) -> usize {
+		if let Some(v) = self {
+			buffers[index].validities.as_mut().unwrap().append(true);
+			v.arrow_append(buffers, index, slippi, opts)
+		} else {
+			Self::arrow_append_null(buffers, index, slippi, opts)
+		}
+	}
+
+	fn arrow_append_null(buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi, opts: Opts) -> usize {
+		buffers[index].validities.as_mut().unwrap().append(false);
+		T::arrow_append_null(buffers, index, slippi, opts)
 	}
 }
 
 impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
-	fn arrow_buffers(name: &str, len: usize, slippi: Slippi) -> Vec<Buffer> {
-		let mut buffers = Vec::new();
+	fn arrow_buffers(path: &Vec<String>, len: usize, slippi: Slippi, opts: Opts) -> Vec<Buffer> {
+		let mut buffers = vec![Buffer::new(path, 0, DataType::Null)];
+		let mut fields = vec![];
+
 		for i in 0 .. N {
-			buffers.extend(T::arrow_buffers(
-				format!("{}.{}", name, i).as_str(),
+			let name = if opts.avro_compatible {
+				format!("_{}", i)
+			} else {
+				format!("{}", i)
+			};
+			let bufs = T::arrow_buffers(
+				&clone_push(path, name.clone()),
 				len,
 				slippi,
-			));
+				opts,
+			);
+			fields.push(Field::new(&name, bufs[0].data_type.clone(), false));
+			buffers.extend(bufs);
 		}
+
+		buffers[0].data_type = DataType::Struct(fields);
 		buffers
 	}
 
-	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi) -> usize {
-		let mut offset = 0;
+	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi, opts: Opts) -> usize {
+		let mut offset = 1;
 		for i in 0 .. N {
-			offset += self[i].arrow_append(buffers, index + offset, slippi);
+			offset += self[i].arrow_append(buffers, index + offset, slippi, opts);
+		}
+		offset
+	}
+
+	fn arrow_append_null(buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi, opts: Opts) -> usize {
+		let mut offset = 1;
+		for _ in 0 .. N {
+			offset += T::arrow_append_null(buffers, index + offset, slippi, opts);
 		}
 		offset
 	}
 }
 
-impl Arrow for frame::PortData {
-	fn arrow_buffers(name: &str, len: usize, slippi: Slippi) -> Vec<Buffer> {
-		let mut buffers = frame::Data::arrow_buffers(
-			format!("{}.{}", name, "leader").as_str(),
-			len,
-			slippi,
+impl<T> Arrow for Vec<T> where T: Arrow {
+	fn arrow_buffers(path: &Vec<String>, len: usize, slippi: Slippi, opts: Opts) -> Vec<Buffer> {
+		let bufs = T::arrow_buffers(path, len, slippi, opts);
+		let field = Field::new(
+			bufs[0].path.last().unwrap(),
+			bufs[0].data_type.clone(),
+			bufs[0].validities.is_some(),
 		);
-		buffers.extend(frame::Data::arrow_buffers(
-			format!("{}.{}", name, "follower").as_str(),
-			len,
-			slippi,
-		));
+
+		let mut buffers = vec![Buffer::new(path, 0, DataType::List(Box::new(field)))];
+		buffers[0].arrow_buffer.push(0i32);
+		buffers.extend(bufs);
 		buffers
 	}
 
-	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi) -> usize {
+	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi, opts: Opts) -> usize {
+		let buf = &mut buffers[index].arrow_buffer;
+		let idx = buf.len() - mem::size_of::<i32>();
+		let last_offset = (&buf[idx..]).read_i32::<LittleEndian>().unwrap();
+		buf.push(last_offset + self.len() as i32);
+
 		let mut offset = 0;
-		offset += self.leader.arrow_append(buffers, index + offset, slippi);
-		if let Some(f) = &self.follower {
-			offset += f.arrow_append(buffers, index + offset, slippi);
+		for x in self {
+			let new_offset = x.arrow_append(buffers, index + 1, slippi, opts);
+			if offset > 0 {
+				assert_eq!(new_offset, offset);
+			}
+			offset = new_offset;
 		}
+		offset
+	}
+
+	fn arrow_append_null(_buffers: &mut Vec<Buffer>, _index: usize, _slippi: Slippi, _opts: Opts) -> usize {
+		unimplemented!()
+	}
+}
+
+impl Arrow for frame::PortData {
+	fn arrow_buffers(path: &Vec<String>, len: usize, slippi: Slippi, opts: Opts) -> Vec<Buffer> {
+		let mut buffers = vec![Buffer::new(path, 0, DataType::Null)];
+		let mut fields = vec![];
+
+		if true {
+			let bufs = frame::Data::arrow_buffers(
+				&clone_push(path, "leader"),
+				len,
+				slippi,
+				opts,
+			);
+			fields.push(Field::new("leader", bufs[0].data_type.clone(), false));
+			buffers.extend(bufs);
+		}
+		if true {
+			let bufs = Option::<frame::Data>::arrow_buffers(
+				&clone_push(path, "follower"),
+				len,
+				slippi,
+				opts,
+			);
+			fields.push(Field::new("follower", bufs[0].data_type.clone(), true));
+			buffers.extend(bufs);
+		}
+
+		buffers[0].data_type = DataType::Struct(fields);
+		buffers
+	}
+
+	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi, opts: Opts) -> usize {
+		let mut offset = 1;
+		offset += self.leader.arrow_append(buffers, index + offset, slippi, opts);
+		if let Some(f) = &self.follower {
+			offset += f.arrow_append(buffers, index + offset, slippi, opts);
+		} else {
+			offset += frame::Data::arrow_append_null(buffers, index + offset, slippi, opts);
+		}
+		offset
+	}
+
+	fn arrow_append_null(buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi, opts: Opts) -> usize {
+		let mut offset = 1;
+		offset += frame::Data::arrow_append_null(buffers, index + offset, slippi, opts);
+		offset += frame::Data::arrow_append_null(buffers, index + offset, slippi, opts);
 		offset
 	}
 }
 
 impl<const N: usize> Arrow for frame::Frame<N> {
-	fn arrow_buffers(name: &str, len: usize, slippi: Slippi) -> Vec<Buffer> {
-		let mut buffers = frame::PortData::arrow_buffers(
-			format!("{}.{}", name, "ports").as_str(),
-			len,
-			slippi,
-		);
-		if slippi.version >= Version(2, 2, 0) {
-			buffers.extend(frame::Start::arrow_buffers(
-				format!("{}.{}", name, "start").as_str(),
+	fn arrow_buffers(path: &Vec<String>, len: usize, slippi: Slippi, opts: Opts) -> Vec<Buffer> {
+		let mut buffers = vec![Buffer::new(path, 0, DataType::Null)];
+		let mut fields = vec![];
+
+		if true {
+			let bufs = <[frame::PortData; N]>::arrow_buffers(
+				&clone_push(path, "ports"),
 				len,
 				slippi,
-			));
+				opts,
+			);
+			fields.push(Field::new("ports", bufs[0].data_type.clone(), false));
+			buffers.extend(bufs);
+		}
+		if slippi.version >= Version(2, 2, 0) {
+			let bufs = frame::Start::arrow_buffers(
+				&clone_push(path, "start"),
+				len,
+				slippi,
+				opts,
+			);
+			fields.push(Field::new("start", bufs[0].data_type.clone(), false));
+			buffers.extend(bufs);
 		}
 		if slippi.version >= Version(3, 0, 0) {
-			buffers.extend(frame::End::arrow_buffers(
-				format!("{}.{}", name, "end").as_str(),
+			let bufs = frame::End::arrow_buffers(
+				&clone_push(path, "end"),
 				len,
 				slippi,
-			))
+				opts,
+			);
+			fields.push(Field::new("end", bufs[0].data_type.clone(), false));
+			buffers.extend(bufs);
 		}
+		if !opts.skip_items && slippi.version >= Version(3, 0, 0) {
+			let bufs = Vec::<frame::Item>::arrow_buffers(
+				&clone_push(path, "items"),
+				len,
+				slippi,
+				opts,
+			);
+			fields.push(Field::new("items", bufs[0].data_type.clone(), false));
+			buffers.extend(bufs);
+		}
+
+		buffers[0].data_type = DataType::Struct(fields);
 		buffers
 	}
 
-	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi) -> usize {
-		let mut offset = 0;
-		offset += self.ports.arrow_append(buffers, index + offset, slippi);
-		if let Some(start) = &self.start {
-			offset += start.arrow_append(buffers, index + offset, slippi);
+	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi, opts: Opts) -> usize {
+		let mut offset = 1;
+		offset += self.ports.arrow_append(buffers, index + offset, slippi, opts);
+		if slippi.version >= Version(2, 2, 0) {
+			offset += self.start.as_ref().unwrap().arrow_append(buffers, index + offset, slippi, opts);
 		}
-		if let Some(end) = &self.end {
-			offset += end.arrow_append(buffers, index + offset, slippi);
+		if slippi.version >= Version(3, 0, 0) {
+			offset += self.end.as_ref().unwrap().arrow_append(buffers, index + offset, slippi, opts);
+		}
+		if !opts.skip_items && slippi.version >= Version(3, 0, 0) {
+			offset += self.items.as_ref().unwrap().arrow_append(buffers, index + offset, slippi, opts);
 		}
 		offset
 	}
-}
 
-fn pop_to(stack: &mut Vec<(String, Vec<(datatypes::Field, array::ArrayRef)>)>, len: usize) {
-	while stack.len() > len {
-		let (name, fields) = stack.pop().unwrap();
-		let arr = Arc::new(StructArray::from(fields));
-		let last = stack.last_mut().unwrap();
-		last.1.push((
-			datatypes::Field::new(
-				&name,
-				arr.data().data_type().clone(),
-				false,
-			),
-			arr,
-		));
+	fn arrow_append_null(_buffers: &mut Vec<Buffer>, _index: usize, _slippi: Slippi, _opts: Opts) -> usize {
+		unimplemented!()
 	}
 }
 
-fn struct_array(buffers: Vec<Buffer>) -> error::Result<StructArray> {
-	let mut stack: Vec<(String, Vec<(datatypes::Field, array::ArrayRef)>)> = vec![];
-	for b in buffers {
-		let path: Vec<_> = b.name.split('.').collect();
-		let common_prefix = stack.iter().zip(path.iter()).take_while(|(a, b)| &&a.0 == b).count();
-		pop_to(&mut stack, common_prefix);
-		while stack.len() + 1 < path.len() {
-			stack.push((path[stack.len()].to_string(), vec![]));
-		}
-		stack.last_mut().unwrap().1.push((
-			datatypes::Field::new(
-				path.last().unwrap(),
-				b.data_type.clone(),
-				b.validities.is_some(),
-			),
-			b.into_array(),
-		));
-	}
-
-	pop_to(&mut stack, 1);
-	let (_, root) = stack.pop().unwrap();
-	Ok(StructArray::from(root))
+fn pop<I: Iterator<Item = Buffer>>(buffers: &mut I) -> ArrayRef {
+	use datatypes::DataType::*;
+	let buf = buffers.next().unwrap();
+	let array = match buf.data_type.clone() {
+		Struct(fields) => {
+			let mut children = vec![];
+			for f in fields {
+				let child = pop(buffers);
+				children.push((f, child));
+			}
+			Arc::new(StructArray::from(children)) as ArrayRef
+		},
+		List(_) => {
+			let child = pop(buffers);
+			Arc::new(array::ListArray::from(
+				ArrayData::builder(buf.data_type.clone())
+					.len(buf.arrow_buffer.len() / mem::size_of::<i32>() - 1)
+					.add_buffer(buf.arrow_buffer.into())
+					.add_child_data(child.data().clone())
+					.build()
+			)) as ArrayRef
+		},
+		Boolean | Int8 | UInt8 | Int16 | UInt16 | Int32 | UInt32 | Int64 | UInt64 | Float32 =>
+			buf.into_primitive_array(),
+		_ => unimplemented!(),
+	};
+	array
 }
 
-fn _frames<const N: usize>(src: &Vec<frame::Frame<N>>, slippi: Slippi) -> error::Result<StructArray> {
-	let mut buffers = frame::Frame::<N>::arrow_buffers("", src.len(), slippi);
-	for frame in src {
-		frame.arrow_append(&mut buffers, 0, slippi);
+fn _frames<const N: usize>(frames: &Vec<frame::Frame<N>>, slippi: Slippi, opts: Opts) -> ArrayRef {
+	let mut buffers = frame::Frame::<N>::arrow_buffers(
+		&vec![String::new()], frames.len(), slippi, opts);
+	for frame in frames {
+		frame.arrow_append(&mut buffers, 0, slippi, opts);
 	}
-	struct_array(buffers)
+	pop(&mut buffers.into_iter())
 }
 
-pub fn frames(game: &game::Game) -> error::Result<StructArray> {
+pub fn frames(game: &game::Game, opts: Option<Opts>) -> ArrayRef {
 	use game::Frames::*;
+	let opts = opts.unwrap_or(Opts {
+		avro_compatible: false,
+		skip_items: false,
+	});
+	let slippi = game.start.slippi;
 	match &game.frames {
-		P1(f) => _frames(f, game.start.slippi),
-		P2(f) => _frames(f, game.start.slippi),
-		P3(f) => _frames(f, game.start.slippi),
-		P4(f) => _frames(f, game.start.slippi),
+		P1(f) => _frames(f, slippi, opts),
+		P2(f) => _frames(f, slippi, opts),
+		P3(f) => _frames(f, slippi, opts),
+		P4(f) => _frames(f, slippi, opts),
 	}
 }
 
-fn _items<const N: usize>(src: &Vec<frame::Frame<N>>, slippi: Slippi) -> error::Result<Option<StructArray>> {
+fn _items<const N: usize>(frames: &Vec<frame::Frame<N>>, slippi: Slippi, opts: Opts) -> Option<ArrayRef> {
 	if slippi.version >= Version(3, 0, 0) {
-		let len: usize = src.iter().map(|f| f.items.as_ref().unwrap().len()).sum();
-		let mut buffers = vec![
-			Buffer {
-				buffer: buffer::MutableBuffer::new(len * std::mem::size_of::<i32>()),
-				validities: None,
-				data_type: datatypes::DataType::UInt32,
-				name: ".frame_index".to_string(),
-			}
-		];
-		buffers.extend(frame::Item::arrow_buffers("", src.len(), slippi));
-		for (idx, frame) in src.iter().enumerate() {
+		let len: usize = frames.iter().map(|f| f.items.as_ref().unwrap().len()).sum();
+		let mut buffers = frame::Item::arrow_buffers(&vec![String::new()], len, slippi, opts);
+		buffers.push(Buffer::new(
+			&vec![String::new(), "frame_index".to_string()],
+			len * std::mem::size_of::<i32>(),
+			DataType::UInt32,
+		));
+		for (idx, frame) in frames.iter().enumerate() {
 			for item in frame.items.as_ref().unwrap() {
-				(idx as i32 + game::FIRST_FRAME_INDEX).arrow_append(&mut buffers, 0, slippi);
-				item.arrow_append(&mut buffers, 1, slippi);
+				let offset = item.arrow_append(&mut buffers, 0, slippi, opts);
+				(idx as i32).arrow_append(&mut buffers, offset, slippi, opts);
 			}
 		}
-		Ok(Some(struct_array(buffers)?))
+		Some(pop(&mut buffers.into_iter()))
 	} else {
-		Ok(None)
+		None
 	}
 }
 
-pub fn items(game: &game::Game) -> error::Result<Option<StructArray>> {
+pub fn items(game: &game::Game, opts: Option<Opts>) -> Option<ArrayRef> {
 	use game::Frames::*;
+	let opts = opts.unwrap_or(Opts {
+		avro_compatible: false,
+		skip_items: false,
+	});
+	let slippi = game.start.slippi;
 	match &game.frames {
-		P1(f) => _items(f, game.start.slippi),
-		P2(f) => _items(f, game.start.slippi),
-		P3(f) => _items(f, game.start.slippi),
-		P4(f) => _items(f, game.start.slippi),
+		P1(f) => _items(f, slippi, opts),
+		P2(f) => _items(f, slippi, opts),
+		P3(f) => _items(f, slippi, opts),
+		P4(f) => _items(f, slippi, opts),
 	}
 }

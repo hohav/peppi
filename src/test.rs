@@ -11,7 +11,8 @@ use super::{
 	buttons::{Logical, Physical},
 	character::{Internal, External},
 	frame::{self, Buttons},
-	game::{DashBack, End, EndMethod, Frames, Game, Player, PlayerType, Start, ShieldDrop, Slippi, SlippiVersion, Ucf},
+	game::{DashBack, End, EndMethod, Frames, Game, Player, PlayerType, Start, ShieldDrop, Ucf},
+	slippi::{Slippi, Version},
 	item::Item,
 	metadata::{self, Metadata},
 	primitives::{Direction, Port, Position, Velocity},
@@ -47,7 +48,7 @@ fn slippi_old_version() -> Result<(), String> {
 	let game = game("v0.1")?;
 	let players = game.start.players;
 
-	assert_eq!(game.start.slippi.version, SlippiVersion(0,1,0));
+	assert_eq!(game.start.slippi.version, Version(0, 1, 0));
 	assert_eq!(game.metadata.duration, None);
 
 	assert_eq!(players.len(), 2);
@@ -89,7 +90,7 @@ fn basic_game() -> Result<(), String> {
 	});
 
 	assert_eq!(game.start, Start {
-		slippi: Slippi { version: SlippiVersion(1, 0, 0) },
+		slippi: Slippi { version: Version(1, 0, 0) },
 		bitfield: [50, 1, 76],
 		is_teams: false,
 		item_spawn_frequency: -1,
@@ -354,7 +355,7 @@ fn console_name() -> Result<(), String> {
 #[test]
 fn v2() -> Result<(), String> {
 	let game = game("v2.0")?;
-	assert_eq!(game.start.slippi.version, SlippiVersion(2,0,1));
+	assert_eq!(game.start.slippi.version, Version(2, 0, 1));
 	Ok(())
 }
 
