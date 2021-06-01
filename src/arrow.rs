@@ -1,7 +1,8 @@
-use std::{convert::TryFrom, mem::size_of, sync::Arc};
-
-use num_traits::identities::Zero;
-use byteorder::{LittleEndian, ReadBytesExt};
+use std::{
+	convert::TryInto,
+	mem::size_of,
+	sync::Arc,
+};
 
 use arrow::{
 	array,
@@ -92,7 +93,7 @@ pub fn clone_push<S: AsRef<str>>(path: &Vec<String>, s: S) -> Vec<String> {
 }
 
 pub trait ArrowPrimitive: Copy + Sized {
-	type ArrowNativeType: datatypes::ArrowNativeType + Zero;
+	type ArrowNativeType: datatypes::ArrowNativeType;
 	type ArrowType;
 	const ARROW_DATA_TYPE: DataType;
 	fn into_arrow_native(self) -> Self::ArrowNativeType;
@@ -260,7 +261,7 @@ impl<T> Arrow for Vec<T> where T: Arrow {
 	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi, opts: Opts) -> usize {
 		let buf = &mut buffers[index].arrow_buffer;
 		let idx = buf.len() - size_of::<i32>();
-		let last_offset = (&buf[idx..]).read_i32::<LittleEndian>().unwrap();
+		let last_offset = i32::from_le_bytes(buf[idx..].try_into().unwrap());
 		buf.push(last_offset + self.len() as i32);
 
 		let mut offset = 0;
