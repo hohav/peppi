@@ -1,4 +1,4 @@
-use std::{mem, sync::Arc};
+use std::{convert::TryFrom, mem::size_of, sync::Arc};
 
 use num_traits::identities::Zero;
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -104,9 +104,7 @@ macro_rules! primitives {
 			type ArrowNativeType = $t1;
 			type ArrowType = $t2;
 			const ARROW_DATA_TYPE: DataType = <$t2 as datatypes::ArrowPrimitiveType>::DATA_TYPE;
-			fn into_arrow_native(self) -> Self::ArrowNativeType {
-				self
-			}
+			fn into_arrow_native(self) -> Self::ArrowNativeType { self }
 		}
 	)* }
 }
@@ -127,6 +125,7 @@ impl ArrowPrimitive for bool {
 	type ArrowNativeType = u8;
 	type ArrowType = BooleanType;
 	const ARROW_DATA_TYPE: DataType = DataType::Boolean;
+
 	fn into_arrow_native(self) -> Self::ArrowNativeType {
 		match self {
 			true => 1,
@@ -146,7 +145,13 @@ impl ArrowPrimitive for Direction {
 	type ArrowNativeType = u8;
 	type ArrowType = BooleanType;
 	const ARROW_DATA_TYPE: DataType = DataType::Boolean;
-	fn into_arrow_native(self) -> Self::ArrowNativeType { self as u8 }
+
+	fn into_arrow_native(self) -> Self::ArrowNativeType {
+		match self {
+			Self::Left => 0,
+			_ => 1,
+		}
+	}
 }
 
 pub(super) trait Arrow {
@@ -157,7 +162,7 @@ pub(super) trait Arrow {
 
 impl<T> Arrow for T where T: ArrowPrimitive {
 	fn arrow_buffers(path: &Vec<String>, len: usize, _slippi: Slippi, _opts: Opts) -> Vec<Buffer> {
-		vec![Buffer::new(path, len * mem::size_of::<T::ArrowNativeType>(), T::ARROW_DATA_TYPE)]
+		vec![Buffer::new(path, len * size_of::<T::ArrowNativeType>(), T::ARROW_DATA_TYPE)]
 	}
 
 	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, _slippi: Slippi, _opts: Opts) -> usize {
@@ -167,7 +172,7 @@ impl<T> Arrow for T where T: ArrowPrimitive {
 
 	fn arrow_append_null(buffers: &mut Vec<Buffer>, index: usize, _slippi: Slippi, _opts: Opts) -> usize {
 		buffers[index].arrow_buffer.extend_zeros(
-			mem::size_of::<T::ArrowNativeType>()
+			size_of::<T::ArrowNativeType>()
 		);
 		1
 	}
@@ -254,7 +259,7 @@ impl<T> Arrow for Vec<T> where T: Arrow {
 
 	fn arrow_append(&self, buffers: &mut Vec<Buffer>, index: usize, slippi: Slippi, opts: Opts) -> usize {
 		let buf = &mut buffers[index].arrow_buffer;
-		let idx = buf.len() - mem::size_of::<i32>();
+		let idx = buf.len() - size_of::<i32>();
 		let last_offset = (&buf[idx..]).read_i32::<LittleEndian>().unwrap();
 		buf.push(last_offset + self.len() as i32);
 
@@ -409,7 +414,7 @@ fn pop<I: Iterator<Item = Buffer>>(buffers: &mut I) -> ArrayRef {
 			let child = pop(buffers);
 			Arc::new(array::ListArray::from(
 				ArrayData::builder(buf.data_type.clone())
-					.len(buf.arrow_buffer.len() / mem::size_of::<i32>() - 1)
+					.len(buf.arrow_buffer.len() / size_of::<i32>() - 1)
 					.add_buffer(buf.arrow_buffer.into())
 					.add_child_data(child.data().clone())
 					.build()
@@ -452,7 +457,7 @@ fn _items<const N: usize>(frames: &Vec<frame::Frame<N>>, slippi: Slippi, opts: O
 		let mut buffers = frame::Item::arrow_buffers(&vec![String::new()], len, slippi, opts);
 		buffers.push(Buffer::new(
 			&vec![String::new(), "frame_index".to_string()],
-			len * std::mem::size_of::<i32>(),
+			len * size_of::<i32>(),
 			DataType::UInt32,
 		));
 		for (idx, frame) in frames.iter().enumerate() {
