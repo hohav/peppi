@@ -37,8 +37,6 @@ pub mod stage;
 pub mod triggers;
 pub mod ubjson;
 
-#[cfg(test)] mod test;
-
 use std::{
 	error,
 	fmt,

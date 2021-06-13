@@ -1,12 +1,8 @@
-use std::{
-	collections::HashMap,
-	fs,
-	io,
-};
+use std::{collections::HashMap, fs, io};
 
 use chrono::{DateTime, Utc};
 
-use super::{
+use peppi::{
 	action_state::{State, Zelda},
 	buttons::{Logical, Physical},
 	character::{Internal, External},
@@ -21,8 +17,8 @@ use super::{
 
 fn game(name: &str) -> Result<Game, String> {
 	let mut buf = io::BufReader::new(
-		fs::File::open(&format!("test/replays/{}.slp", name)).unwrap());
-	super::game(&mut buf, None).map_err(|e| format!("couldn't parse game: {:?}", e))
+		fs::File::open(&format!("tests/data/{}.slp", name)).unwrap());
+	peppi::game(&mut buf, None).map_err(|e| format!("couldn't parse game: {:?}", e))
 }
 
 fn button_seq(game:&Game) -> Result<Vec<Buttons>, String> {
