@@ -38,11 +38,24 @@ macro_rules! pseudo_bitmask {
 			}
 		}
 
-		impl super::arrow::ArrowPrimitive for $name {
-			type ArrowNativeType = $type;
-			type ArrowType = <$type as super::arrow::ArrowPrimitive>::ArrowType;
-			const ARROW_DATA_TYPE: ::arrow::datatypes::DataType = <$type>::ARROW_DATA_TYPE;
-			fn into_arrow_native(self) -> Self::ArrowNativeType { self.0 as $type }
+		impl peppi_arrow::Arrow for $name {
+			type Builder = <$type as peppi_arrow::Arrow>::Builder;
+
+			fn data_type<C: ::peppi_arrow::Context>(context: C) -> arrow::datatypes::DataType {
+				<$type>::data_type(context)
+			}
+
+			fn builder<C: ::peppi_arrow::Context>(len: usize, context: C) -> Self::Builder {
+				<$type>::builder(len, context)
+			}
+
+			fn append<C: ::peppi_arrow::Context>(&self, builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
+				self.0.append(builder, context)
+			}
+
+			fn append_null<C: ::peppi_arrow::Context>(builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
+				<$type>::append_null(builder, context)
+			}
 		}
 	}
 }

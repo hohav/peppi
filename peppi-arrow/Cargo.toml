@@ -1,0 +1,8 @@
+[package]
+name = "peppi-arrow"
+version = "0.1.0"
+authors = ["melkor"]
+edition = "2018"
+
+[dependencies]
+arrow = "4.2"

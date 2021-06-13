@@ -1,7 +1,4 @@
 use std::fmt;
-
-use ::arrow::datatypes;
-
 use super::character::Internal;
 
 macro_rules! state {
@@ -48,15 +45,6 @@ macro_rules! state {
 					$name::$common(s) => write!(f, "{:?}", s),
 					$( $name::$variant(s) => write!(f, "{:?}", s), )*
 				}
-			}
-		}
-
-		impl super::arrow::ArrowPrimitive for State {
-			type ArrowNativeType = u16;
-			type ArrowType = datatypes::UInt16Type;
-			const ARROW_DATA_TYPE: datatypes::DataType = datatypes::DataType::UInt16;
-			fn into_arrow_native(self) -> Self::ArrowNativeType {
-				u16::from(self)
 			}
 		}
 	}

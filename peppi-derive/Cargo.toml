@@ -1,0 +1,16 @@
+[package]
+name = "peppi-derive"
+version = "0.1.0"
+authors = ["melkor"]
+edition = "2018"
+
+[dependencies]
+darling = "0.13"
+peppi-arrow = { path = "../peppi-arrow" }
+proc-macro2 = "1.0"
+quote = "1.0"
+regex = "1.5"
+syn = "1.0"
+
+[lib]
+proc-macro = true

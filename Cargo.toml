@@ -1,22 +1,2 @@
-[package]
-authors = ["melkor <hohav@fastmail.com>"]
-description = "Parser for Slippi replay files"
-edition = "2018"
-license = "MIT"
-name = "peppi"
-repository = "https://github.com/hohav/peppi"
-version = "1.0.0-alpha.1"
-
-[dependencies]
-arrow = "4.1"
-byteorder = "1"
-chrono = { version = "0.4", features = ["serde"] }
-encoding_rs = "0.8"
-log = "0.4"
-num_enum = "0.5"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-
-[lib]
-name = "peppi"
-path = "src/lib.rs"
+[workspace]
+members = ["peppi", "peppi-arrow", "peppi-derive"]

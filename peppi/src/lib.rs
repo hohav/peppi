@@ -17,7 +17,6 @@ pub static mut SERIALIZATION_CONFIG: SerializationConfig = SerializationConfig {
 	enum_names: false,
 };
 
-#[macro_use] #[doc(hidden)] pub mod frame_data;
 #[macro_use] #[doc(hidden)] pub mod pseudo_bitmask;
 #[macro_use] #[doc(hidden)] pub mod pseudo_enum;
 
