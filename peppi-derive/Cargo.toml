@@ -1,8 +1,11 @@
 [package]
-name = "peppi-derive"
-version = "0.1.0"
-authors = ["melkor"]
+authors = ["melkor <hohav@fastmail.com>"]
+description = "Support crate for peppi"
 edition = "2018"
+license = "MIT"
+name = "peppi-derive"
+repository = "https://github.com/hohav/peppi"
+version = "0.1.0"
 
 [dependencies]
 darling = "0.13"

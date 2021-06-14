@@ -1,8 +1,11 @@
 [package]
-name = "peppi-arrow"
-version = "0.1.0"
-authors = ["melkor"]
+authors = ["melkor <hohav@fastmail.com>"]
+description = "Support crate for peppi"
 edition = "2018"
+license = "MIT"
+name = "peppi-arrow"
+repository = "https://github.com/hohav/peppi"
+version = "0.1.0"
 
 [dependencies]
 arrow = "4.2"
