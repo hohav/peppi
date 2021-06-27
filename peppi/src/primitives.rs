@@ -1,8 +1,9 @@
 use std::fmt::{Debug, Display, Formatter, Result};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
 use peppi_derive::Peppi;
 
-#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize, num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum Port {
 	P1 = 0,
@@ -23,25 +24,29 @@ impl Display for Port {
 	}
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub enum Direction { Left, Right }
-
-impl From<Direction> for u8 {
-	fn from(d: Direction) -> Self {
-		match d {
-			Direction::Left => 0,
-			_ => 1,
-		}
+impl Default for Port {
+	fn default() -> Self {
+		Self::P1
 	}
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Peppi)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, IntoPrimitive, TryFromPrimitive)]
+#[repr(u8)]
+pub enum Direction { Left, Right }
+
+impl Default for Direction {
+	fn default() -> Self {
+		Self::Left
+	}
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Peppi)]
 pub struct Position {
 	pub x: f32,
 	pub y: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Peppi)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Peppi)]
 pub struct Velocity {
 	pub x: f32,
 	pub y: f32,

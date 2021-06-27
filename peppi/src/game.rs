@@ -37,7 +37,7 @@ pseudo_enum!(TeamShade: u8 {
 	2 => DARK,
 });
 
-#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Team {
 	pub color: TeamColor,
 	pub shade: TeamShade,
@@ -53,19 +53,19 @@ pseudo_enum!(ShieldDrop: u32 {
 	2 => ARDUINO,
 });
 
-#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Ucf {
 	pub dash_back: Option<DashBack>,
 	pub shield_drop: Option<ShieldDrop>,
 }
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Netplay {
 	pub name: String,
 	pub code: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Player {
 	pub port: Port,
 
@@ -92,13 +92,13 @@ pub struct Player {
 	pub netplay: Option<Netplay>,
 }
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Scene {
 	pub minor: u8,
 	pub major: u8,
 }
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Start {
 	pub slippi: slippi::Slippi,
 	pub bitfield: [u8; 3],
@@ -130,7 +130,7 @@ pseudo_enum!(EndMethod: u8 {
 	7 => NO_CONTEST,
 });
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct End {
 	pub method: EndMethod,
 	// v2.0

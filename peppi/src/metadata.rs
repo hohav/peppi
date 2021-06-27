@@ -18,7 +18,7 @@ use super::{
 	primitives::Port,
 };
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, Default, PartialEq, Serialize)]
 pub struct Metadata {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub date: Option<DateTime<Utc>>,
@@ -32,7 +32,7 @@ pub struct Metadata {
 	pub players: Option<Vec<Player>>,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, Default, PartialEq, Serialize)]
 pub struct Netplay {
 	pub code: String,
 	pub name: String,
@@ -52,7 +52,7 @@ pub fn serialize_characters<S>(characters: &Option<HashMap<character::Internal, 
 	}
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, Default, PartialEq, Serialize)]
 pub struct Player {
 	pub port: Port,
 	#[serde(skip_serializing_if = "Option::is_none")]

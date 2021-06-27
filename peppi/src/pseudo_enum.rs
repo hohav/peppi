@@ -14,7 +14,7 @@ impl std::error::Error for ConversionError { }
 
 macro_rules! pseudo_enum {
 	($name: ident : $type: ty { $( $value: expr => $variant: ident ),* $(,)? }) => {
-		#[derive(Copy, Clone, PartialEq, Eq, Hash, serde::Deserialize)]
+		#[derive(Copy, Clone, Default, PartialEq, Eq, Hash, serde::Deserialize)]
 		#[serde(transparent)]
 		pub struct $name(pub $type);
 
@@ -59,6 +59,10 @@ macro_rules! pseudo_enum {
 		impl peppi_arrow::Arrow for $name {
 			type Builder = <$type as peppi_arrow::Arrow>::Builder;
 
+			fn default() -> Self {
+				<Self as Default>::default()
+			}
+
 			fn data_type<C: ::peppi_arrow::Context>(context: C) -> arrow::datatypes::DataType {
 				<$type>::data_type(context)
 			}
@@ -67,12 +71,16 @@ macro_rules! pseudo_enum {
 				<$type>::builder(len, context)
 			}
 
-			fn append<C: ::peppi_arrow::Context>(&self, builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
-				self.0.append(builder, context)
+			fn write<C: ::peppi_arrow::Context>(&self, builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
+				self.0.write(builder, context)
 			}
 
-			fn append_null<C: ::peppi_arrow::Context>(builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
-				<$type>::append_null(builder, context)
+			fn write_null<C: ::peppi_arrow::Context>(builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
+				<$type>::write_null(builder, context)
+			}
+
+			fn read(&mut self, array: arrow::array::ArrayRef, idx: usize) {
+				self.0.read(array, idx);
 			}
 		}
 	}

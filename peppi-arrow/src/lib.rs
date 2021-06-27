@@ -1,9 +1,16 @@
+use std::mem::MaybeUninit;
+
 use arrow::{
 	array::{
+		ArrayRef,
 		ArrayBuilder,
+		BooleanArray,
 		BooleanBuilder,
+		ListArray,
 		ListBuilder,
+		PrimitiveArray,
 		PrimitiveBuilder,
+		StructArray,
 		StructBuilder,
 	},
 	datatypes::{
@@ -32,18 +39,24 @@ pub trait Context: Copy {
 
 pub trait Arrow {
 	type Builder: ArrayBuilder;
+	fn default() -> Self; // workaround for Default not working with const generics yet
 	fn fields<C: Context>(_context: C) -> Vec<Field> { unimplemented!() }
 	fn data_type<C: Context>(context: C) -> DataType;
 	fn is_nullable() -> bool { false }
 	fn builder<C: Context>(len: usize, context: C) -> Self::Builder;
-	fn append<C: Context>(&self, builder: &mut dyn ArrayBuilder, context: C);
-	fn append_null<C: Context>(builder: &mut dyn ArrayBuilder, context: C);
+	fn write<C: Context>(&self, builder: &mut dyn ArrayBuilder, context: C);
+	fn write_null<C: Context>(builder: &mut dyn ArrayBuilder, context: C);
+	fn read(&mut self, array: ArrayRef, idx: usize);
 }
 
 macro_rules! primitives {
 	( $($type: ty : $arrow_type: ty),* $(,)? ) => { $(
 		impl Arrow for $type {
 			type Builder = PrimitiveBuilder::<$arrow_type>;
+
+			fn default() -> Self {
+				0 as $type
+			}
 
 			fn data_type<C: Context>(_context: C) -> DataType {
 				<$arrow_type>::DATA_TYPE
@@ -53,12 +66,16 @@ macro_rules! primitives {
 				PrimitiveBuilder::<$arrow_type>::new(len)
 			}
 
-			fn append<C: Context>(&self, builder: &mut dyn ArrayBuilder, _context: C) {
-				builder.as_any_mut().downcast_mut::<PrimitiveBuilder::<$arrow_type>>().unwrap().append_value(*self).unwrap()
+			fn write<C: Context>(&self, builder: &mut dyn ArrayBuilder, _context: C) {
+				builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap().append_value(*self).unwrap()
 			}
 
-			fn append_null<C: Context>(builder: &mut dyn ArrayBuilder, _context: C) {
-				builder.as_any_mut().downcast_mut::<PrimitiveBuilder::<$arrow_type>>().unwrap().append_null().unwrap()
+			fn write_null<C: Context>(builder: &mut dyn ArrayBuilder, _context: C) {
+				builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap().append_null().unwrap()
+			}
+
+			fn read(&mut self, array: ArrayRef, idx: usize) {
+				*self = array.as_any().downcast_ref::<PrimitiveArray::<$arrow_type>>().unwrap().value(idx)
 			}
 		}
 	)* }
@@ -79,6 +96,10 @@ primitives!(
 impl Arrow for bool {
 	type Builder = BooleanBuilder;
 
+	fn default() -> Self {
+		false
+	}
+
 	fn data_type<C: Context>(_context: C) -> DataType {
 		DataType::Boolean
 	}
@@ -87,17 +108,25 @@ impl Arrow for bool {
 		BooleanBuilder::new(len)
 	}
 
-	fn append<C: Context>(&self, builder: &mut dyn ArrayBuilder, _context: C) {
-		builder.as_any_mut().downcast_mut::<BooleanBuilder>().unwrap().append_value(*self).unwrap()
+	fn write<C: Context>(&self, builder: &mut dyn ArrayBuilder, _context: C) {
+		builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap().append_value(*self).unwrap()
 	}
 
-	fn append_null<C: Context>(builder: &mut dyn ArrayBuilder, _context: C) {
-		builder.as_any_mut().downcast_mut::<BooleanBuilder>().unwrap().append_null().unwrap()
+	fn write_null<C: Context>(builder: &mut dyn ArrayBuilder, _context: C) {
+		builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap().append_null().unwrap()
+	}
+
+	fn read(&mut self, array: ArrayRef, idx: usize) {
+		*self = array.as_any().downcast_ref::<BooleanArray>().unwrap().value(idx)
 	}
 }
 
 impl<T> Arrow for Option<T> where T: Arrow {
 	type Builder = T::Builder;
+
+	fn default() -> Self {
+		None
+	}
 
 	fn data_type<C: Context>(context: C) -> DataType {
 		T::data_type(context)
@@ -111,21 +140,36 @@ impl<T> Arrow for Option<T> where T: Arrow {
 		T::builder(len, context)
 	}
 
-	fn append<C: Context>(&self, builder: &mut dyn ArrayBuilder, context: C) {
+	fn write<C: Context>(&self, builder: &mut dyn ArrayBuilder, context: C) {
 		if let Some(value) = self {
-			value.append(builder, context)
+			value.write(builder, context)
 		} else {
-			T::append_null(builder, context)
+			T::write_null(builder, context)
 		}
 	}
 
-	fn append_null<C: Context>(builder: &mut dyn ArrayBuilder, context: C) {
-		T::append_null(builder, context)
+	fn write_null<C: Context>(builder: &mut dyn ArrayBuilder, context: C) {
+		T::write_null(builder, context)
+	}
+
+	fn read(&mut self, array: ArrayRef, idx: usize) {
+		*self = match array.is_valid(idx) {
+			true => {
+				let mut value = T::default();
+				value.read(array, idx);
+				Some(value)
+			},
+			_ => None,
+		};
 	}
 }
 
 impl<T> Arrow for Box<T> where T: Arrow {
 	type Builder = T::Builder;
+
+	fn default() -> Self {
+		Box::new(T::default())
+	}
 
 	fn data_type<C: Context>(context: C) -> DataType {
 		T::data_type(context)
@@ -135,17 +179,71 @@ impl<T> Arrow for Box<T> where T: Arrow {
 		T::builder(len, context)
 	}
 
-	fn append<C: Context>(&self, builder: &mut dyn ArrayBuilder, context: C) {
-		(**self).append(builder, context)
+	fn write<C: Context>(&self, builder: &mut dyn ArrayBuilder, context: C) {
+		(**self).write(builder, context)
 	}
 
-	fn append_null<C: Context>(builder: &mut dyn ArrayBuilder, context: C) {
-		T::append_null(builder, context)
+	fn write_null<C: Context>(builder: &mut dyn ArrayBuilder, context: C) {
+		T::write_null(builder, context)
+	}
+
+	fn read(&mut self, array: ArrayRef, idx: usize) {
+		(*self).read(array, idx);
 	}
 }
 
+impl<T> Arrow for Vec<T> where T: Arrow {
+	type Builder = ListBuilder<T::Builder>;
+
+	fn default() -> Self {
+		Vec::new()
+	}
+
+	fn data_type<C: Context>(context: C) -> DataType {
+		DataType::List(Box::new(Field::new("list", T::data_type(context), T::is_nullable())))
+	}
+
+	fn builder<C: Context>(len: usize, context: C) -> Self::Builder {
+		Self::Builder::new(T::builder(len, context))
+	}
+
+	fn write<C: Context>(&self, builder: &mut dyn ArrayBuilder, context: C) {
+		let builder = builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap();
+		for x in self {
+			x.write(builder.values(), context);
+		}
+		builder.append(true).unwrap();
+	}
+
+	fn write_null<C: Context>(builder: &mut dyn ArrayBuilder, _context: C) {
+		let builder = builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap();
+		builder.append(false).unwrap();
+	}
+
+	fn read(&mut self, array: ArrayRef, idx: usize) {
+		let array = array.as_any().downcast_ref::<ListArray>().unwrap();
+		for i in 0 .. array.value_length(idx) {
+			let mut value = T::default();
+			value.read(array.value(idx), i as usize);
+			self.push(value);
+		}
+	}
+}
+
+/// TODO: replace with FixedSizeListArray once Parquet supports those
 impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
 	type Builder = StructBuilder;
+
+	fn default() -> Self {
+		let mut data: [MaybeUninit<T>; N] = unsafe {
+			MaybeUninit::uninit().assume_init()
+		};
+		for elem in &mut data[..] {
+			*elem = MaybeUninit::new(T::default())
+		}
+		//unsafe { mem::transmute::<_, [T; N]>(data) }
+		unsafe { data.as_ptr().cast::<[T; N]>().read() }
+	}
 
 	fn fields<C: Context>(context: C) -> Vec<Field> {
 		let mut fields = vec![];
@@ -169,47 +267,75 @@ impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
 		for _ in 0 .. N {
 			builders.push(Box::new(T::builder(len, context)) as Box<dyn ArrayBuilder>);
 		}
-		::arrow::array::StructBuilder::new(fields, builders)
+		StructBuilder::new(fields, builders)
 	}
 
-	fn append<C: Context>(&self, builder: &mut dyn ArrayBuilder, context: C) {
+	fn write<C: Context>(&self, builder: &mut dyn ArrayBuilder, context: C) {
 		let builder = builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap();
 		for i in 0 .. N {
-			self[i].append(builder.field_builder::<T::Builder>(i).unwrap(), context);
+			self[i].write(builder.field_builder::<T::Builder>(i).unwrap(), context);
 		}
 		builder.append(true).unwrap();
 	}
 
-	fn append_null<C: Context>(builder: &mut dyn ArrayBuilder, context: C) {
+	fn write_null<C: Context>(builder: &mut dyn ArrayBuilder, context: C) {
 		let builder = builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap();
 		for i in 0 .. N {
-			T::append_null(builder.field_builder::<T::Builder>(i).unwrap(), context);
+			T::write_null(builder.field_builder::<T::Builder>(i).unwrap(), context);
 		}
 		builder.append(false).unwrap();
 	}
+
+	fn read(&mut self, array: ArrayRef, idx: usize) {
+		let struct_array = array.as_any().downcast_ref::<StructArray>().unwrap();
+		for i in 0 .. N {
+			self[i].read(struct_array.column(i).clone(), idx);
+		}
+	}
 }
 
-impl<T> Arrow for Vec<T> where T: Arrow {
-	type Builder = ListBuilder<T::Builder>;
+/* For use when Parquet supports fixed-size lists
+impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
+	type Builder = FixedSizeListBuilder<T::Builder>;
+
+	fn default() -> Self {
+		let mut data: [MaybeUninit<T>; N] = unsafe {
+			MaybeUninit::uninit().assume_init()
+		};
+		for elem in &mut data[..] {
+			*elem = MaybeUninit::new(T::default())
+		}
+		//unsafe { mem::transmute::<_, [T; N]>(data) }
+		unsafe { data.as_ptr().cast::<[T; N]>().read() }
+	}
 
 	fn data_type<C: Context>(context: C) -> DataType {
-		DataType::List(Box::new(Field::new("list", T::data_type(context), T::is_nullable())))
+		let field = Field::new("values", T::data_type(context), T::is_nullable());
+		DataType::FixedSizeList(Box::new(field), i32::try_from(N).unwrap())
 	}
 
 	fn builder<C: Context>(len: usize, context: C) -> Self::Builder {
-		Self::Builder::new(T::builder(len, context))
+		Self::Builder::new(T::builder(len, context), i32::try_from(N).unwrap())
 	}
 
-	fn append<C: Context>(&self, builder: &mut dyn ArrayBuilder, context: C) {
+	fn write<C: Context>(&self, builder: &mut dyn ArrayBuilder, context: C) {
 		let builder = builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap();
-		for x in self {
-			x.append(builder.values(), context);
+		for i in 0 .. N {
+			self[i].write(builder.values(), context);
 		}
 		builder.append(true).unwrap();
 	}
 
-	fn append_null<C: Context>(builder: &mut dyn ArrayBuilder, _context: C) {
+	fn write_null<C: Context>(builder: &mut dyn ArrayBuilder, context: C) {
 		let builder = builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap();
 		builder.append(false).unwrap();
 	}
+
+	fn read(&mut self, array: ArrayRef, idx: usize) {
+		let struct_array = array.as_any().downcast_ref::<StructArray>().unwrap();
+		for i in 0 .. N {
+			self[i].read(struct_array.column(i).clone(), idx);
+		}
+	}
 }
+*/

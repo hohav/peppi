@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub struct Version(pub u8, pub u8, pub u8);
 
 pub struct ParseVersionError(pub String);
@@ -34,7 +34,7 @@ impl fmt::Display for Version {
 	}
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Slippi {
 	pub version: Version,
 }

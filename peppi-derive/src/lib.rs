@@ -35,12 +35,35 @@ fn if_ver(version: Option<Version>, inner: proc_macro2::TokenStream) -> proc_mac
 	match version {
 		Some(version) => {
 			let Version(major, minor) = version;
-			quote!(match context.slippi_version() >= ::peppi_arrow::SlippiVersion(#major, #minor, 0) {
+			quote!(match version.0 >= #major && version.1 >= #minor {
 				true => Some(#inner),
 				_ => None,
 			},)
 		},
 		_ => quote!(Some(#inner),),
+	}
+}
+
+/// Takes an `Option<...>` type and returns the inner type.
+fn wrapped_type(ty: &syn::Type) -> Option<&syn::Type> {
+	match ty {
+		syn::Type::Path(tpath) => {
+			let segment = &tpath.path.segments[0];
+			match segment.ident.to_string().as_str() {
+				"Option" => // FIXME: will miss `std::option::Option`, etc
+					match &segment.arguments {
+						syn::PathArguments::AngleBracketed(args) =>
+							match &args.args[0] {
+								syn::GenericArgument::Type(ty) =>
+									Some(ty),
+								_ => None,
+							},
+						_ => None,
+					}
+				_ => None,
+			}
+		},
+		_ => None,
 	}
 }
 
@@ -60,47 +83,70 @@ impl ToTokens for MyInputReceiver {
 			.fields;
 		fields.sort_by_key(|f| f.version);
 
+		let mut arrow_defaults = quote!();
 		let mut arrow_fields = quote!();
 		let mut arrow_builders = quote!();
-		let mut arrow_appenders = quote!();
-		let mut arrow_null_appenders = quote!();
+		let mut arrow_writers = quote!();
+		let mut arrow_null_writers = quote!();
+		let mut arrow_readers = quote!();
+
 		for (i, f) in fields.into_iter().enumerate() {
 			let ident = &f.ident;
 			let name = ident.as_ref()
 				.map(|n| n.to_string().trim_start_matches("r#").to_string())
 				.unwrap_or(format!("{}", i));
 			let ty = &f.ty;
-			arrow_fields.extend(if_ver(
-				f.version,
+			arrow_defaults.extend(
+				quote!(
+					#ident: <#ty as ::peppi_arrow::Arrow>::default(),
+				)
+			);
+			arrow_fields.extend(if_ver(f.version,
 				quote!(::arrow::datatypes::Field::new(
 					#name,
 					<#ty>::data_type(context),
 					<#ty>::is_nullable(),
 				))
 			));
-			arrow_builders.extend(if_ver(
-				f.version,
-				quote!(Box::new(<#ty>::builder(len, context)) as Box<dyn ::arrow::array::ArrayBuilder>)
+			arrow_builders.extend(if_ver(f.version,
+				quote!(Box::new(<#ty>::builder(len, context))
+					as Box<dyn ::arrow::array::ArrayBuilder>)
 			));
-			arrow_appenders.extend(
+			arrow_writers.extend(
 				quote!(
-					if builder.num_fields() > #i {
-						self.#ident.append(
+					if num_fields > #i {
+						self.#ident.write(
 							builder.field_builder::<<#ty as ::peppi_arrow::Arrow>::Builder>(#i).unwrap(),
 							context,
 						);
 					}
 				)
 			);
-			arrow_null_appenders.extend(
+			arrow_null_writers.extend(
 				quote!(
-					if builder.num_fields() > #i {
-						<#ty>::append_null(
+					if num_fields > #i {
+						<#ty>::write_null(
 							builder.field_builder::<<#ty as ::peppi_arrow::Arrow>::Builder>(#i).unwrap(),
 							context,
 						);
 					}
 				)
+			);
+			arrow_readers.extend(
+				if f.version.is_some() {
+					let wrapped = wrapped_type(ty).unwrap();
+					quote!(
+						if struct_array.num_columns() > #i {
+							let mut value = <#wrapped as ::peppi_arrow::Arrow>::default();
+							value.read(struct_array.column(#i).clone(), idx);
+							self.#ident = Some(value);
+						}
+					)
+				} else {
+					quote!(
+						self.#ident.read(struct_array.column(#i).clone(), idx);
+					)
+				}
 			);
 		}
 
@@ -108,7 +154,14 @@ impl ToTokens for MyInputReceiver {
 			impl #impl_generics ::peppi_arrow::Arrow for #ident #ty_generics #where_clause {
 				type Builder = ::arrow::array::StructBuilder;
 
+				fn default() -> Self {
+					Self {
+						#arrow_defaults
+					}
+				}
+
 				fn fields<C: ::peppi_arrow::Context>(context: C) -> Vec<::arrow::datatypes::Field> {
+					let version = context.slippi_version();
 					vec![#arrow_fields].into_iter().filter_map(|f| f).collect()
 				}
 
@@ -117,21 +170,29 @@ impl ToTokens for MyInputReceiver {
 				}
 
 				fn builder<C: ::peppi_arrow::Context>(len: usize, context: C) -> Self::Builder {
+					let version = context.slippi_version();
 					let fields = Self::fields(context);
 					let builders = vec![#arrow_builders].into_iter().filter_map(|f| f).collect();
 					::arrow::array::StructBuilder::new(fields, builders)
 				}
 
-				fn append<C: ::peppi_arrow::Context>(&self, builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
+				fn write<C: ::peppi_arrow::Context>(&self, builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
 					let builder = builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap();
-					#arrow_appenders
+					let num_fields = builder.num_fields();
+					#arrow_writers
 					builder.append(true).unwrap();
 				}
 
-				fn append_null<C: ::peppi_arrow::Context>(builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
+				fn write_null<C: ::peppi_arrow::Context>(builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
 					let builder = builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap();
-					#arrow_null_appenders
+					let num_fields = builder.num_fields();
+					#arrow_null_writers
 					builder.append(false).unwrap();
+				}
+
+				fn read(&mut self, array: ::arrow::array::ArrayRef, idx: usize) {
+					let struct_array = array.as_any().downcast_ref::<arrow::array::StructArray>().unwrap();
+					#arrow_readers
 				}
 			}
 		});

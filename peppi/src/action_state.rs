@@ -26,6 +26,13 @@ macro_rules! state {
 					}
 				}
 			}
+
+			pub fn character(self) -> Option<Internal> {
+				match self {
+					$name::$unknown(_) | $name::$common(_) => None,
+					$( $name::$variant(_) => Some(Internal::$internal), )*
+				}
+			}
 		}
 
 		impl From<$name> for u16 {
@@ -81,6 +88,32 @@ state!(State {
 	YoungLink(YoungLink) => YOUNG_LINK,
 	Zelda(Zelda) => ZELDA,
 });
+
+impl Default for State {
+	fn default() -> Self {
+		State::Unknown(0)
+	}
+}
+
+/// The u16 representation is ambiguous since character-specific enum values overlap.
+/// So we prepend a character byte to make a u32 (with a byte in between for padding).
+impl From<u32> for State {
+	fn from(n: u32) -> State {
+		let bytes = n.to_le_bytes();
+		let character_byte = bytes[0];
+		let state_bytes = [bytes[2], bytes[3]];
+		// should we reject if bytes[1] is not 0?
+		State::from(u16::from_le_bytes(state_bytes), Internal(character_byte))
+	}
+}
+
+impl From<State> for u32 {
+	fn from(state: State) -> u32 {
+		let state_bytes = u16::from(state).to_le_bytes();
+		let character = state.character().map(|c| c.0).unwrap_or(0);
+		u32::from_le_bytes([character, 0, state_bytes[0], state_bytes[1]])
+	}
+}
 
 pseudo_enum!(Common: u16 {
 	000 => DEAD_DOWN,

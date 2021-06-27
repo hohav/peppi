@@ -1,6 +1,6 @@
 macro_rules! pseudo_bitmask {
 	($name: ident : $type: ty { $( $value: expr => $variant: ident ),* $(,)? }) => {
-		#[derive(PartialEq, Eq, Copy, Clone, serde::Serialize)]
+		#[derive(Copy, Clone, Default, PartialEq, Eq, serde::Serialize)]
 		pub struct $name(pub $type);
 
 		impl $name {
@@ -41,6 +41,10 @@ macro_rules! pseudo_bitmask {
 		impl peppi_arrow::Arrow for $name {
 			type Builder = <$type as peppi_arrow::Arrow>::Builder;
 
+			fn default() -> Self {
+				<Self as Default>::default()
+			}
+
 			fn data_type<C: ::peppi_arrow::Context>(context: C) -> arrow::datatypes::DataType {
 				<$type>::data_type(context)
 			}
@@ -49,12 +53,16 @@ macro_rules! pseudo_bitmask {
 				<$type>::builder(len, context)
 			}
 
-			fn append<C: ::peppi_arrow::Context>(&self, builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
-				self.0.append(builder, context)
+			fn write<C: ::peppi_arrow::Context>(&self, builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
+				self.0.write(builder, context)
 			}
 
-			fn append_null<C: ::peppi_arrow::Context>(builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
-				<$type>::append_null(builder, context)
+			fn write_null<C: ::peppi_arrow::Context>(builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
+				<$type>::write_null(builder, context)
+			}
+
+			fn read(&mut self, array: arrow::array::ArrayRef, idx: usize) {
+				self.0.read(array, idx);
 			}
 		}
 	}
