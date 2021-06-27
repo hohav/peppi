@@ -17,7 +17,6 @@ use super::{
 };
 
 use peppi_arrow::{Arrow, Context, SlippiVersion};
-use peppi_derive::Peppi;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Opts {
@@ -114,7 +113,7 @@ pub fn frames_to_arrow(game: &game::Game, opts: Option<Opts>) -> StructArray {
 	}
 }
 
-#[derive(Peppi)]
+#[derive(peppi_derive::Arrow)]
 struct FrameItem {
 	frame_index: u32,
 	item: frame::Item,

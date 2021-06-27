@@ -13,15 +13,15 @@ use super::{
 	triggers,
 };
 
-use peppi_derive::Peppi;
+use peppi_derive::Arrow;
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Peppi)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct Buttons {
 	pub logical: buttons::Logical,
 	pub physical: buttons::Physical,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Peppi)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct Triggers {
 	pub logical: triggers::Logical,
 	pub physical: triggers::Physical,
@@ -48,24 +48,24 @@ pseudo_enum!(HurtboxState: u8 {
 	2 => INTANGIBLE,
 });
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Peppi)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct Start {
 	pub random_seed: u32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Peppi)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct End {
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "3.7")] pub latest_finalized_frame: Option<i32>,
+	#[slippi(version = "3.7")] pub latest_finalized_frame: Option<i32>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Peppi)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct Velocities {
 	pub autogenous: Velocity,
 	pub knockback: Velocity,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Peppi)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct Pre {
 	pub position: Position,
 	pub direction: Direction,
@@ -76,12 +76,12 @@ pub struct Pre {
 	pub buttons: Buttons,
 	pub state: action_state::State,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "1.2")] pub raw_analog_x: Option<u8>,
+	#[slippi(version = "1.2")] pub raw_analog_x: Option<u8>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "1.4")] pub damage: Option<f32>,
+	#[slippi(version = "1.4")] pub damage: Option<f32>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Peppi)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct Post {
 	pub character: character::Internal,
 	pub state: action_state::State,
@@ -94,40 +94,40 @@ pub struct Post {
 	pub last_hit_by: Option<Port>,
 	pub stocks: u8,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "0.2")] pub state_age: Option<f32>,
+	#[slippi(version = "0.2")] pub state_age: Option<f32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "2.0")] pub flags: Option<StateFlags>,
+	#[slippi(version = "2.0")] pub flags: Option<StateFlags>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "2.0")] pub misc_as: Option<f32>,
+	#[slippi(version = "2.0")] pub misc_as: Option<f32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "2.0")] pub airborne: Option<bool>,
+	#[slippi(version = "2.0")] pub airborne: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "2.0")] pub ground: Option<u16>,
+	#[slippi(version = "2.0")] pub ground: Option<u16>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "2.0")] pub jumps: Option<u8>,
+	#[slippi(version = "2.0")] pub jumps: Option<u8>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "2.0")] pub l_cancel: Option<Option<bool>>,
+	#[slippi(version = "2.0")] pub l_cancel: Option<Option<bool>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "2.1")] pub hurtbox_state: Option<HurtboxState>,
+	#[slippi(version = "2.1")] pub hurtbox_state: Option<HurtboxState>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "3.5")] pub velocities: Option<Velocities>,
+	#[slippi(version = "3.5")] pub velocities: Option<Velocities>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "3.8")] pub hitlag: Option<f32>,
+	#[slippi(version = "3.8")] pub hitlag: Option<f32>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Peppi)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct Data {
 	pub pre: Pre,
 	pub post: Post,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Peppi)]
+#[derive(Clone, Debug, PartialEq, Serialize, Arrow)]
 pub struct PortData {
 	pub leader: Data,
 	pub follower: Option<Box<Data>>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Peppi)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct Item {
 	pub id: u32,
 	pub r#type: item::Item,
@@ -138,17 +138,17 @@ pub struct Item {
 	pub damage: u16,
 	pub timer: f32,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "3.2")] pub misc: Option<[u8; 4]>,
+	#[slippi(version = "3.2")] pub misc: Option<[u8; 4]>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[peppi(version = "3.5")] pub owner: Option<Option<Port>>,
+	#[slippi(version = "3.5")] pub owner: Option<Option<Port>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Peppi)]
+#[derive(Clone, Debug, PartialEq, Arrow)]
 pub struct Frame<const N: usize> {
 	pub ports: [PortData; N],
-	#[peppi(version = "2.2")] pub start: Option<Start>,
-	#[peppi(version = "3.0")] pub end: Option<End>,
-	#[peppi(version = "3.0")] pub items: Option<Vec<Item>>,
+	#[slippi(version = "2.2")] pub start: Option<Start>,
+	#[slippi(version = "3.0")] pub end: Option<End>,
+	#[slippi(version = "3.0")] pub items: Option<Vec<Item>>,
 }
 
 // workaround for Serde not supporting const generics

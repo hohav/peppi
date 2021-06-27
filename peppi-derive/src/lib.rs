@@ -208,7 +208,7 @@ pub(crate) struct MyFieldReceiver {
 	version: Option<Version>,
 }
 
-#[proc_macro_derive(Peppi, attributes(peppi))]
+#[proc_macro_derive(Arrow, attributes(slippi))]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let ast = syn::parse(input).expect("Couldn't parse item");
 	build_converters(ast).unwrap()

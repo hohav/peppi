@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display, Formatter, Result};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
-use peppi_derive::Peppi;
+use peppi_derive::Arrow;
 
 #[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
@@ -40,13 +40,13 @@ impl Default for Direction {
 	}
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Peppi)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Arrow)]
 pub struct Position {
 	pub x: f32,
 	pub y: f32,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Peppi)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Arrow)]
 pub struct Velocity {
 	pub x: f32,
 	pub y: f32,
