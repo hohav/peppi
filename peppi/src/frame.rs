@@ -83,12 +83,12 @@ pub struct Pre {
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Peppi)]
 pub struct Post {
+	pub character: character::Internal,
+	pub state: action_state::State,
 	pub position: Position,
 	pub direction: Direction,
 	pub damage: f32,
 	pub shield: f32,
-	pub state: action_state::State,
-	pub character: character::Internal,
 	pub last_attack_landed: Option<attack::Attack>,
 	pub combo_count: u8,
 	pub last_hit_by: Option<Port>,
