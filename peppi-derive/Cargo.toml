@@ -5,7 +5,7 @@ edition = "2018"
 license = "MIT"
 name = "peppi-derive"
 repository = "https://github.com/hohav/peppi"
-version = "0.1.0"
+version = "0.2.0"
 
 [dependencies]
 darling = "0.13"
