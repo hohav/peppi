@@ -388,7 +388,7 @@ fn items() -> Result<(), String> {
 			assert_eq!(items[&0], frame::Item {
 				id: 0,
 				damage: 0,
-				direction: Direction::Right,
+				direction: Some(Direction::Right),
 				position: Position { x: -62.7096061706543, y: -1.4932749271392822 },
 				state: 0,
 				timer: 140.0,
@@ -400,7 +400,7 @@ fn items() -> Result<(), String> {
 			assert_eq!(items[&1], frame::Item {
 				id: 1,
 				damage: 0,
-				direction: Direction::Left,
+				direction: Some(Direction::Left),
 				position: Position { x: 20.395559310913086, y: -1.4932749271392822 },
 				state: 0,
 				timer: 140.0,
@@ -412,7 +412,7 @@ fn items() -> Result<(), String> {
 			assert_eq!(items[&2], frame::Item {
 				id: 2,
 				damage: 0,
-				direction: Direction::Right,
+				direction: Some(Direction::Right),
 				position: Position { x: -3.982539176940918, y: -1.4932749271392822 },
 				state: 0,
 				timer: 140.0,
