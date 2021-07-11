@@ -113,6 +113,19 @@ where F: FnOnce(&mut &[u8]) -> Result<T> {
 	})
 }
 
+fn maybe_direction(value: f32) -> Result<Option<Direction>> {
+	match value {
+		v if v == -1.0 => Ok(Some(Direction::Left)),
+		v if v ==  1.0 => Ok(Some(Direction::Right)),
+		v if v ==  0.0 => Ok(None),
+		v => Err(err!("invalid direction: {}", v)),
+	}
+}
+
+fn direction(value: f32) -> Result<Direction> {
+	maybe_direction(value)?.ok_or(err!("missing direction (0.0)"))
+}
+
 /// Reads the Event Payloads event, which must come first in the raw stream
 /// and tells us the sizes for all other events to follow.
 /// Returns the number of bytes read by this function, plus a map of event
@@ -405,7 +418,7 @@ fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Item>> {
 		event: frame::Item {
 			r#type: item_type,
 			state: r.read_u8()?,
-			direction: direction(r.read_f32::<BE>()?)?,
+			direction: maybe_direction(r.read_f32::<BE>()?)?,
 			velocity: Velocity {
 				x: r.read_f32::<BE>()?,
 				y: r.read_f32::<BE>()?,
@@ -423,14 +436,6 @@ fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Item>> {
 			owner: if_more(r, |r| Ok(Port::try_from(r.read_u8()?).ok()))?
 		},
 	})
-}
-
-fn direction(value: f32) -> Result<Direction> {
-	match value {
-		v if v < 0.0 => Ok(Direction::Left),
-		v if v > 0.0 => Ok(Direction::Right),
-		_ => Err(err!("direction == 0")),
-	}
 }
 
 /// We need to know the character to interpret the action state properly,

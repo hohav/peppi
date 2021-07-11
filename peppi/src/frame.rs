@@ -132,7 +132,7 @@ pub struct Item {
 	pub id: u32,
 	pub r#type: item::Item,
 	pub state: u8,
-	pub direction: Direction,
+	pub direction: Option<Direction>,
 	pub position: Position,
 	pub velocity: Velocity,
 	pub damage: u16,
