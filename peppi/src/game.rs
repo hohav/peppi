@@ -101,7 +101,7 @@ pub struct Scene {
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Start {
 	pub slippi: slippi::Slippi,
-	pub bitfield: [u8; 3],
+	pub bitfield: [u8; 4],
 	pub is_teams: bool,
 	pub item_spawn_frequency: i8,
 	pub self_destruct_score: i8,

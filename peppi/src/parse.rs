@@ -280,11 +280,8 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 
 	r.read_u8()?; // unused (build number)
 	let bitfield = {
-		let mut buf = [0; 3];
-		buf[0] = r.read_u8()?; // bitfield 1
-		buf[1] = r.read_u8()?; // bitfield 2
-		r.read_u8()?; // ???
-		buf[2] = r.read_u8()?; // bitfield 3
+		let mut buf = [0; 4];
+		r.read_exact(&mut buf)?;
 		buf
 	};
 	r.read_u32::<BE>()?; // ???
