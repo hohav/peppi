@@ -1,4 +1,8 @@
-pseudo_enum!(Item: u16 {
+use serde::Serialize;
+use peppi_derive::Arrow;
+use super::primitives::{Direction, Port, Position, Velocity};
+
+pseudo_enum!(Type: u16 {
 	000 => CAPSULE,
 	001 => BOX,
 	002 => BARREL,
@@ -231,3 +235,22 @@ pseudo_enum!(Item: u16 {
 	235 => GREAT_FOX_LASER,
 	236 => BIRDO_EGG,
 });
+
+pseudo_enum!(State: u8 {
+});
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
+pub struct Item {
+	pub id: u32,
+	pub r#type: Type,
+	pub state: State,
+	pub direction: Option<Direction>,
+	pub position: Position,
+	pub velocity: Velocity,
+	pub damage: u16,
+	pub timer: f32,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	#[slippi(version = "3.2")] pub misc: Option<[u8; 4]>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	#[slippi(version = "3.5")] pub owner: Option<Option<Port>>,
+}

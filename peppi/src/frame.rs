@@ -128,28 +128,12 @@ pub struct PortData {
 	pub follower: Option<Box<Data>>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
-pub struct Item {
-	pub id: u32,
-	pub r#type: item::Item,
-	pub state: u8,
-	pub direction: Option<Direction>,
-	pub position: Position,
-	pub velocity: Velocity,
-	pub damage: u16,
-	pub timer: f32,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "3.2")] pub misc: Option<[u8; 4]>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "3.5")] pub owner: Option<Option<Port>>,
-}
-
 #[derive(Clone, Debug, PartialEq, Arrow)]
 pub struct Frame<const N: usize> {
 	pub ports: [PortData; N],
 	#[slippi(version = "2.2")] pub start: Option<Start>,
 	#[slippi(version = "3.0")] pub end: Option<End>,
-	#[slippi(version = "3.0")] pub items: Option<Vec<Item>>,
+	#[slippi(version = "3.0")] pub items: Option<Vec<item::Item>>,
 }
 
 // workaround for Serde not supporting const generics

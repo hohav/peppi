@@ -6,10 +6,10 @@ use peppi::{
 	action_state::{State, Zelda},
 	buttons::{Logical, Physical},
 	character::{Internal, External},
-	frame::{self, Buttons},
+	frame::Buttons,
 	game::{DashBack, End, EndMethod, Frames, Game, Player, PlayerType, Start, ShieldDrop, Ucf},
 	slippi::{Slippi, Version},
-	item::Item,
+	item::{self, Item},
 	metadata::{self, Metadata},
 	primitives::{Direction, Port, Position, Velocity},
 	stage::Stage,
@@ -377,7 +377,7 @@ fn items() -> Result<(), String> {
 	let game = game("items")?;
 	match game.frames {
 		Frames::P2(frames) => {
-			let mut items: HashMap<u32, frame::Item> = HashMap::new();
+			let mut items: HashMap<u32, Item> = HashMap::new();
 			for f in frames {
 				for i in f.items.unwrap() {
 					if !items.contains_key(&i.id) {
@@ -385,38 +385,38 @@ fn items() -> Result<(), String> {
 					}
 				}
 			}
-			assert_eq!(items[&0], frame::Item {
+			assert_eq!(items[&0], Item {
 				id: 0,
 				damage: 0,
 				direction: Some(Direction::Right),
 				position: Position { x: -62.7096061706543, y: -1.4932749271392822 },
-				state: 0,
+				state: item::State(0),
 				timer: 140.0,
-				r#type: Item::PEACH_TURNIP,
+				r#type: item::Type::PEACH_TURNIP,
 				velocity: Velocity { x: 0.0, y: 0.0 },
 				misc: Some([5, 5, 5, 5]),
 				owner: Some(Some(Port::P1)),
 			});
-			assert_eq!(items[&1], frame::Item {
+			assert_eq!(items[&1], Item {
 				id: 1,
 				damage: 0,
 				direction: Some(Direction::Left),
 				position: Position { x: 20.395559310913086, y: -1.4932749271392822 },
-				state: 0,
+				state: item::State(0),
 				timer: 140.0,
-				r#type: Item::PEACH_TURNIP,
+				r#type: item::Type::PEACH_TURNIP,
 				velocity: Velocity { x: 0.0, y: 0.0 },
 				misc: Some([5, 0, 5, 5]),
 				owner: Some(Some(Port::P1)),
 			});
-			assert_eq!(items[&2], frame::Item {
+			assert_eq!(items[&2], Item {
 				id: 2,
 				damage: 0,
 				direction: Some(Direction::Right),
 				position: Position { x: -3.982539176940918, y: -1.4932749271392822 },
-				state: 0,
+				state: item::State(0),
 				timer: 140.0,
-				r#type: Item::PEACH_TURNIP,
+				r#type: item::Type::PEACH_TURNIP,
 				velocity: Velocity { x: 0.0, y: 0.0 },
 				misc: Some([5, 0, 5, 5]),
 				owner: Some(Some(Port::P1)),

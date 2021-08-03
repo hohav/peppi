@@ -5,6 +5,7 @@ use serde_json::{Map, Value};
 use super::{
 	frame::{self, Frame, PortData},
 	game::{self, Frames, Game, NUM_PORTS},
+	item,
 	metadata,
 	parse::{self, Indexed},
 };
@@ -23,7 +24,7 @@ pub struct GameParser {
 	pub frames_end: Vec<frame::End>,
 	pub frames_leaders: FrameEvents,
 	pub frames_followers: FrameEvents,
-	pub items: Vec<Vec<frame::Item>>,
+	pub items: Vec<Vec<item::Item>>,
 	pub metadata: Option<Map<String, Value>>,
 }
 
@@ -179,7 +180,7 @@ impl parse::Handlers for GameParser {
 		Ok(())
 	}
 
-	fn item(&mut self, evt: parse::FrameEvent<parse::FrameId, frame::Item>) -> Result<()> {
+	fn item(&mut self, evt: parse::FrameEvent<parse::FrameId, item::Item>) -> Result<()> {
 		let idx = evt.id.array_index();
 		while self.items.len() <= idx {
 			self.items.push(Vec::new());

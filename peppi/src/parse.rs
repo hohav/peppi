@@ -19,7 +19,7 @@ use super::{
 	frame::{self, Pre, Post},
 	game::{self, NUM_PORTS, Netplay, Player, PlayerType},
 	ground,
-	item,
+	item::{self, Item},
 	primitives::{Direction, Port, Position, Velocity},
 	slippi,
 	stage,
@@ -407,15 +407,15 @@ fn frame_end(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::End>> {
 	})
 }
 
-fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Item>> {
+fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, Item>> {
 	let id = FrameId { index: r.read_i32::<BE>()? };
 	trace!("Item Update: {:?}", id);
-	let item_type = item::Item(r.read_u16::<BE>()?);
+	let r#type = item::Type(r.read_u16::<BE>()?);
 	Ok(FrameEvent {
 		id: id,
-		event: frame::Item {
-			r#type: item_type,
-			state: r.read_u8()?,
+		event: Item {
+			r#type: r#type,
+			state: item::State(r.read_u8()?),
 			direction: maybe_direction(r.read_f32::<BE>()?)?,
 			velocity: Velocity {
 				x: r.read_f32::<BE>()?,
@@ -687,7 +687,7 @@ pub trait Handlers {
 	fn frame_end(&mut self, _: FrameEvent<FrameId, frame::End>) -> Result<()> { Ok(()) }
 
 	/// One event per frame per item, with a maximum of 15 updates per frame. Can be used for stats, training AIs, or visualization engines to handle items. Items include projectiles like lasers or needles.
-	fn item(&mut self, _: FrameEvent<FrameId, frame::Item>) -> Result<()> { Ok(()) }
+	fn item(&mut self, _: FrameEvent<FrameId, Item>) -> Result<()> { Ok(()) }
 
 	/// Called after all parse events have been handled.
 	fn finalize(&mut self) -> Result<()> { Ok(()) }

@@ -13,6 +13,7 @@ use super::{
 	action_state,
 	frame,
 	game,
+	item,
 	primitives::{Direction, Port},
 };
 
@@ -116,7 +117,7 @@ pub fn frames_to_arrow(game: &game::Game, opts: Option<Opts>) -> StructArray {
 #[derive(peppi_derive::Arrow)]
 struct FrameItem {
 	frame_index: u32,
-	item: frame::Item,
+	item: item::Item,
 }
 
 fn _items_to_arrow<const N: usize>(frames: &Vec<frame::Frame<N>>, context: PeppiContext) -> Option<StructArray> {
