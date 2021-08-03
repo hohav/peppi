@@ -1,4 +1,5 @@
-use std::fmt::{Debug, Display, Formatter, Result};
+use std::convert::TryFrom;
+use std::fmt::{self, Debug, Display, Formatter};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
 use peppi_derive::Arrow;
@@ -13,7 +14,7 @@ pub enum Port {
 }
 
 impl Display for Port {
-	fn fmt(&self, f: &mut Formatter) -> Result {
+	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
 		use Port::*;
 		match *self {
 			P1 => write!(f, "P1"),
@@ -37,6 +38,30 @@ pub enum Direction { Left, Right }
 impl Default for Direction {
 	fn default() -> Self {
 		Self::Left
+	}
+}
+
+/// Melee represents direction as f32 for some reason
+impl TryFrom<f32> for Direction {
+	type Error = std::io::ErrorKind;
+
+	fn try_from(x: f32) -> Result<Self, Self::Error> {
+		if x < 0.0 {
+			Ok(Direction::Left)
+		} else if x > 0.0 {
+			Ok(Direction::Right)
+		} else {
+			Err(Self::Error::InvalidData)
+		}
+	}
+}
+
+impl From<Direction> for f32 {
+	fn from(d: Direction) -> Self {
+		match d {
+			Direction::Left => -1.0,
+			Direction::Right => 1.0,
+		}
 	}
 }
 

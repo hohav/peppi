@@ -20,7 +20,7 @@ use super::{
 	game::{self, NUM_PORTS, Netplay, Player, PlayerType},
 	ground,
 	item::{self, Item},
-	primitives::{Direction, Port, Position, Velocity},
+	primitives::{Port, Position, Velocity},
 	slippi,
 	stage,
 	triggers,
@@ -130,19 +130,6 @@ where F: FnOnce(&mut &[u8]) -> Result<T> {
 		true => None,
 		_ => Some(f(r)?),
 	})
-}
-
-fn maybe_direction(value: f32) -> Result<Option<Direction>> {
-	match value {
-		v if v == -1.0 => Ok(Some(Direction::Left)),
-		v if v ==  1.0 => Ok(Some(Direction::Right)),
-		v if v ==  0.0 => Ok(None),
-		v => Err(err!("invalid direction: {}", v)),
-	}
-}
-
-fn direction(value: f32) -> Result<Direction> {
-	maybe_direction(value)?.ok_or(err!("missing direction (0.0)"))
 }
 
 /// Reads the Event Payloads event, which must come first in the raw stream
@@ -437,7 +424,14 @@ fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, Item>> {
 		event: Item {
 			r#type: r#type,
 			state: item::State(r.read_u8()?),
-			direction: maybe_direction(r.read_f32::<BE>()?)?,
+			direction: {
+				let x = r.read_f32::<BE>()?;
+				if x == 0.0 {
+					None
+				} else {
+					Some(x.try_into()?)
+				}
+			},
 			velocity: Velocity {
 				x: r.read_f32::<BE>()?,
 				y: r.read_f32::<BE>()?,
@@ -488,7 +482,7 @@ fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result
 		x: r.read_f32::<BE>()?,
 		y: r.read_f32::<BE>()?,
 	};
-	let direction = direction(r.read_f32::<BE>()?)?;
+	let direction = r.read_f32::<BE>()?.try_into()?;
 	let joystick = Position {
 		x: r.read_f32::<BE>()?,
 		y: r.read_f32::<BE>()?,
@@ -577,7 +571,7 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 		x: r.read_f32::<BE>()?,
 		y: r.read_f32::<BE>()?,
 	};
-	let direction = direction(r.read_f32::<BE>()?)?;
+	let direction = r.read_f32::<BE>()?.try_into()?;
 	let damage = r.read_f32::<BE>()?;
 	let shield = r.read_f32::<BE>()?;
 	let last_attack_landed = {
