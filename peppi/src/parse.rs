@@ -70,6 +70,14 @@ pub struct FrameId {
 	pub index: i32,
 }
 
+impl FrameId {
+	fn new(index: i32) -> FrameId {
+		FrameId {
+			index: index,
+		}
+	}
+}
+
 impl Indexed for FrameId {
 	fn index(&self) -> i32 {
 		self.index
@@ -86,6 +94,16 @@ pub struct PortId {
 	pub index: i32,
 	pub port: Port,
 	pub is_follower: bool,
+}
+
+impl PortId {
+	pub fn new(index: i32, port: u8, is_follower: bool) -> Result<PortId> {
+		Ok(PortId {
+			index: index,
+			port: Port::try_from(port).map_err(|e| err!("invalid port: {:?}", e))?,
+			is_follower: is_follower,
+		})
+	}
 }
 
 impl Indexed for PortId {
@@ -389,7 +407,7 @@ fn game_end(r: &mut &[u8]) -> Result<game::End> {
 }
 
 fn frame_start(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Start>> {
-	let id = FrameId { index: r.read_i32::<BE>()? };
+	let id = FrameId::new(r.read_i32::<BE>()?);
 	trace!("Frame Start: {:?}", id);
 	Ok(FrameEvent {
 		id: id,
@@ -400,7 +418,7 @@ fn frame_start(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Start>> {
 }
 
 fn frame_end(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::End>> {
-	let id = FrameId { index: r.read_i32::<BE>()? };
+	let id = FrameId::new(r.read_i32::<BE>()?);
 	trace!("Frame End: {:?}", id);
 	Ok(FrameEvent {
 		id: id,
@@ -411,7 +429,7 @@ fn frame_end(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::End>> {
 }
 
 fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, Item>> {
-	let id = FrameId { index: r.read_i32::<BE>()? };
+	let id = FrameId::new(r.read_i32::<BE>()?);
 	trace!("Item Update: {:?}", id);
 	let r#type = item::Type(r.read_u16::<BE>()?);
 	Ok(FrameEvent {
@@ -458,11 +476,7 @@ fn predict_character(id: PortId, last_char_states: &[CharState; NUM_PORTS]) -> I
 }
 
 fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result<FrameEvent<PortId, Pre>> {
-	let id = PortId {
-		index: r.read_i32::<BE>()?,
-		port: Port::try_from(r.read_u8()?).map_err(|e| err!("invalid port: {:?}", e))?,
-		is_follower: r.read_u8()? != 0,
-	};
+	let id = PortId::new(r.read_i32::<BE>()?, r.read_u8()?, r.read_u8()? != 0)?;
 	trace!("Pre-Frame Update: {:?}", id);
 
 	let character = predict_character(id, last_char_states);
@@ -554,11 +568,7 @@ fn update_last_char_state(id: PortId, character: Internal, state: State, last_ch
 }
 
 fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> Result<FrameEvent<PortId, Post>> {
-	let id = PortId {
-		index: r.read_i32::<BE>()?,
-		port: Port::try_from(r.read_u8()?).map_err(|e| err!("invalid port: {:?}", e))?,
-		is_follower: r.read_u8()? != 0,
-	};
+	let id = PortId::new(r.read_i32::<BE>()?, r.read_u8()?, r.read_u8()? != 0)?;
 	trace!("Post-Frame Update: {:?}", id);
 
 	let character = Internal(r.read_u8()?);
