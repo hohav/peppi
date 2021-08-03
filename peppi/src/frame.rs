@@ -8,6 +8,7 @@ use super::{
 	attack,
 	buttons,
 	character,
+	ground,
 	item,
 	primitives::{Direction, Port, Position, Velocity},
 	triggers,
@@ -102,7 +103,7 @@ pub struct Post {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "2.0")] pub airborne: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "2.0")] pub ground: Option<u16>,
+	#[slippi(version = "2.0")] pub ground: Option<ground::Ground>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "2.0")] pub jumps: Option<u8>,
 	#[serde(skip_serializing_if = "Option::is_none")]

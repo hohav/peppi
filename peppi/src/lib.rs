@@ -28,6 +28,7 @@ pub mod character;
 pub mod frame;
 pub mod game;
 pub mod game_parser;
+pub mod ground;
 pub mod item;
 pub mod metadata;
 pub mod parse;

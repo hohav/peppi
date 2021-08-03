@@ -18,6 +18,7 @@ use super::{
 	character::{self, Internal},
 	frame::{self, Pre, Post},
 	game::{self, NUM_PORTS, Netplay, Player, PlayerType},
+	ground,
 	item,
 	primitives::{Direction, Port, Position, Velocity},
 	slippi,
@@ -588,7 +589,7 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 	})?;
 	let misc_as = if_more(r, |r| r.read_f32::<BE>())?;
 	let airborne = if_more(r, |r| Ok(r.read_u8()? != 0))?;
-	let ground = if_more(r, |r| r.read_u16::<BE>())?;
+	let ground = if_more(r, |r| Ok(ground::Ground(r.read_u16::<BE>()?)))?;
 	let jumps = if_more(r, |r| r.read_u8())?;
 	let l_cancel = if_more(r, |r| Ok(
 		match r.read_u8()? {
