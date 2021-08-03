@@ -92,7 +92,7 @@ pub struct Player {
 	pub netplay: Option<Netplay>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Scene {
 	pub minor: u8,
 	pub major: u8,
