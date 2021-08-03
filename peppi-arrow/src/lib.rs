@@ -75,7 +75,7 @@ macro_rules! primitives {
 			}
 
 			fn read(&mut self, array: ArrayRef, idx: usize) {
-				*self = array.as_any().downcast_ref::<PrimitiveArray::<$arrow_type>>().unwrap().value(idx)
+				*self = array.as_any().downcast_ref::<PrimitiveArray::<$arrow_type>>().unwrap().value(idx);
 			}
 		}
 	)* }
