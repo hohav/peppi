@@ -285,7 +285,9 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 		r.read_exact(&mut buf)?;
 		buf
 	};
-	r.read_u32::<BE>()?; // ???
+	r.read_u16::<BE>()?; // ???
+	let is_raining_bombs = r.read_u8()? != 0;
+	r.read_u8()?; // ???
 	let is_teams = r.read_u8()? != 0;
 	r.read_u16::<BE>()?; // ???
 	let item_spawn_frequency = r.read_i8()?;
@@ -359,6 +361,7 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 	Ok(game::Start {
 		slippi: slippi,
 		bitfield: bitfield,
+		is_raining_bombs: is_raining_bombs,
 		is_teams: is_teams,
 		item_spawn_frequency: item_spawn_frequency,
 		self_destruct_score: self_destruct_score,

@@ -102,6 +102,7 @@ pub struct Scene {
 pub struct Start {
 	pub slippi: slippi::Slippi,
 	pub bitfield: [u8; 4],
+	pub is_raining_bombs: bool,
 	pub is_teams: bool,
 	pub item_spawn_frequency: i8,
 	pub self_destruct_score: i8,

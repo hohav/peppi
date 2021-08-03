@@ -88,6 +88,7 @@ fn basic_game() -> Result<(), String> {
 	assert_eq!(game.start, Start {
 		slippi: Slippi { version: Version(1, 0, 0) },
 		bitfield: [50, 1, 134, 76],
+		is_raining_bombs: false,
 		is_teams: false,
 		item_spawn_frequency: -1,
 		self_destruct_score: -1,
