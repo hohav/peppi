@@ -7,7 +7,8 @@ use std::{
 
 use byteorder::ReadBytesExt;
 use encoding_rs::SHIFT_JIS;
-use log::{debug, trace};
+use log::{info, debug, trace};
+use serde_json;
 
 type BE = byteorder::BigEndian;
 
@@ -157,7 +158,9 @@ fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, HashMap<u8, u16>)> {
 		sizes.insert(r.read_u8()?, r.read_u16::<BE>()?);
 	}
 
-	trace!("Event payload sizes: {:?}", sizes);
+	info!("Event payload sizes: {{{}}}",
+		sizes.iter().map(|(k, v)| format!("0x{:x}: {}", k, v)).collect::<Vec<_>>().join(", "));
+
 	Ok((1 + size as usize, sizes)) // +1 byte for the event code
 }
 
@@ -788,7 +791,7 @@ pub fn parse<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: Option
 	// Since we already read the opening "{" from the `metadata` value,
 	// we know it's a map. `parse_map` will consume the corresponding "}".
 	let metadata = ubjson::parse_map(&mut r)?;
-	debug!("Raw metadata: {:?}", metadata);
+	info!("Raw metadata: {}", serde_json::to_string(&metadata)?);
 	handlers.metadata(metadata)?;
 
 	expect_bytes(&mut r, &[0x7d])?; // top-level closing brace ("}")

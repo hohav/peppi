@@ -48,7 +48,7 @@ macro_rules! into_game {
 		for p in &ports {
 			match $gp.frames_leaders.pre[*p].len() {
 				n if n == frame_count => (),
-				n => Err(err!("mismatched pre-frame counts: {}, {}", frame_count, n))?,
+				n => Err(err!("mismatched pre-frame counts: {}: {}, {}", p, frame_count, n))?,
 			}
 		}
 
