@@ -12,6 +12,7 @@ use super::{
 };
 
 pub const NUM_PORTS: usize = 4;
+pub const MAX_PLAYERS: usize = 6;
 pub const FIRST_FRAME_INDEX: i32 = -123;
 
 /// We can parse files with higher versions than this, but we won't expose all information.
@@ -112,6 +113,10 @@ pub struct Start {
 	pub damage_ratio: f32,
 	pub players: Vec<Player>,
 	pub random_seed: u32,
+
+	#[serde(skip)] #[doc(hidden)]
+	pub raw_bytes: Vec<u8>,
+
 	// v1.5
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_pal: Option<bool>,
@@ -159,11 +164,19 @@ impl Frames {
 	}
 }
 
+#[derive(Debug, PartialEq)]
+pub struct GeckoCodes {
+	pub bytes: Vec<u8>,
+	pub actual_size: u16,
+}
+
 /// Replay data for a single game of Melee.
 ///
 /// See https://github.com/project-slippi/slippi-wiki/blob/master/SPEC.md.
 #[derive(PartialEq, Serialize)]
 pub struct Game {
+	#[serde(skip)] #[doc(hidden)]
+	pub gecko_codes: Option<GeckoCodes>,
 	pub start: Start,
 	pub end: End,
 	pub frames: Frames,

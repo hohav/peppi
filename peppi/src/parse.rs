@@ -18,7 +18,7 @@ use super::{
 	buttons,
 	character::{self, Internal},
 	frame::{self, Pre, Post},
-	game::{self, NUM_PORTS, Netplay, Player, PlayerType},
+	game::{self, MAX_PLAYERS, NUM_PORTS, Netplay, Player, PlayerType},
 	ground,
 	item::{self, Item},
 	primitives::{Port, Position, Velocity},
@@ -46,11 +46,11 @@ struct CharState {
 	age: u32,
 }
 
-const PAYLOADS_EVENT_CODE: u8 = 0x35;
+pub(super) const PAYLOADS_EVENT_CODE: u8 = 0x35;
 
-#[derive(Clone, Copy, Debug, PartialEq, num_enum::TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, num_enum::TryFromPrimitive)]
 #[repr(u8)]
-enum Event {
+pub(super) enum Event {
 	GameStart = 0x36,
 	FramePre = 0x37,
 	FramePost = 0x38,
@@ -58,6 +58,7 @@ enum Event {
 	FrameStart = 0x3A,
 	Item = 0x3B,
 	FrameEnd = 0x3C,
+	GeckoCodes = 0x3D,
 }
 
 pub trait Indexed {
@@ -155,7 +156,9 @@ fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, HashMap<u8, u16>)> {
 
 	let mut sizes = HashMap::new();
 	for _ in (0 .. size - 1).step_by(3) {
-		sizes.insert(r.read_u8()?, r.read_u16::<BE>()?);
+		let code = r.read_u8()?;
+		let size = r.read_u16::<BE>()?;
+		sizes.insert(code, size);
 	}
 
 	info!("Event payload sizes: {{{}}}",
@@ -166,11 +169,13 @@ fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, HashMap<u8, u16>)> {
 
 fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3: Option<[u8; 16]>, v3_9: Option<[u8; 41]>) -> Result<Option<Player>> {
 	let mut r = &v0[..];
+	let mut unmapped = [0; 15];
+
 	let character = character::External(r.read_u8()?);
 	let r#type = game::PlayerType(r.read_u8()?);
 	let stocks = r.read_u8()?;
 	let costume = r.read_u8()?;
-	r.read_exact(&mut [0; 3])?; // ???
+	r.read_exact(&mut unmapped[0..3])?;
 	let team_shade = r.read_u8()?;
 	let handicap = r.read_u8()?;
 	let team_color = r.read_u8()?;
@@ -183,9 +188,9 @@ fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3
 			false => None,
 		}
 	};
-	r.read_u16::<BE>()?; // ???
+	r.read_exact(&mut unmapped[3..5])?;
 	let bitfield = r.read_u8()?;
-	r.read_u16::<BE>()?; // ???
+	r.read_exact(&mut unmapped[5..7])?;
 	let cpu_level = {
 		let cpu_level = r.read_u8()?;
 		match r#type {
@@ -193,11 +198,11 @@ fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3
 			_ => None,
 		}
 	};
-	r.read_u32::<BE>()?; // ???
+	r.read_exact(&mut unmapped[7..11])?;
 	let offense_ratio = r.read_f32::<BE>()?;
 	let defense_ratio = r.read_f32::<BE>()?;
 	let model_scale = r.read_f32::<BE>()?;
-	r.read_u32::<BE>()?; // ???
+	r.read_exact(&mut unmapped[11..15])?;
 	// total bytes: 0x24
 
 	// v1.0
@@ -283,42 +288,42 @@ fn player_bytes_v1_0(r: &mut &[u8]) -> Result<[u8; 8]> {
 }
 
 fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
+	let raw_bytes = r.to_vec();
 	let slippi = slippi::Slippi {
 		version: slippi::Version(r.read_u8()?, r.read_u8()?, r.read_u8()?),
 	};
-
 	r.read_u8()?; // unused (build number)
+
+	let mut unmapped = [0; 73];
 	let bitfield = {
 		let mut buf = [0; 4];
 		r.read_exact(&mut buf)?;
 		buf
 	};
-	r.read_u16::<BE>()?; // ???
+	r.read_exact(&mut unmapped[0..2])?;
 	let is_raining_bombs = r.read_u8()? != 0;
-	r.read_u8()?; // ???
+	r.read_exact(&mut unmapped[2..3])?;
 	let is_teams = r.read_u8()? != 0;
-	r.read_u16::<BE>()?; // ???
+	r.read_exact(&mut unmapped[3..5])?;
 	let item_spawn_frequency = r.read_i8()?;
 	let self_destruct_score = r.read_i8()?;
-	r.read_u8()?; // ???
+	r.read_exact(&mut unmapped[5..6])?;
 	let stage = stage::Stage(r.read_u16::<BE>()?);
 	let timer = r.read_u32::<BE>()?;
-	r.read_exact(&mut [0; 15])?; // ???
+	r.read_exact(&mut unmapped[6..21])?;
 	let item_spawn_bitfield = {
 		let mut buf = [0; 5];
 		r.read_exact(&mut buf)?;
 		buf
 	};
-	r.read_u64::<BE>()?; // ???
+	r.read_exact(&mut unmapped[21..29])?;
 	let damage_ratio = r.read_f32::<BE>()?;
-	r.read_exact(&mut [0; 44])?; // ???
+	r.read_exact(&mut unmapped[29..73])?;
 	// @0x65
-	let mut players_v0 = [[0; 36]; 4];
+	let mut players_v0 = [[0; 36]; MAX_PLAYERS];
 	for p in &mut players_v0 {
 		r.read_exact(p)?;
 	}
-	// @0xf5
-	r.read_exact(&mut [0; 72])?; // ???
 	// @0x13d
 	let random_seed = r.read_u32::<BE>()?;
 
@@ -379,6 +384,7 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 		damage_ratio: damage_ratio,
 		players: players,
 		random_seed: random_seed,
+		raw_bytes: raw_bytes,
 		// v1.5
 		is_pal: is_pal,
 		// v2.0
@@ -615,18 +621,22 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 
 	// v3.5
 	let velocities = if_more(r, |r| Ok({
-		let autogenous_air_x = r.read_f32::<BE>()?;
+		let autogenous_x_air = r.read_f32::<BE>()?;
 		let autogenous_y = r.read_f32::<BE>()?;
 		let knockback_x = r.read_f32::<BE>()?;
 		let knockback_y = r.read_f32::<BE>()?;
-		let autogenous_ground_x = r.read_f32::<BE>()?;
+		let autogenous_x_ground = r.read_f32::<BE>()?;
 		frame::Velocities {
 			autogenous: Velocity {
 				x: match airborne.unwrap() {
-					true => autogenous_air_x,
-					_ => autogenous_ground_x,
+					true => autogenous_x_air,
+					_ => autogenous_x_ground,
 				},
 				y: autogenous_y,
+			},
+			autogenous_x: frame::AutogenousXVelocity {
+				air: autogenous_x_air,
+				ground: autogenous_x_ground,
 			},
 			knockback: Velocity {
 				x: knockback_x,
@@ -680,6 +690,9 @@ pub trait Handlers {
 	// Descriptions below partially copied from the Slippi spec:
 	// https://github.com/project-slippi/slippi-wiki/blob/master/SPEC.md
 
+	/// List of enabled Gecko codes. Currently unparsed.
+	fn gecko_codes(&mut self, _codes: &Vec<u8>, _actual_size: u16) -> Result<()> { Ok(()) }
+
 	/// How the game is set up; also includes the version of the extraction code.
 	fn game_start(&mut self, _: game::Start) -> Result<()> { Ok(()) }
 	/// The end of the game.
@@ -713,18 +726,54 @@ fn expect_bytes<R: Read>(r: &mut R, expected: &[u8]) -> Result<()> {
 	}
 }
 
+fn handle_splitter_event(buf: &[u8], accumulator: &mut Option<Vec<u8>>) -> Result<Option<u8>> {
+	assert_eq!(buf.len(), 516);
+	let actual_size = (&buf[512 .. 514]).read_u16::<BE>()?;
+	assert!(actual_size <= 512);
+	let wrapped_event = buf[514];
+	let is_final = buf[515] != 0;
+
+	if accumulator.is_none() {
+		*accumulator = Some(Vec::new());
+	}
+	let accumulator = accumulator.as_mut().unwrap();
+
+	// bytes beyond `actual_size` are meaningless,
+	// but save them anyway for lossless round-tripping
+	accumulator.extend_from_slice(&buf[0 .. 512]);
+
+	Ok(match is_final {
+		true => Some(wrapped_event),
+		_ => None,
+	})
+}
+
 /// Parses a single event from the raw stream. If the event is one of the
 /// supported `Event` types, calls the corresponding `Handler` callback with
 /// the parsed event.
 ///
 /// Returns the number of bytes read by this function.
-fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_char_states: &mut [CharState; NUM_PORTS], handlers: &mut H) -> Result<(usize, Option<Event>)> {
-	let code = r.read_u8()?;
+fn event<R: Read, H: Handlers>(
+		mut r: R,
+		payload_sizes: &HashMap<u8, u16>,
+		last_char_states: &mut [CharState; NUM_PORTS],
+		handlers: &mut H,
+		splitter_accumulator: &mut Option<Vec<u8>>,
+	) -> Result<(usize, Option<Event>)> {
+	let mut code = r.read_u8()?;
 	debug!("Event: {:#x}", code);
 
 	let size = *payload_sizes.get(&code).ok_or_else(|| err!("unknown event: {}", code))? as usize;
 	let mut buf = vec![0; size];
 	r.read_exact(&mut *buf)?;
+
+	if code == 0x10 { // message splitter
+		if let Some(wrapped_event) = handle_splitter_event(&buf, splitter_accumulator)? {
+			code = wrapped_event;
+			buf.clear();
+			buf.append(splitter_accumulator.as_mut().unwrap());
+		}
+	};
 
 	let event = Event::try_from(code).ok();
 	if let Some(event) = event {
@@ -737,6 +786,7 @@ fn event<R: Read, H: Handlers>(mut r: R, payload_sizes: &HashMap<u8, u16>, last_
 			FramePost => handlers.frame_post(frame_post(&mut &*buf, last_char_states)?)?,
 			FrameEnd => handlers.frame_end(frame_end(&mut &*buf)?)?,
 			Item => handlers.item(item(&mut &*buf)?)?,
+			GeckoCodes => handlers.gecko_codes(&buf, payload_sizes[&(GeckoCodes as u8)])?,
 		};
 	}
 
@@ -765,6 +815,8 @@ pub fn parse<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: Option
 	let mut last_event: Option<Event> = None;
 	let skip_frames = opts.map(|o| o.skip_frames).unwrap_or(false);
 
+	let mut splitter_accumulator = None;
+
 	// `raw_len` will be 0 for an in-progress replay
 	while (raw_len == 0 || bytes_read < raw_len) && last_event != Some(Event::GameEnd) {
 		if skip_frames && last_event == Some(Event::GameStart) {
@@ -775,7 +827,13 @@ pub fn parse<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: Option
 			io::copy(&mut r.by_ref().take(skip as u64), &mut io::sink())?;
 			bytes_read += skip;
 		}
-		let (bytes, event) = event(r.by_ref(), &payload_sizes, &mut last_char_states, handlers)?;
+		let (bytes, event) = event(
+			r.by_ref(),
+			&payload_sizes,
+			&mut last_char_states,
+			handlers,
+			&mut splitter_accumulator,
+		)?;
 		bytes_read += bytes;
 		last_event = event;
 	}

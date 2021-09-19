@@ -37,6 +37,7 @@ pub mod slippi;
 pub mod stage;
 pub mod triggers;
 pub mod ubjson;
+pub mod unparse;
 
 use std::{
 	error,
@@ -94,8 +95,9 @@ pub fn parse<R: Read, H: parse::Handlers>(r: &mut R, handlers: &mut H, opts: Opt
 }
 
 /// Parse a Slippi replay from `r`, returning a `game::Game` object.
-pub fn game<R: Read>(r: &mut R, opts: Option<parse::Opts>) -> Result<game::Game, ParseError> {
+pub fn game<R: Read>(r: &mut R, parse_opts: Option<parse::Opts>, collect_opts: Option<game_parser::Opts>) -> Result<game::Game, ParseError> {
 	let mut game_parser: game_parser::GameParser = Default::default();
-	parse(r, &mut game_parser, opts)
+	game_parser.opts = collect_opts.unwrap_or(Default::default());
+	parse(r, &mut game_parser, parse_opts)
 		.and_then(|_| game_parser.into_game().map_err(|e| ParseError { error: e, pos: None }))
 }

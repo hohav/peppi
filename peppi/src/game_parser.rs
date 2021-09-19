@@ -4,11 +4,17 @@ use serde_json::{Map, Value};
 
 use super::{
 	frame::{self, Frame, PortData},
-	game::{self, Frames, Game, NUM_PORTS},
+	game::{self, Frames, Game, GeckoCodes, NUM_PORTS},
 	item,
 	metadata,
-	parse::{self, Indexed},
+	parse::{self, FrameEvent, FrameId, Indexed, PortId},
+	primitives::Port,
 };
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Opts {
+	pub rollbacks: bool,
+}
 
 #[derive(Debug, Default)]
 pub struct FrameEvents {
@@ -18,8 +24,13 @@ pub struct FrameEvents {
 
 #[derive(Debug, Default)]
 pub struct GameParser {
+	pub opts: Opts,
+	pub first_port: Option<Port>,
+
+	pub gecko_codes: Option<GeckoCodes>,
 	pub start: Option<game::Start>,
 	pub end: Option<game::End>,
+	pub frames_index: Vec<i32>,
 	pub frames_start: Vec<frame::Start>,
 	pub frames_end: Vec<frame::End>,
 	pub frames_leaders: FrameEvents,
@@ -62,6 +73,10 @@ macro_rules! into_game {
 		let mut frames = Vec::with_capacity(frame_count);
 		for n in 0 .. frame_count {
 			frames.push(Frame {
+				index: match $gp.opts.rollbacks {
+					true => $gp.frames_index[n],
+					_ => n as i32 + game::FIRST_FRAME_INDEX,
+				},
 				start: $gp.frames_start.get(n).copied(),
 				end: $gp.frames_end.get(n).copied(),
 				ports: [ $(
@@ -89,6 +104,7 @@ macro_rules! into_game {
 		}
 
 		Game {
+			gecko_codes: $gp.gecko_codes,
 			start: start,
 			end: end,
 			frames: Frames::$frames_type(frames),
@@ -113,23 +129,25 @@ impl GameParser {
 	}
 }
 
-fn append_frame_event<Id, Event>(v: &mut Vec<Event>, evt: parse::FrameEvent<Id, Event>) -> Result<()> where Id: parse::Indexed, Event: Copy {
-	let idx = evt.id.array_index();
-	if idx == v.len() {
-		v.push(evt.event);
-	} else if idx < v.len() { // rollback
-		v[idx] = evt.event;
-	} else {
-		// is this appropriate for Frame Start & Frame End?
-		if let Some(&last) = v.last() {
-			while v.len() < idx {
-				v.push(last);
-			}
-		} else {
-			Err(err!("missing initial frame data: {:?}", evt.id.index()))?;
-		}
+fn append_frame_event<Id, Event>(v: &mut Vec<Event>, evt: FrameEvent<Id, Event>, opts: Opts) -> Result<usize> where Id: Indexed, Event: Copy {
+	let idx = match opts.rollbacks {
+		true => v.len(),
+		_ => evt.id.array_index(),
+	};
+
+	while v.len() < idx {
+		// fill in missing values by duplicating the last value
+		// FIXME: determine whether this is appropriate for Frame Start & Frame End
+		v.push(*v.last().ok_or_else(|| err!("missing initial frame data: {:?}", evt.id.index()))?);
 	}
-	Ok(())
+
+	if idx < v.len() {
+		v[idx] = evt.event; // rollback
+	} else {
+		v.push(evt.event);
+	}
+
+	Ok(idx)
 }
 
 /// fills in missing frame data for eliminated players by duplicating their last-seen data
@@ -146,6 +164,14 @@ macro_rules! append_missing_frame_data {
 }
 
 impl parse::Handlers for GameParser {
+	fn gecko_codes(&mut self, codes: &Vec<u8>, actual_size: u16) -> Result<()> {
+		self.gecko_codes = Some(GeckoCodes {
+			bytes: codes.clone(),
+			actual_size: actual_size,
+		});
+		Ok(())
+	}
+
 	fn game_start(&mut self, s: game::Start) -> Result<()> {
 		self.start = Some(s);
 		Ok(())
@@ -156,40 +182,50 @@ impl parse::Handlers for GameParser {
 		Ok(())
 	}
 
-	fn frame_start(&mut self, evt: parse::FrameEvent<parse::FrameId, frame::Start>) -> Result<()> {
-		append_frame_event(&mut self.frames_start, evt)?;
-		Ok(())
-	}
-
-	fn frame_pre(&mut self, evt: parse::FrameEvent<parse::PortId, frame::Pre>) -> Result<()> {
-		match evt.id.is_follower {
-			true => Ok(append_frame_event(&mut self.frames_followers.pre[evt.id.port as usize], evt)?),
-			_ => Ok(append_frame_event(&mut self.frames_leaders.pre[evt.id.port as usize], evt)?),
-		}
-	}
-
-	fn frame_post(&mut self, evt: parse::FrameEvent<parse::PortId, frame::Post>) -> Result<()> {
-		match evt.id.is_follower {
-			true => Ok(append_frame_event(&mut self.frames_followers.post[evt.id.port as usize], evt)?),
-			_ => Ok(append_frame_event(&mut self.frames_leaders.post[evt.id.port as usize], evt)?),
-		}
-	}
-
-	fn frame_end(&mut self, evt: parse::FrameEvent<parse::FrameId, frame::End>) -> Result<()> {
-		append_frame_event(&mut self.frames_end, evt)?;
-		Ok(())
-	}
-
-	fn item(&mut self, evt: parse::FrameEvent<parse::FrameId, item::Item>) -> Result<()> {
-		let idx = evt.id.array_index();
+	fn frame_start(&mut self, evt: FrameEvent<FrameId, frame::Start>) -> Result<()> {
+		let idx = append_frame_event(&mut self.frames_start, evt, self.opts)?;
+		// reset items list in case of rollback
 		while self.items.len() <= idx {
 			self.items.push(Vec::new());
 		}
-		let v = &mut self.items[idx];
-		match v.iter().position(|i| i.id == evt.event.id) {
-			Some(idx) => v[idx] = evt.event, // rollback
-			_ => v.push(evt.event),
+		self.items[idx] = Vec::new();
+		Ok(())
+	}
+
+	fn frame_pre(&mut self, evt: FrameEvent<PortId, frame::Pre>) -> Result<()> {
+		if self.first_port.is_none() {
+			self.first_port = Some(evt.id.port);
+		}
+		if Some(evt.id.port) == self.first_port {
+			self.frames_index.push(evt.id.index);
+		}
+		match evt.id.is_follower {
+			true => append_frame_event(&mut self.frames_followers.pre[evt.id.port as usize], evt, self.opts)?,
+			_ => append_frame_event(&mut self.frames_leaders.pre[evt.id.port as usize], evt, self.opts)?,
 		};
+		Ok(())
+	}
+
+	fn frame_post(&mut self, evt: FrameEvent<PortId, frame::Post>) -> Result<()> {
+		match evt.id.is_follower {
+			true => append_frame_event(&mut self.frames_followers.post[evt.id.port as usize], evt, self.opts)?,
+			_ => append_frame_event(&mut self.frames_leaders.post[evt.id.port as usize], evt, self.opts)?,
+		};
+		Ok(())
+	}
+
+	fn frame_end(&mut self, evt: FrameEvent<FrameId, frame::End>) -> Result<()> {
+		append_frame_event(&mut self.frames_end, evt, self.opts)?;
+		Ok(())
+	}
+
+	fn item(&mut self, evt: FrameEvent<FrameId, item::Item>) -> Result<()> {
+		assert!(self.items.len() > 0);
+		let idx = match self.opts.rollbacks {
+			true => self.items.len() - 1,
+			_ => evt.id.array_index(),
+		};
+		self.items[idx].push(evt.event);
 		Ok(())
 	}
 

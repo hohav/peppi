@@ -13,12 +13,17 @@ use peppi::{
 	metadata::{self, Metadata},
 	primitives::{Direction, Port, Position, Velocity},
 	stage::Stage,
+	unparse,
 };
 
-fn game(name: &str) -> Result<Game, String> {
+fn read_game(path: &str) -> Result<Game, String> {
 	let mut buf = io::BufReader::new(
-		fs::File::open(&format!("tests/data/{}.slp", name)).unwrap());
-	peppi::game(&mut buf, None).map_err(|e| format!("couldn't parse game: {:?}", e))
+		fs::File::open(path).unwrap());
+	peppi::game(&mut buf, None, None).map_err(|e| format!("couldn't parse game: {:?}", e))
+}
+
+fn game(name: &str) -> Result<Game, String> {
+	read_game(&format!("tests/data/{}.slp", name))
 }
 
 fn button_seq(game:&Game) -> Result<Vec<Buttons>, String> {
@@ -142,6 +147,9 @@ fn basic_game() -> Result<(), String> {
 		is_pal: None,
 		is_frozen_ps: None,
 		scene: None,
+		raw_bytes: vec![
+			1, 0, 0, 0, 50, 1, 134, 76, 195, 0, 0, 0, 0, 0, 0, 255, 255, 110, 0, 8, 0, 0, 1, 224, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 4, 3, 0, 0, 0, 0, 9, 0, 120, 0, 192, 0, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 2, 1, 4, 0, 0, 1, 0, 0, 9, 0, 120, 0, 64, 0, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 26, 3, 4, 0, 0, 255, 0, 0, 9, 0, 120, 0, 64, 0, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 26, 3, 4, 0, 0, 255, 0, 0, 9, 0, 120, 0, 64, 0, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 33, 3, 4, 0, 0, 255, 0, 0, 9, 0, 120, 0, 64, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 33, 3, 4, 0, 0, 255, 0, 0, 9, 0, 120, 0, 64, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 226, 176, 35, 114, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+		],
 	});
 
 	assert_eq!(game.end, End {
@@ -425,5 +433,31 @@ fn items() -> Result<(), String> {
 		},
 		_ => Err("wrong number of ports")?,
 	};
+	Ok(())
+}
+
+#[test]
+fn round_trip() -> Result<(), String> {
+	let game1 = game("v2.0")?;
+	let path = "/tmp/peppi_test_round_trip.slp";
+	let mut buf = fs::File::create(path).unwrap();
+	unparse::unparse(&mut buf, &game1).map_err(|e| format!("couldn't unparse game: {:?}", e))?;
+	let game2 = read_game(path)?;
+
+	assert_eq!(game1.start, game2.start);
+	assert_eq!(game1.end, game2.end);
+	assert_eq!(game1.metadata, game2.metadata);
+	assert_eq!(game1.metadata_raw, game2.metadata_raw);
+
+	match (game1.frames, game2.frames) {
+		(Frames::P2(f1), Frames::P2(f2)) => {
+			assert_eq!(f1.len(), f2.len());
+			for idx in 0 .. f1.len() {
+				assert_eq!(f1[idx], f2[idx], "frame: {}", idx);
+			}
+		},
+		_ => Err("wrong number of ports")?,
+	}
+
 	Ok(())
 }

@@ -6,6 +6,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub struct Version(pub u8, pub u8, pub u8);
 
+pub const fn version(major: u8, minor: u8) -> Version {
+	Version(major, minor, 0)
+}
+
 pub struct ParseVersionError(pub String);
 
 impl From<std::num::ParseIntError> for ParseVersionError {

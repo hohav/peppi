@@ -64,6 +64,14 @@ pub struct End {
 pub struct Velocities {
 	pub autogenous: Velocity,
 	pub knockback: Velocity,
+	#[serde(skip)] #[doc(hidden)]
+	pub autogenous_x: AutogenousXVelocity,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
+pub struct AutogenousXVelocity {
+	pub air: f32,
+	pub ground: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
@@ -130,6 +138,7 @@ pub struct PortData {
 
 #[derive(Clone, Debug, PartialEq, Arrow)]
 pub struct Frame<const N: usize> {
+	pub index: i32,
 	pub ports: [PortData; N],
 	#[slippi(version = "2.2")] pub start: Option<Start>,
 	#[slippi(version = "3.0")] pub end: Option<End>,
@@ -140,6 +149,8 @@ pub struct Frame<const N: usize> {
 impl<const N: usize> Serialize for Frame<N> {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
 		let mut state = serializer.serialize_struct("Frame", 1)?;
+
+		state.serialize_field("index", &self.index)?;
 
 		if let Some(start) = self.start {
 			state.serialize_field("start", &start)?;
