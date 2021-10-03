@@ -12,19 +12,24 @@ use serde_json;
 
 type BE = byteorder::BigEndian;
 
-use super::{
-	action_state::{self, Common, State},
-	attack::Attack,
-	buttons,
-	character::{self, Internal},
-	frame::{self, Pre, Post},
-	game::{self, MAX_PLAYERS, NUM_PORTS, Netplay, Player, PlayerType},
-	ground,
-	item::{self, Item},
-	primitives::{Port, Position, Velocity},
-	slippi,
-	stage,
-	triggers,
+use crate::{
+	model::{
+		enums::{
+			action_state::{self, Common, State},
+			attack::Attack,
+			character::{self, Internal},
+			ground,
+			item,
+			stage,
+		},
+		buttons,
+		frame::{self, Pre, Post},
+		game::{self, MAX_PLAYERS, NUM_PORTS, Netplay, Player, PlayerType},
+		item::Item,
+		primitives::{Port, Position, Velocity},
+		slippi,
+		triggers,
+	},
 	ubjson,
 };
 
@@ -802,7 +807,7 @@ pub struct Opts {
 }
 
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn parse<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: Option<Opts>) -> Result<()> {
+pub fn deserialize<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: Option<Opts>) -> Result<()> {
 	// For speed, assume the `raw` element comes first and handle it manually.
 	// The official JS parser does this too, so it should be reliable.
 	expect_bytes(&mut r,
@@ -848,7 +853,7 @@ pub fn parse<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: Option
 
 	// Since we already read the opening "{" from the `metadata` value,
 	// we know it's a map. `parse_map` will consume the corresponding "}".
-	let metadata = ubjson::parse_map(&mut r)?;
+	let metadata = ubjson::de::to_map(&mut r)?;
 	info!("Raw metadata: {}", serde_json::to_string(&metadata)?);
 	handlers.metadata(metadata)?;
 

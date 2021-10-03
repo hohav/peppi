@@ -2,13 +2,15 @@ use std::io::Result;
 
 use serde_json::{Map, Value};
 
-use super::{
-	frame::{self, Frame, PortData},
-	game::{self, Frames, Game, GeckoCodes, NUM_PORTS},
-	item,
-	metadata,
-	parse::{self, FrameEvent, FrameId, Indexed, PortId},
-	primitives::Port,
+use crate::{
+	model::{
+		frame::{self, Frame, PortData},
+		game::{self, Frames, Game, GeckoCodes, NUM_PORTS},
+		item,
+		metadata,
+		primitives::Port,
+	},
+	serde::de::{self, FrameEvent, FrameId, Indexed, PortId},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -23,7 +25,7 @@ pub struct FrameEvents {
 }
 
 #[derive(Debug, Default)]
-pub struct GameParser {
+pub struct Collector {
 	pub opts: Opts,
 	pub first_port: Option<Port>,
 
@@ -114,7 +116,7 @@ macro_rules! into_game {
 	}}
 }
 
-impl GameParser {
+impl Collector {
 	pub fn into_game(self) -> Result<Game> {
 		match self.start {
 			None => Err(err!("missing start event")),
@@ -163,7 +165,7 @@ macro_rules! append_missing_frame_data {
 	}
 }
 
-impl parse::Handlers for GameParser {
+impl de::Handlers for Collector {
 	fn gecko_codes(&mut self, codes: &Vec<u8>, actual_size: u16) -> Result<()> {
 		self.gecko_codes = Some(GeckoCodes {
 			bytes: codes.clone(),

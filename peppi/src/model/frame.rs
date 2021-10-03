@@ -3,15 +3,14 @@ use serde::{
 	ser::SerializeStruct,
 };
 
-use super::{
-	action_state,
-	attack,
-	buttons,
-	character,
-	ground,
-	item,
-	primitives::{Direction, Port, Position, Velocity},
-	triggers,
+use crate::{
+	model::{
+		buttons,
+		enums::{action_state, attack, character, ground},
+		item,
+		primitives::{Direction, Port, Position, Velocity},
+		triggers,
+	},
 };
 
 use peppi_derive::Arrow;

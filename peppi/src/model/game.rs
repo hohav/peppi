@@ -2,13 +2,14 @@ use std::fmt::{self, Debug};
 
 use serde::{Deserialize, Serialize};
 
-use super::{
-	character,
-	frame,
-	metadata,
-	primitives::Port,
-	slippi,
-	stage,
+use crate::{
+	model::{
+		enums::{character, stage},
+		frame,
+		metadata,
+		primitives::Port,
+		slippi,
+	},
 };
 
 pub const NUM_PORTS: usize = 4;

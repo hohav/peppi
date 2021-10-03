@@ -17,27 +17,39 @@ pub static mut SERIALIZATION_CONFIG: SerializationConfig = SerializationConfig {
 	enum_names: false,
 };
 
-#[macro_use] #[doc(hidden)] pub mod pseudo_bitmask;
-#[macro_use] #[doc(hidden)] pub mod pseudo_enum;
+pub(crate) mod ubjson {
+	pub(crate) mod de;
+	pub(crate) mod ser;
+}
 
-pub mod action_state;
-pub mod arrow;
-pub mod attack;
-pub mod buttons;
-pub mod character;
-pub mod frame;
-pub mod game;
-pub mod game_parser;
-pub mod ground;
-pub mod item;
-pub mod metadata;
-pub mod parse;
-pub mod primitives;
-pub mod slippi;
-pub mod stage;
-pub mod triggers;
-pub mod ubjson;
-pub mod unparse;
+pub mod model {
+	#[macro_use] #[doc(hidden)] pub(crate) mod pseudo_bitmask;
+	#[macro_use] #[doc(hidden)] pub(crate) mod pseudo_enum;
+
+	pub mod buttons;
+	pub mod frame;
+	pub mod game;
+	pub mod item;
+	pub mod metadata;
+	pub mod primitives;
+	pub mod slippi;
+	pub mod triggers;
+	pub mod enums {
+		pub mod action_state;
+		pub mod attack;
+		pub mod character;
+		pub mod ground;
+		pub mod item;
+		pub mod stage;
+	}
+}
+
+pub mod serde {
+	pub mod arrow;
+	pub mod collect;
+	pub mod de;
+	pub mod ser;
+}
 
 use std::{
 	error,
@@ -85,18 +97,18 @@ impl<R: Read> Read for TrackingReader<R> {
 }
 
 /// Parse a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn parse<R: Read, H: parse::Handlers>(r: &mut R, handlers: &mut H, opts: Option<parse::Opts>) -> std::result::Result<(), ParseError> {
+pub fn parse<R: Read, H: serde::de::Handlers>(r: &mut R, handlers: &mut H, opts: Option<serde::de::Opts>) -> std::result::Result<(), ParseError> {
 	let mut r = TrackingReader {
 		pos: 0,
 		reader: r,
 	};
-	parse::parse(&mut r, handlers, opts)
+	serde::de::deserialize(&mut r, handlers, opts)
 		.map_err(|e| ParseError { error: e, pos: Some(r.pos) })
 }
 
 /// Parse a Slippi replay from `r`, returning a `game::Game` object.
-pub fn game<R: Read>(r: &mut R, parse_opts: Option<parse::Opts>, collect_opts: Option<game_parser::Opts>) -> Result<game::Game, ParseError> {
-	let mut game_parser: game_parser::GameParser = Default::default();
+pub fn game<R: Read>(r: &mut R, parse_opts: Option<serde::de::Opts>, collect_opts: Option<serde::collect::Opts>) -> Result<model::game::Game, ParseError> {
+	let mut game_parser: serde::collect::Collector = Default::default();
 	game_parser.opts = collect_opts.unwrap_or(Default::default());
 	parse(r, &mut game_parser, parse_opts)
 		.and_then(|_| game_parser.into_game().map_err(|e| ParseError { error: e, pos: None }))

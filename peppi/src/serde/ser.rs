@@ -5,12 +5,14 @@ use std::{
 
 use byteorder::{LittleEndian, WriteBytesExt};
 
-use super::{
-	frame,
-	game::{self, Frames, GeckoCodes},
-	item,
-	parse::{PAYLOADS_EVENT_CODE, Event, PortId},
-	slippi::{self, version as ver},
+use crate::{
+	model::{
+		frame,
+		game::{self, Frames, GeckoCodes},
+		item,
+		slippi::{self, version as ver},
+	},
+	serde::de::{PAYLOADS_EVENT_CODE, Event, PortId},
 	ubjson,
 };
 
@@ -281,7 +283,7 @@ fn frames<W: Write, const N: usize>(w: &mut W, frames: &Vec<frame::Frame<N>>, v:
 	Ok(())
 }
 
-pub fn unparse<W: Write + Seek>(w: &mut W, game: &game::Game) -> Result<()> {
+pub fn serialize<W: Write + Seek>(w: &mut W, game: &game::Game) -> Result<()> {
 	w.write_all(
 		&[0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c])?;
 	w.write_u32::<BE>(0)?;
@@ -315,7 +317,7 @@ pub fn unparse<W: Write + Seek>(w: &mut W, game: &game::Game) -> Result<()> {
 
 	w.write_all(
 		&[0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b])?;
-	ubjson::unparse_map(w, &game.metadata_raw)?;
+	ubjson::ser::from_map(w, &game.metadata_raw)?;
 	w.write_all(&[0x7d])?; // closing brace for `metadata`
 	w.write_all(&[0x7d])?; // closing brace for top-level map
 

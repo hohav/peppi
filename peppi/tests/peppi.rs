@@ -3,23 +3,28 @@ use std::{collections::HashMap, fs, io};
 use chrono::{DateTime, Utc};
 
 use peppi::{
-	action_state::{State, Zelda},
-	buttons::{Logical, Physical},
-	character::{Internal, External},
-	frame::Buttons,
-	game::{DashBack, End, EndMethod, Frames, Game, Player, PlayerType, Start, ShieldDrop, Ucf},
-	slippi::{Slippi, Version},
-	item::{self, Item},
-	metadata::{self, Metadata},
-	primitives::{Direction, Port, Position, Velocity},
-	stage::Stage,
-	unparse,
+	model::{
+		buttons::{Logical, Physical},
+		enums::{
+			action_state::{State, Zelda},
+			character::{Internal, External},
+			item,
+			stage::Stage,
+		},
+		frame::Buttons,
+		game::{DashBack, End, EndMethod, Frames, Game, Player, PlayerType, Start, ShieldDrop, Ucf},
+		item::Item,
+		metadata::{self, Metadata},
+		primitives::{Direction, Port, Position, Velocity},
+		slippi::{Slippi, Version},
+	},
+	serde,
 };
 
 fn read_game(path: &str) -> Result<Game, String> {
 	let mut buf = io::BufReader::new(
 		fs::File::open(path).unwrap());
-	peppi::game(&mut buf, None, None).map_err(|e| format!("couldn't parse game: {:?}", e))
+	peppi::game(&mut buf, None, None).map_err(|e| format!("couldn't deserialize game: {:?}", e))
 }
 
 fn game(name: &str) -> Result<Game, String> {
@@ -441,7 +446,7 @@ fn round_trip() -> Result<(), String> {
 	let game1 = game("v2.0")?;
 	let path = "/tmp/peppi_test_round_trip.slp";
 	let mut buf = fs::File::create(path).unwrap();
-	unparse::unparse(&mut buf, &game1).map_err(|e| format!("couldn't unparse game: {:?}", e))?;
+	serde::ser::serialize(&mut buf, &game1).map_err(|e| format!("couldn't serialize game: {:?}", e))?;
 	let game2 = read_game(path)?;
 
 	assert_eq!(game1.start, game2.start);

@@ -12,10 +12,12 @@ use serde::{
 };
 use serde_json::{Map, Value};
 
-use super::{
-	character,
-	game::FIRST_FRAME_INDEX,
-	primitives::Port,
+use crate::{
+	model::{
+		enums::character,
+		game::FIRST_FRAME_INDEX,
+		primitives::Port,
+	},
 };
 
 #[derive(Debug, Default, PartialEq, Serialize)]

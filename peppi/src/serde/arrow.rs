@@ -9,12 +9,14 @@ use arrow::{
 	datatypes::DataType,
 };
 
-use super::{
-	action_state,
-	frame,
-	game,
-	item,
-	primitives::{Direction, Port},
+use crate::{
+	model::{
+		enums::action_state,
+		frame,
+		game,
+		item,
+		primitives::{Direction, Port},
+	},
 };
 
 use peppi_arrow::{Arrow, Context, SlippiVersion};
