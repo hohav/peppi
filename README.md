@@ -23,7 +23,7 @@ use std::{fs, io};
 fn main() {
     let mut buf = io::BufReader::new(
         fs::File::open("game.slp").unwrap());
-    let game = peppi::game(&mut buf, None).unwrap();
+    let game = peppi::game(&mut buf, None, None).unwrap();
     println!("{:#?}", game);
 }
 ```
@@ -33,8 +33,8 @@ fn main() {
 ```rust
 use std::{fs, io};
 
-use peppi::frame;
-use peppi::parse::{Handlers, FrameEvent, PortId};
+use peppi::model::frame;
+use peppi::serde::de::{Handlers, FrameEvent, PortId};
 
 struct FramePrinter {}
 
