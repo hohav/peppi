@@ -180,7 +180,9 @@ pub struct Game {
 	pub start: Start,
 	pub end: End,
 	pub frames: Frames,
+	#[serde(skip)]
 	pub metadata: metadata::Metadata,
+	#[serde(rename = "metadata")]
 	pub metadata_raw: serde_json::Map<String, serde_json::Value>,
 }
 
