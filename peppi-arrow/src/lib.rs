@@ -272,8 +272,8 @@ impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
 
 	fn write<C: Context>(&self, builder: &mut dyn ArrayBuilder, context: C) {
 		let builder = builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap();
-		for i in 0 .. N {
-			self[i].write(builder.field_builder::<T::Builder>(i).unwrap(), context);
+		for (i, x) in self.iter().enumerate() {
+			x.write(builder.field_builder::<T::Builder>(i).unwrap(), context);
 		}
 		builder.append(true).unwrap();
 	}
@@ -288,8 +288,8 @@ impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
 
 	fn read(&mut self, array: ArrayRef, idx: usize) {
 		let struct_array = array.as_any().downcast_ref::<StructArray>().unwrap();
-		for i in 0 .. N {
-			self[i].read(struct_array.column(i).clone(), idx);
+		for (i, x) in self.iter_mut().enumerate() {
+			x.read(struct_array.column(i).clone(), idx);
 		}
 	}
 }

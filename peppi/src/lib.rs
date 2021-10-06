@@ -1,3 +1,6 @@
+#![allow(clippy::zero_prefixed_literal)]
+#![allow(clippy::redundant_field_names)]
+
 macro_rules! err {
 	($( $arg: expr ),*) => {
 		std::io::Error::new(std::io::ErrorKind::InvalidData, format!($( $arg ),*))
@@ -108,8 +111,10 @@ pub fn parse<R: Read, H: serde::de::Handlers>(r: &mut R, handlers: &mut H, opts:
 
 /// Parse a Slippi replay from `r`, returning a `game::Game` object.
 pub fn game<R: Read>(r: &mut R, parse_opts: Option<serde::de::Opts>, collect_opts: Option<serde::collect::Opts>) -> Result<model::game::Game, ParseError> {
-	let mut game_parser: serde::collect::Collector = Default::default();
-	game_parser.opts = collect_opts.unwrap_or(Default::default());
+	let mut game_parser = serde::collect::Collector {
+		opts: collect_opts.unwrap_or_default(),
+		..Default::default()
+	};
 	parse(r, &mut game_parser, parse_opts)
 		.and_then(|_| game_parser.into_game().map_err(|e| ParseError { error: e, pos: None }))
 }

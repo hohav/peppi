@@ -1,6 +1,4 @@
 use darling::{ast, FromDeriveInput, FromField, FromMeta};
-use proc_macro;
-use proc_macro2;
 use quote::{quote, ToTokens};
 //use syn::parse_str;
 

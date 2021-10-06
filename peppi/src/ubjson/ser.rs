@@ -4,7 +4,7 @@ use std::convert::TryInto;
 use byteorder::{BigEndian, WriteBytesExt};
 use serde_json::{Map, Value};
 
-fn write_utf8<W: Write>(w: &mut W, s: &String) -> Result<()> {
+fn write_utf8<W: Write>(w: &mut W, s: &str) -> Result<()> {
 	//FIXME: length in bytes?
 	write!(w, "U")?;
 	w.write_u8(s.len().try_into().unwrap())?;

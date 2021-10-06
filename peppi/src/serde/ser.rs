@@ -246,7 +246,7 @@ fn frame_end<W: Write>(w: &mut W, e: &frame::End, v: slippi::Version, frame_idx:
 	Ok(())
 }
 
-fn frames<W: Write, const N: usize>(w: &mut W, frames: &Vec<frame::Frame<N>>, v: slippi::Version) -> Result<()> {
+fn frames<W: Write, const N: usize>(w: &mut W, frames: &[frame::Frame<N>], v: slippi::Version) -> Result<()> {
 	for f in frames {
 		if v >= ver(2, 2) {
 			frame_start(w, f.start.as_ref().unwrap(), v, f.index)?;
@@ -263,7 +263,7 @@ fn frames<W: Write, const N: usize>(w: &mut W, frames: &Vec<frame::Frame<N>>, v:
 
 		if v >= ver(3, 0) {
 			for i in f.items.as_ref().unwrap() {
-				item(w, &i, v, f.index)?;
+				item(w, i, v, f.index)?;
 			}
 		}
 
@@ -289,7 +289,7 @@ pub fn serialize<W: Write + Seek>(w: &mut W, game: &game::Game) -> Result<()> {
 	w.write_u32::<BE>(0)?;
 	let raw_start = w.stream_position()?;
 
-	let payload_sizes = payload_sizes(&game);
+	let payload_sizes = payload_sizes(game);
 	w.write_u8(PAYLOADS_EVENT_CODE)?;
 	w.write_u8((payload_sizes.len() * 3 + 1).try_into().unwrap())?; // see note in `parse::payload_sizes`
 	for (event, size) in payload_sizes {
@@ -301,7 +301,7 @@ pub fn serialize<W: Write + Seek>(w: &mut W, game: &game::Game) -> Result<()> {
 	game_start(w, &game.start, v)?;
 
 	if let Some(codes) = &game.gecko_codes {
-		gecko_codes(w, &codes)?;
+		gecko_codes(w, codes)?;
 	}
 
 	match &game.frames {

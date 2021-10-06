@@ -96,7 +96,7 @@ fn context(game: &game::Game, opts: Option<Opts>) -> PeppiContext {
 	}
 }
 
-fn _frames_to_arrow<const N: usize>(frames: &Vec<frame::Frame<N>>, context: PeppiContext) -> StructArray {
+fn _frames_to_arrow<const N: usize>(frames: &[frame::Frame<N>], context: PeppiContext) -> StructArray {
 	let mut builder = frame::Frame::<N>::builder(frames.len(), context);
 	for frame in frames {
 		frame.write(&mut builder, context);
@@ -122,7 +122,7 @@ struct FrameItem {
 	item: item::Item,
 }
 
-fn _items_to_arrow<const N: usize>(frames: &Vec<frame::Frame<N>>, context: PeppiContext) -> Option<StructArray> {
+fn _items_to_arrow<const N: usize>(frames: &[frame::Frame<N>], context: PeppiContext) -> Option<StructArray> {
 	if frames[0].items.is_some() {
 		let len = frames.iter().map(|f| f.items.as_ref().unwrap().len()).sum();
 		let mut builder = FrameItem::builder(len, context);

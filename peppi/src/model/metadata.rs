@@ -111,9 +111,9 @@ fn parse_characters(characters: &Map<String, Value>) -> Result<HashMap<character
 					character::Internal(k),
 					usize::try_from(v).map_err(|e| err!("metadata.players.N.characters.{}: invalid duration: {:?}, {:?}", k, v, e))?,
 				)),
-				None => Err(err!("metadata.players.N.characters.{}: expected u64, but got: {:?}", k, v).into()),
+				None => Err(err!("metadata.players.N.characters.{}: expected u64, but got: {:?}", k, v)),
 			},
-			v => Err(err!("metadata.players.N.characters.{}: expected number, but got: {:?}", k, v).into()),
+			v => Err(err!("metadata.players.N.characters.{}: expected number, but got: {:?}", k, v)),
 		}
 	}).collect()
 }
@@ -122,11 +122,11 @@ fn metadata_player(port: Port, player: &Map<String, Value>) -> Result<Player> {
 	Ok(Player {
 		port: port,
 		characters: match player.get("characters") {
-			Some(Value::Object(characters)) => match parse_characters(&characters) {
+			Some(Value::Object(characters)) => match parse_characters(characters) {
 				Ok(characters) => Some(characters),
-				Err(e) => Err(err!("metadata.players.N.characters: parse error: {:?}, {:?}", e, characters))?,
+				Err(e) => return Err(err!("metadata.players.N.characters: parse error: {:?}, {:?}", e, characters)),
 			},
-			characters => Err(err!("metadata.players.N.characters: expected map, but got: {:?}", characters))?,
+			characters => return Err(err!("metadata.players.N.characters: expected map, but got: {:?}", characters)),
 		},
 		netplay: match player.get("names") {
 			None => None,
@@ -138,11 +138,11 @@ fn metadata_player(port: Port, player: &Map<String, Value>) -> Result<Player> {
 						code: code.clone(),
 						name: name.clone(),
 					}),
-					name => Err(err!("metadata.players.N.names.netplay: expected str, but got: {:?}", name))?,
+					name => return Err(err!("metadata.players.N.names.netplay: expected str, but got: {:?}", name)),
 				},
-				code => Err(err!("metadata.players.N.names.code: expected str, but got: {:?}", code))?,
+				code => return Err(err!("metadata.players.N.names.code: expected str, but got: {:?}", code)),
 			},
-			names => Err(err!("metadata.players.N.names: expected map, but got: {:?}", names))?,
+			names => return Err(err!("metadata.players.N.names: expected map, but got: {:?}", names)),
 		},
 	})
 }
@@ -159,11 +159,11 @@ fn players(json: &Map<String, Value>) -> Result<Option<Vec<Player>>> {
 					Ok(port) => match Port::try_from(port) {
 						Ok(port) => match player {
 							Value::Object(player) => result.push(metadata_player(port, player)?),
-							player => Err(err!("metadata.players.{:?}: expected map, but got: {:?}", port, player))?,
+							player => return Err(err!("metadata.players.{:?}: expected map, but got: {:?}", port, player)),
 						},
-						Err(e) => Err(err!("metadata.players: invalid port: {}, {:?}", port, e))?,
+						Err(e) => return Err(err!("metadata.players: invalid port: {}, {:?}", port, e)),
 					},
-					Err(e) => Err(err!("metadata.players: invalid port: {}, {:?}", port, e))?,
+					Err(e) => return Err(err!("metadata.players: invalid port: {}, {:?}", port, e)),
 				};
 			}
 			match result.len() {
@@ -171,7 +171,7 @@ fn players(json: &Map<String, Value>) -> Result<Option<Vec<Player>>> {
 				_ => Ok(Some(result)),
 			}
 		},
-		players => Err(err!("metadata.players: expected map, but got: {:?}", players))?,
+		players => Err(err!("metadata.players: expected map, but got: {:?}", players)),
 	}
 }
 

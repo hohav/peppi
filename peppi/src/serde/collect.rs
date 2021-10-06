@@ -52,7 +52,7 @@ macro_rules! into_game {
 		if let Some(ref players) = metadata.players {
 			let meta_ports: Vec<_> = players.iter().map(|p| p.port as usize).collect();
 			if meta_ports != ports {
-				Err(err!("game-start ports ({:?}) != metadata ports ({:?})", ports, meta_ports))?;
+				return Err(err!("game-start ports ({:?}) != metadata ports ({:?})", ports, meta_ports));
 			}
 		}
 
@@ -61,14 +61,14 @@ macro_rules! into_game {
 		for p in &ports {
 			match $gp.frames_leaders.pre[*p].len() {
 				n if n == frame_count => (),
-				n => Err(err!("mismatched pre-frame counts: {}: {}, {}", p, frame_count, n))?,
+				n => return Err(err!("mismatched pre-frame counts: {}: {}, {}", p, frame_count, n)),
 			}
 		}
 
 		for p in &ports {
 			match $gp.frames_leaders.post[*p].len() {
 				n if n == frame_count => (),
-				n => Err(err!("mismatched post-frame counts: {}, {}", frame_count, n))?,
+				n => return Err(err!("mismatched post-frame counts: {}, {}", frame_count, n)),
 			}
 		}
 
@@ -96,7 +96,7 @@ macro_rules! into_game {
 									pre: pre[n],
 									post: post[n],
 								})),
-								_ => Err(err!("inconsistent follower data (frame: {})", n))?,
+								_ => return Err(err!("inconsistent follower data (frame: {})", n)),
 							}
 						},
 					},
@@ -166,9 +166,9 @@ macro_rules! append_missing_frame_data {
 }
 
 impl de::Handlers for Collector {
-	fn gecko_codes(&mut self, codes: &Vec<u8>, actual_size: u16) -> Result<()> {
+	fn gecko_codes(&mut self, codes: &[u8], actual_size: u16) -> Result<()> {
 		self.gecko_codes = Some(GeckoCodes {
-			bytes: codes.clone(),
+			bytes: codes.to_vec(),
 			actual_size: actual_size,
 		});
 		Ok(())
@@ -222,7 +222,7 @@ impl de::Handlers for Collector {
 	}
 
 	fn item(&mut self, evt: FrameEvent<FrameId, item::Item>) -> Result<()> {
-		assert!(self.items.len() > 0);
+		assert!(!self.items.is_empty());
 		let idx = match self.opts.rollbacks {
 			true => self.items.len() - 1,
 			_ => evt.id.array_index(),

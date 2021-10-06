@@ -148,7 +148,7 @@ where F: FnOnce(&mut &[u8]) -> Result<T> {
 fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, HashMap<u8, u16>)> {
 	let code = r.read_u8()?;
 	if code != PAYLOADS_EVENT_CODE {
-		Err(err!("expected event payloads, but got: {}", code))?;
+		return Err(err!("expected event payloads, but got: {}", code));
 	}
 
 	// Size in bytes of the subsequent list of payload-size kv pairs.
@@ -156,7 +156,7 @@ fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, HashMap<u8, u16>)> {
 	// However the value includes this size byte itself, so it's off-by-one.
 	let size = r.read_u8()?;
 	if size % 3 != 1 {
-		Err(err!("invalid payload size: {}", size))?;
+		return Err(err!("invalid payload size: {}", size));
 	}
 
 	let mut sizes = HashMap::new();
@@ -539,7 +539,7 @@ fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result
 
 fn flags(buf: &[u8; 5]) -> frame::StateFlags {
 	frame::StateFlags(
-		((buf[0] as u64) << 00) +
+		(buf[0] as u64) +
 		((buf[1] as u64) << 08) +
 		((buf[2] as u64) << 16) +
 		((buf[3] as u64) << 24) +
@@ -617,7 +617,7 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 			0 => None,
 			1 => Some(true),
 			2 => Some(false),
-			i => Err(err!("invalid L-Cancel value: {}", i))?,
+			i => return Err(err!("invalid L-Cancel value: {}", i)),
 		}
 	))?;
 
@@ -696,7 +696,7 @@ pub trait Handlers {
 	// https://github.com/project-slippi/slippi-wiki/blob/master/SPEC.md
 
 	/// List of enabled Gecko codes. Currently unparsed.
-	fn gecko_codes(&mut self, _codes: &Vec<u8>, _actual_size: u16) -> Result<()> { Ok(()) }
+	fn gecko_codes(&mut self, _codes: &[u8], _actual_size: u16) -> Result<()> { Ok(()) }
 
 	/// How the game is set up; also includes the version of the extraction code.
 	fn game_start(&mut self, _: game::Start) -> Result<()> { Ok(()) }
@@ -844,7 +844,7 @@ pub fn deserialize<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: 
 	}
 
 	if raw_len != 0 && bytes_read != raw_len {
-		Err(err!("failed to consume expected number of bytes: {}, {}", raw_len, bytes_read))?;
+		return Err(err!("failed to consume expected number of bytes: {}, {}", raw_len, bytes_read));
 	}
 
 	expect_bytes(&mut r,

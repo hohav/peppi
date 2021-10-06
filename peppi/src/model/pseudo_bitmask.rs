@@ -7,6 +7,7 @@ macro_rules! pseudo_bitmask {
 			$( pub const $variant:$name = $name($value); )*
 		}
 
+		#[allow(clippy::bad_bit_mask)]
 		impl std::fmt::Debug for $name {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 				match unsafe { crate::SERIALIZATION_CONFIG.enum_names } {
