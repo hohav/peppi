@@ -21,7 +21,7 @@ impl FromMeta for Version {
 }
 
 #[derive(Debug, FromDeriveInput)]
-#[darling(attributes(peppi), supports(struct_any))]
+#[darling(attributes(slippi), supports(struct_any))]
 pub(crate) struct MyInputReceiver {
 	ident: syn::Ident,
 	generics: syn::Generics,
@@ -197,7 +197,7 @@ impl ToTokens for MyInputReceiver {
 }
 
 #[derive(Debug, FromField)]
-#[darling(attributes(peppi))]
+#[darling(attributes(slippi))]
 pub(crate) struct MyFieldReceiver {
 	ident: Option<syn::Ident>,
 	ty: syn::Type,
