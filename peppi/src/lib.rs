@@ -69,9 +69,9 @@ pub struct ParseError {
 impl fmt::Display for ParseError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		if let Some(pos) = self.pos {
-			write!(f, "error parsing game ({}): {}", pos, self.error)
+			write!(f, "parse error @{:#x}: {}", pos, self.error)
 		} else {
-			write!(f, "error parsing game: {}", self.error)
+			write!(f, "parse error: {}", self.error)
 		}
 	}
 }
