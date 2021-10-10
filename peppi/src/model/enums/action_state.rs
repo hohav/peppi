@@ -1,6 +1,8 @@
 use std::fmt;
 use super::character::Internal;
 
+const MAX_COMMON_STATE: u16 = 340;
+
 macro_rules! state {
 	($name: ident {
 		$unknown: ident,
@@ -17,7 +19,7 @@ macro_rules! state {
 
 		impl $name {
 			pub fn from(value: u16, character: Internal) -> $name {
-				if value <= 340 {
+				if value <= MAX_COMMON_STATE {
 					$name::$common($common_type(value))
 				} else {
 					match character {
@@ -95,23 +97,13 @@ impl Default for State {
 	}
 }
 
-/// The u16 representation is ambiguous since character-specific enum values overlap.
-/// So we prepend a character byte to make a u32 (with a byte in between for padding).
-impl From<u32> for State {
-	fn from(n: u32) -> State {
-		let bytes = n.to_le_bytes();
-		let character_byte = bytes[0];
-		let state_bytes = [bytes[2], bytes[3]];
-		// should we reject if bytes[1] is not 0?
-		State::from(u16::from_le_bytes(state_bytes), Internal(character_byte))
-	}
-}
-
-impl From<State> for u32 {
-	fn from(state: State) -> u32 {
-		let state_bytes = u16::from(state).to_le_bytes();
-		let character = state.character().map(|c| c.0).unwrap_or(0);
-		u32::from_le_bytes([character, 0, state_bytes[0], state_bytes[1]])
+impl From<u16> for State {
+	fn from(n: u16) -> State {
+		if n <= MAX_COMMON_STATE {
+			State::Common(Common(n))
+		} else {
+			State::Unknown(n)
+		}
 	}
 }
 

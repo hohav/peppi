@@ -69,7 +69,7 @@ macro_rules! arrow {
 arrow!(
 	Port: u8,
 	Direction: u8,
-	action_state::State: u32,
+	action_state::State: u16,
 );
 
 #[derive(Clone, Copy, Debug)]
