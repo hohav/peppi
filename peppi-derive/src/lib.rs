@@ -1,6 +1,5 @@
 use darling::{ast, FromDeriveInput, FromField, FromMeta};
 use quote::{quote, ToTokens};
-//use syn::parse_str;
 
 type Result<T> = std::result::Result<T, darling::Error>;
 
