@@ -10,7 +10,7 @@ In your `Cargo.toml`:
 
 ```toml
 [dependencies]
-peppi = "1.0.0-alpha.4"
+peppi = "1.0.0-alpha.5"
 ```
 
 ## Usage
