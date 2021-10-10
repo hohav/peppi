@@ -180,8 +180,6 @@ pub struct GeckoCodes {
 /// See https://github.com/project-slippi/slippi-wiki/blob/master/SPEC.md.
 #[derive(PartialEq, Serialize)]
 pub struct Game {
-	#[serde(skip)] #[doc(hidden)]
-	pub gecko_codes: Option<GeckoCodes>,
 	pub start: Start,
 	pub end: End,
 	pub frames: Frames,
@@ -189,6 +187,8 @@ pub struct Game {
 	pub metadata: metadata::Metadata,
 	#[serde(rename = "metadata")]
 	pub metadata_raw: serde_json::Map<String, serde_json::Value>,
+	#[serde(skip)] #[doc(hidden)]
+	pub gecko_codes: Option<GeckoCodes>,
 }
 
 impl Debug for Game {
