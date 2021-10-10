@@ -153,32 +153,35 @@ pub fn items_to_arrow(game: &game::Game, opts: Option<Opts>) -> Option<StructArr
 	}
 }
 
-fn _frames_from_arrow<const N: usize>(array: ArrayRef, frames: &mut Vec<frame::Frame::<N>>) {
-	let old_len = frames.len();
-	for i in 0 .. array.len() {
+/*
+fn _frames_from_arrow<const N: usize>(arr: ArrayRef) -> Vec<frame::Frame<N>> {
+	let mut frames = Vec::new();
+	for i in 0 .. arr.len() {
 		frames.push(frame::Frame::<N>::default());
-		frames[old_len + i].read(array.clone(), i);
+		frames[i].read(arr.clone(), i);
 	}
+	frames
 }
 
-/* Not ready for public use
-pub fn frames_from_arrow(array: ArrayRef) -> game::Game {
-	let sarray = array.as_any().downcast_ref::<StructArray>().unwrap();
-	let ports = sarray.column_by_name("ports").unwrap()
-		.as_any().downcast_ref::<StructArray>().unwrap();
-	match ports.num_columns() {
-		2 => {
-			let mut game = game::Game {
-				start: game::Start::default(),
-				end: game::End::default(),
-				frames: game::Frames::P2(Vec::<frame::Frame2>::new()),
-				metadata: metadata::Metadata::default(),
-				metadata_raw: serde_json::Map::new(),
+pub fn game_from_arrow(frames: ArrayRef) -> game::Game {
+	let ports_data_type = frames.as_any().downcast_ref::<StructArray>().expect("expected a `StructArray`").column_by_name("ports").expect("expected `ports`").data_type();
+	match ports_data_type {
+		DataType::Struct(fields) => {
+			let frames = match fields.len() {
+				1 => game::Frames::P1(_frames_from_arrow(frames)),
+				2 => game::Frames::P2(_frames_from_arrow(frames)),
+				3 => game::Frames::P3(_frames_from_arrow(frames)),
+				4 => game::Frames::P4(_frames_from_arrow(frames)),
+				_ => unimplemented!(),
 			};
-			if let game::Frames::P2(ref mut frames) = game.frames {
-				_frames_from_arrow(array, frames);
+			game::Game {
+				start: game::Start::default(), //TODO
+				end: game::End::default(), //TODO
+				frames: frames,
+				metadata: crate::model::metadata::Metadata::default(), //TODO
+				metadata_raw: serde_json::Map::new(), //TODO
+				gecko_codes: None, //TODO
 			}
-			game
 		},
 		_ => unimplemented!(),
 	}
