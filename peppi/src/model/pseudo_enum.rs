@@ -12,6 +12,8 @@ impl std::fmt::Display for ConversionError {
 
 impl std::error::Error for ConversionError { }
 
+// An open "enum" that supports named and unnamed values.
+// Used when not all possible values are known.
 macro_rules! pseudo_enum {
 	($name: ident : $type: ty { $( $value: expr => $variant: ident ),* $(,)? }) => {
 		#[derive(Copy, Clone, Default, PartialEq, Eq, Hash, serde::Deserialize)]
@@ -22,8 +24,23 @@ macro_rules! pseudo_enum {
 			$( pub const $variant:$name = $name($value); )*
 		}
 
+		impl std::convert::TryFrom<$name> for String {
+			type Error = crate::model::pseudo_enum::ConversionError;
+			/// Returns the stringified name for this enum value, if any.
+			fn try_from(e: $name) -> std::result::Result<Self, Self::Error> {
+				match e.0 {
+					$( $value => Ok(stringify!($variant).to_string()), )*
+					_ => Err(Self::Error {
+						r#type: format!("{}::{}", module_path!(), stringify!($name)),
+						value: format!("{}", e.0),
+					}),
+				}
+			}
+		}
+
 		impl std::convert::TryFrom<&str> for $name {
 			type Error = crate::model::pseudo_enum::ConversionError;
+			/// Returns the enum value with the given name, if any.
 			fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
 				match s {
 					$( stringify!($variant) => Ok($name::$variant), )*
@@ -37,9 +54,10 @@ macro_rules! pseudo_enum {
 
 		impl std::fmt::Debug for $name {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+				use std::convert::TryFrom;
 				match unsafe { crate::SERIALIZATION_CONFIG.enum_names } {
-					true => match self.0 {
-						$( $value => write!(f, "{}:{}", self.0, stringify!($variant)), )*
+					true => match String::try_from(*self) {
+						Ok(s) => write!(f, "{}:{}", self.0, s),
 						_ => write!(f, "{}", self.0),
 					},
 					_ => write!(f, "{}", self.0),
