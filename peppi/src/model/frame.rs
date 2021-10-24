@@ -168,8 +168,3 @@ impl<const N: usize> Serialize for Frame<N> {
 		state.end()
 	}
 }
-
-pub type Frame1 = Frame<1>;
-pub type Frame2 = Frame<2>;
-pub type Frame3 = Frame<3>;
-pub type Frame4 = Frame<4>;

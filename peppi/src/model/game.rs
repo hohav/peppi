@@ -148,10 +148,10 @@ pub struct End {
 #[derive(Debug, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Frames {
-	P1(Vec<frame::Frame1>),
-	P2(Vec<frame::Frame2>),
-	P3(Vec<frame::Frame3>),
-	P4(Vec<frame::Frame4>),
+	P1(Vec<frame::Frame<1>>),
+	P2(Vec<frame::Frame<2>>),
+	P3(Vec<frame::Frame<3>>),
+	P4(Vec<frame::Frame<4>>),
 }
 
 impl Frames {
