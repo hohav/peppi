@@ -38,6 +38,7 @@ impl fmt::Display for Version {
 	}
 }
 
+/// Information about the Slippi mod.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Slippi {
 	pub version: Version,

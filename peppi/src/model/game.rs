@@ -14,6 +14,8 @@ use crate::{
 
 pub const NUM_PORTS: usize = 4;
 pub const MAX_PLAYERS: usize = 6;
+
+/// Frame indexes start at -123, and reach 0 at "Go!".
 pub const FIRST_FRAME_INDEX: i32 = -123;
 
 /// We can parse files with higher versions than this, but we won't expose all information.
@@ -55,41 +57,49 @@ pseudo_enum!(ShieldDrop: u32 {
 	2 => ARDUINO,
 });
 
+/// Information about the "Universal Controller Fix" mod.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Ucf {
 	pub dash_back: Option<DashBack>,
 	pub shield_drop: Option<ShieldDrop>,
 }
 
+/// Netplay name & connect code.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Netplay {
 	pub name: String,
 	pub code: String,
 }
 
+/// Information about each player such as character, team, stock count, etc.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Player {
 	pub port: Port,
 
 	pub character: character::External,
 	pub r#type: PlayerType,
+	/// starting stock count
 	pub stocks: u8,
 	pub costume: u8,
 	pub team: Option<Team>,
+	/// handicap level; affects `offense_ratio` & `defense_ratio`
 	pub handicap: u8,
+	/// miscellaneous flags (metal, stamina mode, etc)
 	pub bitfield: u8,
 	pub cpu_level: Option<u8>,
+	/// knockback multiplier when this player hits another
 	pub offense_ratio: f32,
+	/// knockback multiplier when this player is hit
 	pub defense_ratio: f32,
 	pub model_scale: f32,
 
-	// v1_0
+	/// UCF info (added: v1.0)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub ucf: Option<Ucf>,
-	// v1_3
+	/// in-game name-tag (added: v1.3)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub name_tag: Option<String>,
-	// v3.9
+	/// netplay info (added: v3.9)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub netplay: Option<Netplay>,
 }
@@ -100,6 +110,7 @@ pub struct Scene {
 	pub major: u8,
 }
 
+/// Information used to initialize the game such as the game mode, settings, characters & stage.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Start {
 	pub slippi: slippi::Slippi,
@@ -115,16 +126,17 @@ pub struct Start {
 	pub players: Vec<Player>,
 	pub random_seed: u32,
 
+	/// mostly-redundant copy of the raw start block, for round-tripping
 	#[serde(skip)] #[doc(hidden)]
 	pub raw_bytes: Vec<u8>,
 
-	// v1.5
+	/// (added: v1.5)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_pal: Option<bool>,
-	// v2.0
+	/// (added: v2.0)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_frozen_ps: Option<bool>,
-	// v3.7
+	/// (added: v3.7)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub scene: Option<Scene>,
 }
@@ -137,14 +149,19 @@ pseudo_enum!(EndMethod: u8 {
 	7 => NO_CONTEST,
 });
 
+/// Information about the end of the game.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct End {
+	/// how the game ended
 	pub method: EndMethod,
-	// v2.0
+	/// player who LRAS'd, if any (added: v2.0)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub lras_initiator: Option<Option<Port>>,
 }
 
+/// Encapsulates the frame data.
+///
+/// Exists because `peppi::model::frame::Frame` is a const-generic type whose size varies.
 #[derive(Debug, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Frames {
@@ -169,6 +186,9 @@ impl Frames {
 	}
 }
 
+/// Binary blob of Gecko codes in use.
+///
+/// Currently unparsed, but still needed for round-tripping.
 #[derive(Debug, PartialEq)]
 pub struct GeckoCodes {
 	pub bytes: Vec<u8>,
