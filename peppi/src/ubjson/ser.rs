@@ -1,5 +1,4 @@
 use std::io::{Write, Result};
-use std::convert::TryInto;
 
 use byteorder::{BigEndian, WriteBytesExt};
 use serde_json::{Map, Value};

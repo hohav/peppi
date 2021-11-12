@@ -1,5 +1,4 @@
 use std::{
-	convert::TryInto,
 	io::{Result, Seek, SeekFrom, Write},
 };
 

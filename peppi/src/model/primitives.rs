@@ -1,4 +1,3 @@
-use std::convert::TryFrom;
 use std::fmt::{self, Debug, Display, Formatter};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};

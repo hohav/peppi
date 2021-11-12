@@ -54,7 +54,6 @@ macro_rules! pseudo_enum {
 
 		impl std::fmt::Debug for $name {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-				use std::convert::TryFrom;
 				match unsafe { crate::SERIALIZATION_CONFIG.enum_names } {
 					true => match String::try_from(*self) {
 						Ok(s) => write!(f, "{}:{}", self.0, s),
