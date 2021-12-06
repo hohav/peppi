@@ -111,9 +111,10 @@ impl ToTokens for MyInputReceiver {
 			));
 			arrow_writers.extend(
 				quote!(
+					let x: Option<usize> = None;
 					if num_fields > #i {
 						self.#ident.write(
-							builder.field_builder::<<#ty as ::peppi_arrow::Arrow>::Builder>(#i).unwrap(),
+							builder.field_builder::<<#ty as ::peppi_arrow::Arrow>::Builder>(#i).expect(stringify!(Failed to create builder for: #ident)),
 							context,
 						);
 					}
@@ -123,7 +124,7 @@ impl ToTokens for MyInputReceiver {
 				quote!(
 					if num_fields > #i {
 						<#ty>::write_null(
-							builder.field_builder::<<#ty as ::peppi_arrow::Arrow>::Builder>(#i).unwrap(),
+							builder.field_builder::<<#ty as ::peppi_arrow::Arrow>::Builder>(#i).expect(stringify!(Failed to create null builder for: #ident)),
 							context,
 						);
 					}
@@ -131,7 +132,7 @@ impl ToTokens for MyInputReceiver {
 			);
 			arrow_readers.extend(
 				if f.version.is_some() {
-					let wrapped = wrapped_type(ty).unwrap();
+					let wrapped = wrapped_type(ty).expect(stringify!(Failed to unwrap type for: #ident));
 					quote!(
 						if struct_array.num_columns() > #i {
 							let mut value = <#wrapped as ::peppi_arrow::Arrow>::default();
@@ -169,26 +170,31 @@ impl ToTokens for MyInputReceiver {
 				fn builder<C: ::peppi_arrow::Context>(len: usize, context: C) -> Self::Builder {
 					let version = context.slippi_version();
 					let fields = Self::fields(context);
-					let builders = vec![#arrow_builders].into_iter().filter_map(|f| f).collect();
+					let builders: Vec<_> = vec![#arrow_builders].into_iter().filter_map(|f| f).collect();
 					::arrow::array::StructBuilder::new(fields, builders)
 				}
 
 				fn write<C: ::peppi_arrow::Context>(&self, builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
-					let builder = builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap();
+					let builder = builder.as_any_mut().downcast_mut::<Self::Builder>()
+						.expect(stringify!(Failed to downcast builder for: #ident));
 					let num_fields = builder.num_fields();
 					#arrow_writers
-					builder.append(true).unwrap();
+					builder.append(true)
+						.expect(stringify!(Failed to append for: #ident));
 				}
 
 				fn write_null<C: ::peppi_arrow::Context>(builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
-					let builder = builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap();
+					let builder = builder.as_any_mut().downcast_mut::<Self::Builder>()
+						.expect(stringify!(Failed to downcast null builder for: #ident));
 					let num_fields = builder.num_fields();
 					#arrow_null_writers
-					builder.append(false).unwrap();
+					builder.append(false)
+						.expect(stringify!(Failed to append null for: #ident));
 				}
 
 				fn read(&mut self, array: ::arrow::array::ArrayRef, idx: usize) {
-					let struct_array = array.as_any().downcast_ref::<arrow::array::StructArray>().unwrap();
+					let struct_array = array.as_any().downcast_ref::<arrow::array::StructArray>()
+						.expect(stringify!(Failed to downcast array for: #ident));
 					#arrow_readers
 				}
 			}
@@ -207,8 +213,8 @@ pub(crate) struct MyFieldReceiver {
 
 #[proc_macro_derive(Arrow, attributes(slippi))]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	let ast = syn::parse(input).expect("Couldn't parse item");
-	build_converters(ast).unwrap()
+	let ast = syn::parse(input).expect("Failed to parse item");
+	build_converters(ast).expect("Failed to build converters")
 }
 
 fn build_converters(ast: syn::DeriveInput) -> Result<proc_macro::TokenStream> {
