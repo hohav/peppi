@@ -32,7 +32,7 @@ fn if_ver(version: Option<Version>, inner: proc_macro2::TokenStream) -> proc_mac
 	match version {
 		Some(version) => {
 			let Version(major, minor) = version;
-			quote!(match version.0 >= #major && version.1 >= #minor {
+			quote!(match version.0 > #major || (version.0 == #major && version.1 >= #minor) {
 				true => Some(#inner),
 				_ => None,
 			},)
