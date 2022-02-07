@@ -165,6 +165,7 @@ pub struct PortData {
 	/// Frame data for the follower, if any (Nana).
 	// Boxing reduces memory usage greatly for most characters,
 	// at the expense of pointer dereferences for Nana.
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub follower: Option<Box<Data>>,
 }
 
