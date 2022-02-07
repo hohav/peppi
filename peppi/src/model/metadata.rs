@@ -182,12 +182,14 @@ fn console(json: &Map<String, Value>) -> Result<Option<String>> {
 	}
 }
 
-pub fn parse(json: &Map<String, Value>) -> Result<Metadata> {
-	Ok(Metadata {
-		date: date(json)?,
-		duration: duration(json)?,
-		platform: platform(json)?,
-		players: players(json)?,
-		console: console(json)?,
-	})
+impl Metadata {
+	pub fn parse(json: &Map<String, Value>) -> Result<Metadata> {
+		Ok(Metadata {
+			date: date(json)?,
+			duration: duration(json)?,
+			platform: platform(json)?,
+			players: players(json)?,
+			console: console(json)?,
+		})
+	}
 }

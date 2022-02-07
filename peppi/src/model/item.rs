@@ -1,4 +1,5 @@
 use serde::Serialize;
+
 use peppi_derive::Arrow;
 use crate::model::{
 	enums::item::{State, Type},

@@ -1,5 +1,5 @@
 use std::{
-	io::{Result, Seek, SeekFrom, Write},
+	io::{Result, Write},
 };
 
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -7,7 +7,7 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use crate::{
 	model::{
 		frame,
-		game::{self, Frames, GeckoCodes},
+		game::{self, Frames, Game, GeckoCodes},
 		item,
 		slippi::{self, version as ver},
 	},
@@ -17,7 +17,7 @@ use crate::{
 
 type BE = byteorder::BigEndian;
 
-fn payload_sizes(game: &game::Game) -> Vec<(u8, u16)> {
+fn payload_sizes(game: &Game) -> Vec<(u8, u16)> {
 	let start = &game.start;
 	let v = start.slippi.version;
 	let mut sizes = Vec::new();
@@ -293,13 +293,62 @@ fn frames<W: Write, const N: usize>(w: &mut W, frames: &[frame::Frame<N>], v: sl
 	Ok(())
 }
 
-pub fn serialize<W: Write + Seek>(w: &mut W, game: &game::Game) -> Result<()> {
+#[derive(Debug)]
+struct FrameCounts {
+	frames: u32,
+	frame_data: u32,
+	items: u32,
+}
+
+fn frame_counts<const N: usize>(frames: &Vec<frame::Frame<N>>) -> FrameCounts {
+	FrameCounts {
+		frames: frames.len().try_into().unwrap(),
+		frame_data: frames.iter().map(|f|
+			f.ports.iter().map(|p| match p.follower {
+				None => 1,
+				_ => 2,
+			}).sum::<u32>(),
+		).sum::<u32>(),
+		items: frames.iter().flat_map(|f| f.items.as_ref().map(|i| i.len() as u32)).sum(),
+	}
+}
+
+fn gecko_codes_size(gecko_codes: &GeckoCodes) -> u32 {
+	assert_eq!(gecko_codes.bytes.len() % 512, 0);
+	let num_blocks = u32::try_from(gecko_codes.bytes.len()).unwrap() / 512;
+	num_blocks * (512 + 5)
+}
+
+fn raw_size(game: &Game, payload_sizes: &Vec<(u8, u16)>) -> u32 {
+	use Event::*;
+
+	let counts = match &game.frames {
+		Frames::P1(f) => frame_counts(&f),
+		Frames::P2(f) => frame_counts(&f),
+		Frames::P3(f) => frame_counts(&f),
+		Frames::P4(f) => frame_counts(&f),
+	};
+
+	let sizes: std::collections::HashMap<u8, u16> = payload_sizes.iter().map(|(k, v)| (*k, *v)).collect();
+	1 + 1 + (3 * payload_sizes.len() as u32) // Payload sizes
+		+ 1 + sizes[&(GameStart as u8)] as u32 // GameStart
+		+ 1 + sizes[&(GameEnd as u8)] as u32 // GameEnd
+		+ counts.frame_data * (1 + sizes[&(FramePre as u8)] as u32) // FramePre
+		+ counts.frame_data * (1 + sizes[&(FramePost as u8)] as u32) // FramePost
+		+ sizes.get(&(FrameStart as u8)).map(|s| counts.frames * (1 + *s as u32)).unwrap_or(0) // FrameStart
+		+ sizes.get(&(FrameEnd as u8)).map(|s| counts.frames * (1 + *s as u32)).unwrap_or(0) // FrameEnd
+		+ sizes.get(&(Item as u8)).map(|s| counts.items * (1 + *s as u32)).unwrap_or(0) // Item
+		+ game.gecko_codes.as_ref().map(gecko_codes_size).unwrap_or(0)
+}
+
+pub fn serialize<W: Write>(w: &mut W, game: &Game) -> Result<()> {
+	let payload_sizes = payload_sizes(game);
+	let raw_size = raw_size(&game, &payload_sizes);
+
 	w.write_all(
 		&[0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c])?;
-	w.write_u32::<BE>(0)?;
-	let raw_start = w.stream_position()?;
+	w.write_u32::<BE>(raw_size)?;
 
-	let payload_sizes = payload_sizes(game);
 	w.write_u8(PAYLOADS_EVENT_CODE)?;
 	w.write_u8((payload_sizes.len() * 3 + 1).try_into().unwrap())?; // see note in `parse::payload_sizes`
 	for (event, size) in payload_sizes {
@@ -323,16 +372,11 @@ pub fn serialize<W: Write + Seek>(w: &mut W, game: &game::Game) -> Result<()> {
 
 	game_end(w, &game.end, v)?;
 
-	let raw_len = w.stream_position()? - raw_start;
-
 	w.write_all(
 		&[0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b])?;
 	ubjson::ser::from_map(w, &game.metadata_raw)?;
 	w.write_all(&[0x7d])?; // closing brace for `metadata`
 	w.write_all(&[0x7d])?; // closing brace for top-level map
-
-	w.seek(SeekFrom::Start(11))?;
-	w.write_u32::<BE>(raw_len as u32)?;
 
 	Ok(())
 }

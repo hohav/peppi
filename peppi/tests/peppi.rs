@@ -161,6 +161,7 @@ fn basic_game() -> Result<(), String> {
 	assert_eq!(game.end, End {
 		method: EndMethod::RESOLVED,
 		lras_initiator: None,
+		raw_bytes: vec![3],
 	});
 
 	match game.frames {

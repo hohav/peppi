@@ -10,6 +10,7 @@ use crate::{
 		primitives::Port,
 		slippi,
 	},
+	serde::de,
 };
 
 pub const NUM_PORTS: usize = 4;
@@ -152,6 +153,12 @@ pub struct Start {
 	pub language: Option<Language>,
 }
 
+impl Start {
+	pub fn from_bytes(bytes: &[u8]) -> std::io::Result<Self> {
+		de::game_start(&mut bytes.clone())
+	}
+}
+
 pseudo_enum!(EndMethod: u8 {
 	0 => UNRESOLVED,
 	1 => TIME,
@@ -165,9 +172,20 @@ pseudo_enum!(EndMethod: u8 {
 pub struct End {
 	/// how the game ended
 	pub method: EndMethod,
+
+	/// mostly-redundant copy of the raw start block, for round-tripping
+	#[serde(skip)] #[doc(hidden)]
+	pub raw_bytes: Vec<u8>,
+
 	/// player who LRAS'd, if any (added: v2.0)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub lras_initiator: Option<Option<Port>>,
+}
+
+impl End {
+	pub fn from_bytes(bytes: &[u8]) -> std::io::Result<Self> {
+		de::game_end(&mut bytes.clone())
+	}
 }
 
 /// Encapsulates the frame data.

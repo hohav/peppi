@@ -1,6 +1,7 @@
 use std::fmt::{self, Debug, Display, Formatter};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
+
 use peppi_derive::Arrow;
 
 #[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize, IntoPrimitive, TryFromPrimitive)]

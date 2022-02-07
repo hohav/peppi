@@ -82,9 +82,9 @@ impl ToTokens for MyInputReceiver {
 
 		let mut arrow_defaults = quote!();
 		let mut arrow_fields = quote!();
-		let mut arrow_builders = quote!();
-		let mut arrow_writers = quote!();
-		let mut arrow_null_writers = quote!();
+		let mut arrow_arrays = quote!();
+		let mut arrow_pushers = quote!();
+		let mut arrow_null_pushers = quote!();
 		let mut arrow_readers = quote!();
 
 		for (i, f) in fields.into_iter().enumerate() {
@@ -95,38 +95,31 @@ impl ToTokens for MyInputReceiver {
 			let ty = &f.ty;
 			arrow_defaults.extend(
 				quote!(
-					#ident: <#ty as ::peppi_arrow::Arrow>::default(),
+					#ident: <#ty as ::peppi_arrow::Arrow>::arrow_default(),
 				)
 			);
 			arrow_fields.extend(if_ver(f.version,
-				quote!(::arrow::datatypes::Field::new(
+				quote!(::arrow2::datatypes::Field::new(
 					#name,
 					<#ty>::data_type(context),
 					<#ty>::is_nullable(),
 				))
 			));
-			arrow_builders.extend(if_ver(f.version,
-				quote!(Box::new(<#ty>::builder(len, context))
-					as Box<dyn ::arrow::array::ArrayBuilder>)
+			arrow_arrays.extend(if_ver(f.version,
+				quote!(Box::new(<#ty>::arrow_array(context))
+					as Box<dyn ::arrow2::array::MutableArray>)
 			));
-			arrow_writers.extend(
+			arrow_pushers.extend(
 				quote!(
-					let x: Option<usize> = None;
 					if num_fields > #i {
-						self.#ident.write(
-							builder.field_builder::<<#ty as ::peppi_arrow::Arrow>::Builder>(#i).expect(stringify!(Failed to create builder for: #ident)),
-							context,
-						);
+						self.#ident.arrow_push(array.mut_values()[#i].deref_mut());
 					}
 				)
 			);
-			arrow_null_writers.extend(
+			arrow_null_pushers.extend(
 				quote!(
 					if num_fields > #i {
-						<#ty>::write_null(
-							builder.field_builder::<<#ty as ::peppi_arrow::Arrow>::Builder>(#i).expect(stringify!(Failed to create null builder for: #ident)),
-							context,
-						);
+						<#ty>::arrow_push_null(array.mut_values()[#i].deref_mut());
 					}
 				)
 			);
@@ -134,15 +127,16 @@ impl ToTokens for MyInputReceiver {
 				if f.version.is_some() {
 					let wrapped = wrapped_type(ty).expect(stringify!(Failed to unwrap type for: #ident));
 					quote!(
-						if struct_array.num_columns() > #i {
-							let mut value = <#wrapped as ::peppi_arrow::Arrow>::default();
-							value.read(struct_array.column(#i).clone(), idx);
+						let values = struct_array.values();
+						if values.len() > #i {
+							let mut value = <#wrapped as ::peppi_arrow::Arrow>::arrow_default();
+							value.arrow_read(values[#i].as_ref(), idx);
 							self.#ident = Some(value);
 						}
 					)
 				} else {
 					quote!(
-						self.#ident.read(struct_array.column(#i).clone(), idx);
+						self.#ident.arrow_read(struct_array.values()[#i].as_ref(), idx);
 					)
 				}
 			);
@@ -150,50 +144,47 @@ impl ToTokens for MyInputReceiver {
 
 		tokens.extend(quote! {
 			impl #impl_generics ::peppi_arrow::Arrow for #ident #ty_generics #where_clause {
-				type Builder = ::arrow::array::StructBuilder;
+				type ArrowArray = ::arrow2::array::MutableStructArray;
 
-				fn default() -> Self {
+				fn arrow_default() -> Self {
 					Self {
 						#arrow_defaults
 					}
 				}
 
-				fn fields<C: ::peppi_arrow::Context>(context: C) -> Vec<::arrow::datatypes::Field> {
+				fn data_type<C: ::peppi_arrow::Context>(context: C) -> ::arrow2::datatypes::DataType {
 					let version = context.slippi_version();
-					vec![#arrow_fields].into_iter().filter_map(|f| f).collect()
+					let fields = vec![#arrow_fields].into_iter().filter_map(|f| f).collect();
+					::arrow2::datatypes::DataType::Struct(fields)
 				}
 
-				fn data_type<C: ::peppi_arrow::Context>(context: C) -> ::arrow::datatypes::DataType {
-					::arrow::datatypes::DataType::Struct(Self::fields(context))
-				}
-
-				fn builder<C: ::peppi_arrow::Context>(len: usize, context: C) -> Self::Builder {
+				fn arrow_array<C: ::peppi_arrow::Context>(context: C) -> Self::ArrowArray {
 					let version = context.slippi_version();
-					let fields = Self::fields(context);
-					let builders: Vec<_> = vec![#arrow_builders].into_iter().filter_map(|f| f).collect();
-					::arrow::array::StructBuilder::new(fields, builders)
+					let data_type = Self::data_type(context);
+					let values: Vec<_> = vec![#arrow_arrays].into_iter().filter_map(|f| f).collect();
+					::arrow2::array::MutableStructArray::new(data_type, values)
 				}
 
-				fn write<C: ::peppi_arrow::Context>(&self, builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
-					let builder = builder.as_any_mut().downcast_mut::<Self::Builder>()
-						.expect(stringify!(Failed to downcast builder for: #ident));
-					let num_fields = builder.num_fields();
-					#arrow_writers
-					builder.append(true)
-						.expect(stringify!(Failed to append for: #ident));
+				fn arrow_push(&self, array: &mut dyn ::arrow2::array::MutableArray) {
+					use std::ops::DerefMut;
+					let array = array.as_mut_any().downcast_mut::<Self::ArrowArray>()
+						.expect(stringify!(Failed to downcast array for: #ident));
+					let num_fields = array.values().len();
+					#arrow_pushers
+					array.push(true);
 				}
 
-				fn write_null<C: ::peppi_arrow::Context>(builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
-					let builder = builder.as_any_mut().downcast_mut::<Self::Builder>()
-						.expect(stringify!(Failed to downcast null builder for: #ident));
-					let num_fields = builder.num_fields();
-					#arrow_null_writers
-					builder.append(false)
-						.expect(stringify!(Failed to append null for: #ident));
+				fn arrow_push_null(array: &mut dyn ::arrow2::array::MutableArray) {
+					use std::ops::DerefMut;
+					let array = array.as_mut_any().downcast_mut::<Self::ArrowArray>()
+						.expect(stringify!(Failed to downcast array for: #ident));
+					let num_fields = array.values().len();
+					#arrow_null_pushers
+					array.push(false);
 				}
 
-				fn read(&mut self, array: ::arrow::array::ArrayRef, idx: usize) {
-					let struct_array = array.as_any().downcast_ref::<arrow::array::StructArray>()
+				fn arrow_read(&mut self, array: &dyn ::arrow2::array::Array, idx: usize) {
+					let struct_array = array.as_any().downcast_ref::<::arrow2::array::StructArray>()
 						.expect(stringify!(Failed to downcast array for: #ident));
 					#arrow_readers
 				}

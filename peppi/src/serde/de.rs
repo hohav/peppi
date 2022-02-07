@@ -165,7 +165,7 @@ fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, HashMap<u8, u16>)> {
 		sizes.insert(code, size);
 	}
 
-	info!("Event payload sizes: {{{}}}",
+	debug!("Event payload sizes: {{{}}}",
 		sizes.iter().map(|(k, v)| format!("0x{:x}: {}", k, v)).collect::<Vec<_>>().join(", "));
 
 	Ok((1 + size as usize, sizes)) // +1 byte for the event code
@@ -307,7 +307,7 @@ fn player_bytes_v1_0(r: &mut &[u8]) -> Result<[u8; 8]> {
 	Ok(buf)
 }
 
-fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
+pub(crate) fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 	let raw_bytes = r.to_vec();
 	let slippi = slippi::Slippi {
 		version: slippi::Version(r.read_u8()?, r.read_u8()?, r.read_u8()?),
@@ -433,9 +433,11 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 	})
 }
 
-fn game_end(r: &mut &[u8]) -> Result<game::End> {
+pub(crate) fn game_end(r: &mut &[u8]) -> Result<game::End> {
+	let raw_bytes = r.to_vec();
 	Ok(game::End {
 		method: game::EndMethod(r.read_u8()?),
+		raw_bytes: raw_bytes,
 		// v2.0
 		lras_initiator: if_more(r, |r| Ok(Port::try_from(r.read_u8()?).ok()))?,
 	})
@@ -855,6 +857,7 @@ pub fn deserialize<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: 
 		&[0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c])?;
 
 	let raw_len = r.read_u32::<BE>()? as usize;
+	info!("raw_len: {}", raw_len);
 	let (mut bytes_read, payload_sizes) = payload_sizes(&mut r)?;
 	let mut last_char_states = [DEFAULT_CHAR_STATE; NUM_PORTS];
 	let mut last_event: Option<Event> = None;

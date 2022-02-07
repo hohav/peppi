@@ -3,6 +3,7 @@ use serde::{
 	ser::SerializeStruct,
 };
 
+use peppi_derive::Arrow;
 use crate::{
 	model::{
 		buttons,
@@ -12,8 +13,6 @@ use crate::{
 		triggers,
 	},
 };
-
-use peppi_derive::Arrow;
 
 /// Controller button state.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]

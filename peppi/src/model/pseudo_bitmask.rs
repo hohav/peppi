@@ -40,30 +40,30 @@ macro_rules! pseudo_bitmask {
 		}
 
 		impl peppi_arrow::Arrow for $name {
-			type Builder = <$type as peppi_arrow::Arrow>::Builder;
+			type ArrowArray = <$type as peppi_arrow::Arrow>::ArrowArray;
 
-			fn default() -> Self {
+			fn arrow_default() -> Self {
 				<Self as Default>::default()
 			}
 
-			fn data_type<C: ::peppi_arrow::Context>(context: C) -> arrow::datatypes::DataType {
+			fn data_type<C: peppi_arrow::Context>(context: C) -> ::arrow2::datatypes::DataType {
 				<$type>::data_type(context)
 			}
 
-			fn builder<C: ::peppi_arrow::Context>(len: usize, context: C) -> Self::Builder {
-				<$type>::builder(len, context)
+			fn arrow_array<C: peppi_arrow::Context>(context: C) -> Self::ArrowArray {
+				<$type>::arrow_array(context)
 			}
 
-			fn write<C: ::peppi_arrow::Context>(&self, builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
-				self.0.write(builder, context)
+			fn arrow_push(&self, array: &mut dyn ::arrow2::array::MutableArray) {
+				self.0.arrow_push(array)
 			}
 
-			fn write_null<C: ::peppi_arrow::Context>(builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
-				<$type>::write_null(builder, context)
+			fn arrow_push_null(array: &mut dyn ::arrow2::array::MutableArray) {
+				<$type>::arrow_push_null(array)
 			}
 
-			fn read(&mut self, array: arrow::array::ArrayRef, idx: usize) {
-				self.0.read(array, idx);
+			fn arrow_read(&mut self, array: &dyn ::arrow2::array::Array, idx: usize) {
+				self.0.arrow_read(array, idx);
 			}
 		}
 	}

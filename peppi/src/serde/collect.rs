@@ -7,7 +7,7 @@ use crate::{
 		frame::{self, Frame, PortData},
 		game::{self, Frames, Game, GeckoCodes, NUM_PORTS},
 		item,
-		metadata,
+		metadata::Metadata,
 		primitives::Port,
 	},
 	serde::de::{self, FrameEvent, FrameId, Indexed, PortId},
@@ -20,8 +20,8 @@ pub struct Opts {
 
 #[derive(Debug, Default)]
 pub struct FrameEvents {
-	pub pre: [Vec<frame::Pre>; NUM_PORTS],
-	pub post: [Vec<frame::Post>; NUM_PORTS],
+	pub pre: [Vec<Option<frame::Pre>>; NUM_PORTS],
+	pub post: [Vec<Option<frame::Post>>; NUM_PORTS],
 }
 
 #[derive(Debug, Default)]
@@ -33,8 +33,8 @@ pub struct Collector {
 	pub start: Option<game::Start>,
 	pub end: Option<game::End>,
 	pub frames_index: Vec<i32>,
-	pub frames_start: Vec<frame::Start>,
-	pub frames_end: Vec<frame::End>,
+	pub frames_start: Vec<Option<frame::Start>>,
+	pub frames_end: Vec<Option<frame::End>>,
 	pub frames_leaders: FrameEvents,
 	pub frames_followers: FrameEvents,
 	pub items: Vec<Vec<item::Item>>,
@@ -48,7 +48,7 @@ macro_rules! into_game {
 		let ports: Vec<_> = start.players.iter().map(|p| p.port as usize).collect();
 
 		let metadata_raw = $gp.metadata.unwrap_or_default();
-		let metadata = metadata::parse(&metadata_raw)?;
+		let metadata = Metadata::parse(&metadata_raw)?;
 		if let Some(ref players) = metadata.players {
 			let meta_ports: Vec<_> = players.iter().map(|p| p.port as usize).collect();
 			if meta_ports != ports {
@@ -79,23 +79,25 @@ macro_rules! into_game {
 					true => $gp.frames_index[n],
 					_ => n as i32 + game::FIRST_FRAME_INDEX,
 				},
-				start: $gp.frames_start.get(n).copied(),
-				end: $gp.frames_end.get(n).copied(),
+				start: $gp.frames_start.get(n).copied().unwrap_or(None),
+				end: $gp.frames_end.get(n).copied().unwrap_or(None),
 				ports: [ $(
 					PortData {
 						leader: frame::Data {
-							pre: $gp.frames_leaders.pre[ports[$idx]][n],
-							post: $gp.frames_leaders.post[ports[$idx]][n],
+							pre: $gp.frames_leaders.pre[ports[$idx]][n]
+								.ok_or_else(|| err!("missing pre event: {}", n))?,
+							post: $gp.frames_leaders.post[ports[$idx]][n]
+								.ok_or_else(|| err!("missing post event: {}", n))?,
 						},
 						follower: {
-							let pre = &$gp.frames_followers.pre[ports[$idx]];
-							let post = &$gp.frames_followers.post[ports[$idx]];
-							match (pre.is_empty(), post.is_empty()) {
-								(true, true) => None,
-								(false, false) => Some(Box::new(frame::Data {
-									pre: pre[n],
-									post: post[n],
+							let pre = $gp.frames_followers.pre[ports[$idx]].get(n).copied().unwrap_or(None);
+							let post = $gp.frames_followers.post[ports[$idx]].get(n).copied().unwrap_or(None);
+							match (pre, post) {
+								(Some(pre), Some(post)) => Some(Box::new(frame::Data {
+									pre: pre,
+									post: post,
 								})),
+								(None, None) => None,
 								_ => return Err(err!("inconsistent follower data (frame: {})", n)),
 							}
 						},
@@ -131,22 +133,20 @@ impl Collector {
 	}
 }
 
-fn append_frame_event<Id, Event>(v: &mut Vec<Event>, evt: FrameEvent<Id, Event>, opts: Opts) -> Result<usize> where Id: Indexed, Event: Copy {
+fn append_frame_event<Id, Event>(v: &mut Vec<Option<Event>>, evt: FrameEvent<Id, Event>, frame_count: usize, opts: Opts) -> Result<usize> where Id: Indexed, Event: Copy {
 	let idx = match opts.rollbacks {
-		true => v.len(),
+		true => frame_count - 1,
 		_ => evt.id.array_index(),
 	};
 
 	while v.len() < idx {
-		// fill in missing values by duplicating the last value
-		// FIXME: determine whether this is appropriate for Frame Start & Frame End
-		v.push(*v.last().ok_or_else(|| err!("missing initial frame data: {:?}", evt.id.index()))?);
+		v.push(None);
 	}
 
 	if idx < v.len() {
-		v[idx] = evt.event; // rollback
+		v[idx] = Some(evt.event); // rollback
 	} else {
-		v.push(evt.event);
+		v.push(Some(evt.event));
 	}
 
 	Ok(idx)
@@ -156,10 +156,8 @@ fn append_frame_event<Id, Event>(v: &mut Vec<Event>, evt: FrameEvent<Id, Event>,
 macro_rules! append_missing_frame_data {
 	( $arr: expr, $count: expr ) => {
 		for f in $arr.iter_mut() {
-			if let Some(&last) = f.last() {
-				while f.len() < $count {
-					f.push(last);
-				}
+			while f.len() < $count {
+				f.push(None);
 			}
 		}
 	}
@@ -185,7 +183,8 @@ impl de::Handlers for Collector {
 	}
 
 	fn frame_start(&mut self, evt: FrameEvent<FrameId, frame::Start>) -> Result<()> {
-		let idx = append_frame_event(&mut self.frames_start, evt, self.opts)?;
+		self.frames_index.push(evt.id.index);
+		let idx = append_frame_event(&mut self.frames_start, evt, self.frames_index.len(), self.opts)?;
 		// reset items list in case of rollback
 		while self.items.len() <= idx {
 			self.items.push(Vec::new());
@@ -198,26 +197,26 @@ impl de::Handlers for Collector {
 		if self.first_port.is_none() {
 			self.first_port = Some(evt.id.port);
 		}
-		if Some(evt.id.port) == self.first_port && !evt.id.is_follower {
+		if self.frames_start.is_empty() && Some(evt.id.port) == self.first_port && !evt.id.is_follower {
 			self.frames_index.push(evt.id.index);
 		}
 		match evt.id.is_follower {
-			true => append_frame_event(&mut self.frames_followers.pre[evt.id.port as usize], evt, self.opts)?,
-			_ => append_frame_event(&mut self.frames_leaders.pre[evt.id.port as usize], evt, self.opts)?,
+			true => append_frame_event(&mut self.frames_followers.pre[evt.id.port as usize], evt, self.frames_index.len(), self.opts)?,
+			_ => append_frame_event(&mut self.frames_leaders.pre[evt.id.port as usize], evt, self.frames_index.len(), self.opts)?,
 		};
 		Ok(())
 	}
 
 	fn frame_post(&mut self, evt: FrameEvent<PortId, frame::Post>) -> Result<()> {
 		match evt.id.is_follower {
-			true => append_frame_event(&mut self.frames_followers.post[evt.id.port as usize], evt, self.opts)?,
-			_ => append_frame_event(&mut self.frames_leaders.post[evt.id.port as usize], evt, self.opts)?,
+			true => append_frame_event(&mut self.frames_followers.post[evt.id.port as usize], evt, self.frames_index.len(), self.opts)?,
+			_ => append_frame_event(&mut self.frames_leaders.post[evt.id.port as usize], evt, self.frames_index.len(), self.opts)?,
 		};
 		Ok(())
 	}
 
 	fn frame_end(&mut self, evt: FrameEvent<FrameId, frame::End>) -> Result<()> {
-		append_frame_event(&mut self.frames_end, evt, self.opts)?;
+		append_frame_event(&mut self.frames_end, evt, self.frames_index.len(), self.opts)?;
 		Ok(())
 	}
 
