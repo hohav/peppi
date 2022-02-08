@@ -198,7 +198,7 @@ impl de::Handlers for Collector {
 		if self.first_port.is_none() {
 			self.first_port = Some(evt.id.port);
 		}
-		if Some(evt.id.port) == self.first_port {
+		if Some(evt.id.port) == self.first_port && !evt.id.is_follower {
 			self.frames_index.push(evt.id.index);
 		}
 		match evt.id.is_follower {
