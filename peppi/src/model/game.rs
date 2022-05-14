@@ -64,11 +64,14 @@ pub struct Ucf {
 	pub shield_drop: Option<ShieldDrop>,
 }
 
-/// Netplay name & connect code.
+/// Netplay name, connect code, and Slippi UID.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Netplay {
 	pub name: String,
 	pub code: String,
+	/// Slippi UID (added: v3.11)
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub suid: Option<String>,
 }
 
 /// Information about each player such as character, team, stock count, etc.

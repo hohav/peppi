@@ -152,6 +152,9 @@ pub struct Post {
 	/// hitlag remaining
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "3.8")] pub hitlag: Option<f32>,
+	/// animation the character is in (for Wait: 2 = Wait1, 3 = Wait2, 4 = Wait3)
+	#[serde(skip_serializing_if = "Option::is_none")]
+	#[slippi(version = "3.11")] pub animation_index: Option<u32>,
 }
 
 /// Frame data for a single character. Includes both pre-frame and post-frame data.
