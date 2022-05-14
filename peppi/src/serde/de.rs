@@ -171,7 +171,7 @@ fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, HashMap<u8, u16>)> {
 	Ok((1 + size as usize, sizes)) // +1 byte for the event code
 }
 
-fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3: Option<[u8; 16]>, v3_9: Option<[u8; 41]>) -> Result<Option<Player>> {
+fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3: Option<[u8; 16]>, v3_9: Option<[u8; 41]>, v3_11: Option<[u8; 29]>) -> Result<Option<Player>> {
 	let mut r = &v0[..];
 	let mut unmapped = [0; 15];
 
@@ -245,6 +245,11 @@ fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3
 				let first_null = r.iter().position(|&x| x == 0).unwrap_or(10);
 				SHIFT_JIS.decode_without_bom_handling(&r[0..first_null]).0.to_string()
 			},
+			// v3.11
+			suid: v3_11.map(|v3_11| {
+				let first_null = v3_11.iter().position(|&x| x == 0).unwrap_or(28);
+				String::from_utf8_lossy(&v3_11[0..first_null]).to_string()
+			}),
 		}
 	});
 
@@ -271,6 +276,12 @@ fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3
 		}),
 		_ => None,
 	})
+}
+
+fn player_bytes_v3_11(r: &mut &[u8]) -> Result<[u8; 29]> {
+	let mut buf = [0; 29];
+	r.read_exact(&mut buf)?;
+	Ok(buf)
 }
 
 fn player_bytes_v3_9(r: &mut &[u8]) -> Result<[u8; 41]> {
@@ -368,9 +379,19 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 		],
 	};
 
+	let players_v3_11 = match r.is_empty() {
+		true => [None, None, None, None],
+		_ => [
+			Some(player_bytes_v3_11(&mut r)?),
+			Some(player_bytes_v3_11(&mut r)?),
+			Some(player_bytes_v3_11(&mut r)?),
+			Some(player_bytes_v3_11(&mut r)?),
+		],
+	};
+
 	let mut players = Vec::<Player>::new();
 	for n in 0 .. NUM_PORTS {
-		if let Some(p) = player(Port::try_from(n as u8).unwrap(), &players_v0[n], is_teams, players_v1_0[n], players_v1_3[n], players_v3_9[n])? {
+		if let Some(p) = player(Port::try_from(n as u8).unwrap(), &players_v0[n], is_teams, players_v1_0[n], players_v1_3[n], players_v3_9[n], players_v3_11[n])? {
 			players.push(p);
 		}
 	}
@@ -653,6 +674,9 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 	// v3.8
 	let hitlag = if_more(r, |r| r.read_f32::<BE>())?;
 
+	// v3.11
+	let animation_index = if_more(r, |r| r.read_u32::<BE>())?;
+
 	update_last_char_state(id, character, state, last_char_states);
 
 	Ok(FrameEvent {
@@ -683,6 +707,8 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 			velocities: velocities,
 			// v3.8
 			hitlag: hitlag,
+			// v3.11
+			animation_index: animation_index,
 		},
 	})
 }

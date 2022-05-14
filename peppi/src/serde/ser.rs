@@ -35,7 +35,9 @@ fn payload_sizes(game: &game::Game) -> Vec<(u8, u16)> {
 	));
 
 	sizes.push((Event::FramePost as u8,
-		if v >= ver(3, 8) {
+		if v >= ver(3, 11) {
+			80
+		} else if v >= ver(3, 8) {
 			76
 		} else if v >= ver(3, 5) {
 			72
