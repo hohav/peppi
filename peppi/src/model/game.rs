@@ -57,6 +57,11 @@ pseudo_enum!(ShieldDrop: u32 {
 	2 => ARDUINO,
 });
 
+pseudo_enum!(Language: u8 {
+	0 => JAPANESE,
+	1 => ENGLISH,
+});
+
 /// Information about the "Universal Controller Fix" mod.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Ucf {
@@ -142,6 +147,9 @@ pub struct Start {
 	/// (added: v3.7)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub scene: Option<Scene>,
+	/// (added: v3.12)
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub language: Option<Language>,
 }
 
 pseudo_enum!(EndMethod: u8 {

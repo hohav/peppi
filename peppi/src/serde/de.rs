@@ -396,6 +396,8 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 		}
 	}
 
+	let lang = if_more(r, |r| Ok(game::Language(r.read_u8()?)))?;
+
 	Ok(game::Start {
 		slippi: slippi,
 		bitfield: bitfield,
@@ -416,6 +418,8 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 		is_frozen_ps: is_frozen_ps,
 		// v3.7
 		scene: scene,
+		// v3.12
+		language: lang,
 	})
 }
 
