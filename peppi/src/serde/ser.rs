@@ -53,7 +53,13 @@ fn payload_sizes(game: &game::Game) -> Vec<(u8, u16)> {
 	sizes.push((Event::GameEnd as u8, if v >= ver(2, 0) { 2 } else { 1 }));
 
 	if v >= ver(2, 2) {
-		sizes.push((Event::FrameStart as u8, 8));
+		sizes.push((Event::FrameStart as u8,
+			if v >= ver(3, 10) {
+				12
+			} else {
+				8
+			}
+		));
 	}
 
 	if v >= ver(3, 0) {
@@ -118,10 +124,13 @@ fn game_end<W: Write>(w: &mut W, e: &game::End, v: slippi::Version) -> Result<()
 	Ok(())
 }
 
-fn frame_start<W: Write>(w: &mut W, s: &frame::Start, _ver: slippi::Version, frame_idx: i32) -> Result<()> {
+fn frame_start<W: Write>(w: &mut W, s: &frame::Start, v: slippi::Version, frame_idx: i32) -> Result<()> {
 	w.write_u8(Event::FrameStart as u8)?;
 	w.write_i32::<BE>(frame_idx)?;
 	w.write_u32::<BE>(s.random_seed)?;
+	if v >= ver(3, 10) {
+		w.write_u32::<BE>(s.scene_frame_counter.unwrap())?;
+	}
 	Ok(())
 }
 
