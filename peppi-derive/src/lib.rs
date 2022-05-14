@@ -8,7 +8,7 @@ struct Version (u8, u8);
 
 impl FromMeta for Version {
 	fn from_string(value: &str) -> Result<Self> {
-		if let Ok(re) = regex::Regex::new(r"^(\d)\.(\d)$") {
+		if let Ok(re) = regex::Regex::new(r"^(\d+)\.(\d+)$") {
 			if let Some(caps) = re.captures(value) {
 				return Ok(Version(
 					caps.get(1).unwrap().as_str().parse::<u8>().unwrap(),

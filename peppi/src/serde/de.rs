@@ -413,6 +413,7 @@ fn frame_start(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::Start>> {
 		id: id,
 		event: frame::Start {
 			random_seed: r.read_u32::<BE>()?,
+			scene_frame_counter: if_more(r, |r| r.read_u32::<BE>())?,
 		},
 	})
 }

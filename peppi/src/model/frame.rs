@@ -54,6 +54,10 @@ pseudo_enum!(HurtboxState: u8 {
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct Start {
 	pub random_seed: u32,
+	/// Scene frame counter. Starts at 0 when game starts. Continues to count frames
+	/// even if the game is paused.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	#[slippi(version = "3.10")] pub scene_frame_counter: Option<u32>,
 }
 
 /// End-of-frame data.
