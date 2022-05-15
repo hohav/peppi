@@ -171,7 +171,7 @@ fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, HashMap<u8, u16>)> {
 	Ok((1 + size as usize, sizes)) // +1 byte for the event code
 }
 
-fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3: Option<[u8; 16]>, v3_9: Option<[u8; 41]>, v3_11: Option<[u8; 29]>) -> Result<Option<Player>> {
+fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3: Option<[u8; 16]>, v3_9_name: Option<[u8; 31]>, v3_9_code: Option<[u8; 10]>, v3_11: Option<[u8; 29]>) -> Result<Option<Player>> {
 	let mut r = &v0[..];
 	let mut unmapped = [0; 15];
 
@@ -234,16 +234,15 @@ fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3
 	});
 
 	// v3.9
-	let netplay = v3_9.map(|v3_9| {
-		let r = &v3_9[..];
+	let netplay = v3_9_name.zip(v3_9_code).map(|(name, code)| {
 		Netplay {
 			name: {
-				let first_null = r.iter().position(|&x| x == 0).unwrap_or(31);
-				SHIFT_JIS.decode_without_bom_handling(&r[0..first_null]).0.to_string()
+				let first_null = name.iter().position(|&x| x == 0).unwrap_or(31);
+				SHIFT_JIS.decode_without_bom_handling(&name[0..first_null]).0.to_string()
 			},
 			code: {
-				let first_null = r.iter().position(|&x| x == 0).unwrap_or(10);
-				SHIFT_JIS.decode_without_bom_handling(&r[0..first_null]).0.to_string()
+				let first_null = code.iter().position(|&x| x == 0).unwrap_or(10);
+				SHIFT_JIS.decode_without_bom_handling(&code[0..first_null]).0.to_string()
 			},
 			// v3.11
 			suid: v3_11.map(|v3_11| {
@@ -284,8 +283,14 @@ fn player_bytes_v3_11(r: &mut &[u8]) -> Result<[u8; 29]> {
 	Ok(buf)
 }
 
-fn player_bytes_v3_9(r: &mut &[u8]) -> Result<[u8; 41]> {
-	let mut buf = [0; 41];
+fn player_bytes_v3_9_name(r: &mut &[u8]) -> Result<[u8; 31]> {
+	let mut buf = [0; 31];
+	r.read_exact(&mut buf)?;
+	Ok(buf)
+}
+
+fn player_bytes_v3_9_code(r: &mut &[u8]) -> Result<[u8; 10]> {
+	let mut buf = [0; 10];
 	r.read_exact(&mut buf)?;
 	Ok(buf)
 }
@@ -370,13 +375,18 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 	}))?;
 
 	let players_v3_9 = match r.is_empty() {
-		true => [None, None, None, None],
-		_ => [
-			Some(player_bytes_v3_9(&mut r)?),
-			Some(player_bytes_v3_9(&mut r)?),
-			Some(player_bytes_v3_9(&mut r)?),
-			Some(player_bytes_v3_9(&mut r)?),
-		],
+		true => ([None, None, None, None], [None, None, None, None]),
+		_ => ([
+			Some(player_bytes_v3_9_name(&mut r)?),
+			Some(player_bytes_v3_9_name(&mut r)?),
+			Some(player_bytes_v3_9_name(&mut r)?),
+			Some(player_bytes_v3_9_name(&mut r)?),
+		], [
+			Some(player_bytes_v3_9_code(&mut r)?),
+			Some(player_bytes_v3_9_code(&mut r)?),
+			Some(player_bytes_v3_9_code(&mut r)?),
+			Some(player_bytes_v3_9_code(&mut r)?),
+		]),
 	};
 
 	let players_v3_11 = match r.is_empty() {
@@ -391,7 +401,7 @@ fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 
 	let mut players = Vec::<Player>::new();
 	for n in 0 .. NUM_PORTS {
-		if let Some(p) = player(Port::try_from(n as u8).unwrap(), &players_v0[n], is_teams, players_v1_0[n], players_v1_3[n], players_v3_9[n], players_v3_11[n])? {
+		if let Some(p) = player(Port::try_from(n as u8).unwrap(), &players_v0[n], is_teams, players_v1_0[n], players_v1_3[n], players_v3_9.0[n], players_v3_9.1[n], players_v3_11[n])? {
 			players.push(p);
 		}
 	}
