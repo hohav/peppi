@@ -188,7 +188,7 @@ impl<T> Arrow for Box<T> where T: Arrow {
 	}
 
 	fn read(&mut self, array: ArrayRef, idx: usize) {
-		(*self).read(array, idx);
+		(**self).read(array, idx);
 	}
 }
 
