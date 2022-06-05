@@ -12,7 +12,7 @@ use peppi::{
 			stage::Stage,
 		},
 		frame::Buttons,
-		game::{DashBack, End, EndMethod, Frames, Game, Player, PlayerType, Start, ShieldDrop, Ucf},
+		game::{DashBack, End, EndMethod, Frames, Game, Language, Netplay, Player, PlayerType, Scene, Start, ShieldDrop, Ucf},
 		item::Item,
 		metadata::{self, Metadata},
 		primitives::{Direction, Port, Position, Velocity},
@@ -367,6 +367,85 @@ fn console_name() -> Result<(), String> {
 fn v2() -> Result<(), String> {
 	let game = game("v2.0")?;
 	assert_eq!(game.start.slippi.version, Version(2, 0, 1));
+	Ok(())
+}
+
+#[test]
+fn v3_12() -> Result<(), String> {
+	let game = game("v3.12")?;
+
+	assert_eq!(game.start, Start {
+		slippi: Slippi { version: Version(3, 12, 0) },
+		bitfield: [50, 1, 142, 76],
+		is_raining_bombs: false,
+		is_teams: false,
+		item_spawn_frequency: -1,
+		self_destruct_score: -1,
+		stage: Stage::POKEMON_STADIUM,
+		timer: 480,
+		item_spawn_bitfield: [255, 255, 255, 255, 255],
+		damage_ratio: 1.0,
+		players: vec![
+			Player {
+				port: Port::P1,
+				character: External::MARTH,
+				r#type: PlayerType::HUMAN,
+				stocks: 4,
+				costume: 3,
+				team: None,
+				handicap: 9,
+				bitfield: 192,
+				cpu_level: None,
+				offense_ratio: 0.0,
+				defense_ratio: 1.0,
+				model_scale: 1.0,
+				ucf: Some(Ucf {
+					dash_back: Some(DashBack::UCF),
+					shield_drop: Some(ShieldDrop::UCF)
+				}),
+				name_tag: Some("".to_string()),
+				netplay: Some(Netplay {
+					name: "xxxxxx".to_string(),
+					code: "XX＃111".to_string(),
+					suid: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string())
+				})
+			},
+			Player {
+				port: Port::P2,
+				character: External::MARTH,
+				r#type: PlayerType::HUMAN,
+				stocks: 4,
+				costume: 0,
+				team: None,
+				handicap: 9,
+				bitfield: 192,
+				cpu_level: None,
+				offense_ratio: 0.0,
+				defense_ratio: 1.0,
+				model_scale: 1.0,
+				ucf: Some(Ucf {
+					dash_back: Some(DashBack::UCF),
+					shield_drop: Some(ShieldDrop::UCF)
+				}),
+				name_tag: Some("".to_string()),
+				netplay: Some(Netplay {
+					name: "yyyyyyyyyy".to_string(),
+					code: "YYYY＃222".to_string(),
+					suid: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string())
+				})
+			}
+		],
+		random_seed: 39656,
+		raw_bytes: vec![3, 12, 0, 0, 50, 1, 142, 76, 195, 0, 0, 0, 0, 0, 0, 255, 255, 110, 0, 3, 0, 0, 1, 224, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 4, 3, 0, 0, 0, 0, 9, 0, 120, 0, 192, 0, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 9, 0, 4, 0, 0, 1, 0, 0, 9, 1, 120, 0, 192, 0, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 21, 3, 4, 0, 0, 255, 0, 0, 9, 0, 120, 0, 192, 0, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 21, 3, 4, 0, 0, 255, 0, 0, 9, 0, 120, 0, 192, 0, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 33, 3, 4, 0, 0, 255, 0, 0, 9, 0, 120, 0, 64, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 33, 3, 4, 0, 0, 255, 0, 0, 9, 0, 120, 0, 64, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 0, 0, 154, 232, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 8, 120, 120, 120, 120, 120, 120, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 121, 121, 121, 121, 121, 121, 121, 121, 121, 121, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 88, 88, 129, 148, 49, 49, 49, 0, 0, 0, 89, 89, 89, 89, 129, 148, 50, 50, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 0, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		is_pal: Some(false),
+		is_frozen_ps: Some(false),
+		scene: Some(Scene {
+			minor: 2,
+			major: 8
+		}),
+		language: Some(Language::ENGLISH)
+	});
+
 	Ok(())
 }
 
