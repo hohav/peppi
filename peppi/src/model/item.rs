@@ -1,9 +1,9 @@
-use serde::Serialize;
-use peppi_derive::Arrow;
 use crate::model::{
 	enums::item::{State, Type},
 	primitives::{Direction, Port, Position, Velocity},
 };
+use peppi_derive::Arrow;
+use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct Item {
@@ -16,7 +16,9 @@ pub struct Item {
 	pub damage: u16,
 	pub timer: f32,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "3.2")] pub misc: Option<[u8; 4]>,
+	#[slippi(version = "3.2")]
+	pub misc: Option<[u8; 4]>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "3.5")] pub owner: Option<Option<Port>>,
+	#[slippi(version = "3.5")]
+	pub owner: Option<Option<Port>>,
 }

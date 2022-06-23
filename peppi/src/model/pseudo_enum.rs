@@ -10,7 +10,7 @@ impl std::fmt::Display for ConversionError {
 	}
 }
 
-impl std::error::Error for ConversionError { }
+impl std::error::Error for ConversionError {}
 
 // An open "enum" that supports named and unnamed values.
 // Used when not all possible values are known.

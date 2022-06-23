@@ -1,23 +1,11 @@
-use std::{
-	collections::HashMap,
-	io::Result,
-};
+use std::{collections::HashMap, io::Result};
 
 use chrono::{DateTime, Utc};
 use log::warn;
-use serde::{
-	Serialize,
-	ser::SerializeMap,
-};
+use serde::{ser::SerializeMap, Serialize};
 use serde_json::{Map, Value};
 
-use crate::{
-	model::{
-		enums::character,
-		game::FIRST_FRAME_INDEX,
-		primitives::Port,
-	},
-};
+use crate::model::{enums::character, game::FIRST_FRAME_INDEX, primitives::Port};
 
 #[derive(Debug, Default, PartialEq, Serialize)]
 pub struct Metadata {
@@ -40,7 +28,13 @@ pub struct Netplay {
 }
 
 // needed for JMESPath
-pub fn serialize_characters<S>(characters: &Option<HashMap<character::Internal, usize>>, serializer: S) -> std::result::Result<S::Ok, S::Error> where S: serde::Serializer {
+pub fn serialize_characters<S>(
+	characters: &Option<HashMap<character::Internal, usize>>,
+	serializer: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+	S: serde::Serializer,
+{
 	match characters {
 		Some(characters) => {
 			let mut map = serializer.serialize_map(Some(characters.len()))?;
@@ -48,7 +42,7 @@ pub fn serialize_characters<S>(characters: &Option<HashMap<character::Internal, 
 				map.serialize_entry(&format!("{:?}", k), v)?;
 			}
 			map.end()
-		},
+		}
 		_ => serializer.serialize_none(),
 	}
 }
@@ -69,13 +63,20 @@ fn date(json: &Map<String, Value>) -> Result<Option<DateTime<Utc>>> {
 		None => Ok(None),
 		Some(Value::String(start_at)) => match start_at.parse::<DateTime<Utc>>() {
 			Ok(start_at) => Ok(Some(start_at)),
-			e if e == date_too_short =>
-				format!("{}Z", start_at).parse::<DateTime<Utc>>()
-					.map(Some)
-					.map_err(|e| err!("metadata.startAt: parse error: {:?}, {:?}", e, start_at)),
-			Err(e) => Err(err!("metadata.startAt: parse error: {:?}, {:?}", e, start_at)),
+			e if e == date_too_short => format!("{}Z", start_at)
+				.parse::<DateTime<Utc>>()
+				.map(Some)
+				.map_err(|e| err!("metadata.startAt: parse error: {:?}, {:?}", e, start_at)),
+			Err(e) => Err(err!(
+				"metadata.startAt: parse error: {:?}, {:?}",
+				e,
+				start_at
+			)),
 		},
-		start_at => Err(err!("metadata.startAt: expected str, but got: {:?}", start_at)),
+		start_at => Err(err!(
+			"metadata.startAt: expected str, but got: {:?}",
+			start_at
+		)),
 	}
 }
 
@@ -85,11 +86,21 @@ fn duration(json: &Map<String, Value>) -> Result<Option<usize>> {
 		Some(Value::Number(last_frame)) => match last_frame.as_i64() {
 			Some(last_frame) => match usize::try_from(last_frame - FIRST_FRAME_INDEX as i64 + 1) {
 				Ok(duration) => Ok(Some(duration)),
-				Err(e) => Err(err!("metadata.lastFrame: value out of range: {:?}, {:?}", last_frame, e)),
+				Err(e) => Err(err!(
+					"metadata.lastFrame: value out of range: {:?}, {:?}",
+					last_frame,
+					e
+				)),
 			},
-			None => Err(err!("metadata.lastFrame: expected i64, but got: {:?}", last_frame)),
+			None => Err(err!(
+				"metadata.lastFrame: expected i64, but got: {:?}",
+				last_frame
+			)),
 		},
-		last_frame => Err(err!("metadata.lastFrame: expected number, but got: {:?}", last_frame)),
+		last_frame => Err(err!(
+			"metadata.lastFrame: expected number, but got: {:?}",
+			last_frame
+		)),
 	}
 }
 
@@ -97,24 +108,50 @@ fn platform(json: &Map<String, Value>) -> Result<Option<String>> {
 	match json.get("playedOn") {
 		None => Ok(None),
 		Some(Value::String(played_on)) => Ok(Some(played_on.clone())),
-		played_on => Err(err!("metadata.playedOn: expected str, but got: {:?}", played_on)),
+		played_on => Err(err!(
+			"metadata.playedOn: expected str, but got: {:?}",
+			played_on
+		)),
 	}
 }
 
-fn parse_characters(characters: &Map<String, Value>) -> Result<HashMap<character::Internal, usize>> {
-	characters.iter().map(|(k, v)| {
-		let k = k.parse::<u8>().map_err(|e| err!("metadata.players.N.characters: invalid character: {:?}, {:?}", k, e))?;
-		match v {
-			Value::Number(v) => match v.as_u64() {
-				Some(v) => Ok((
-					character::Internal(k),
-					usize::try_from(v).map_err(|e| err!("metadata.players.N.characters.{}: invalid duration: {:?}, {:?}", k, v, e))?,
+fn parse_characters(
+	characters: &Map<String, Value>,
+) -> Result<HashMap<character::Internal, usize>> {
+	characters
+		.iter()
+		.map(|(k, v)| {
+			let k = k.parse::<u8>().map_err(|e| {
+				err!(
+					"metadata.players.N.characters: invalid character: {:?}, {:?}",
+					k,
+					e
+				)
+			})?;
+			match v {
+				Value::Number(v) => {
+					match v.as_u64() {
+						Some(v) => Ok((
+							character::Internal(k),
+							usize::try_from(v).map_err(|e| {
+								err!("metadata.players.N.characters.{}: invalid duration: {:?}, {:?}", k, v, e)
+							})?,
+						)),
+						None => Err(err!(
+							"metadata.players.N.characters.{}: expected u64, but got: {:?}",
+							k,
+							v
+						)),
+					}
+				}
+				v => Err(err!(
+					"metadata.players.N.characters.{}: expected number, but got: {:?}",
+					k,
+					v
 				)),
-				None => Err(err!("metadata.players.N.characters.{}: expected u64, but got: {:?}", k, v)),
-			},
-			v => Err(err!("metadata.players.N.characters.{}: expected number, but got: {:?}", k, v)),
-		}
-	}).collect()
+			}
+		})
+		.collect()
 }
 
 fn metadata_player(port: Port, player: &Map<String, Value>) -> Result<Player> {
@@ -123,25 +160,54 @@ fn metadata_player(port: Port, player: &Map<String, Value>) -> Result<Player> {
 		characters: match player.get("characters") {
 			Some(Value::Object(characters)) => match parse_characters(characters) {
 				Ok(characters) => Some(characters),
-				Err(e) => return Err(err!("metadata.players.N.characters: parse error: {:?}, {:?}", e, characters)),
+				Err(e) => {
+					return Err(err!(
+						"metadata.players.N.characters: parse error: {:?}, {:?}",
+						e,
+						characters
+					))
+				}
 			},
-			characters => return Err(err!("metadata.players.N.characters: expected map, but got: {:?}", characters)),
+			characters => {
+				return Err(err!(
+					"metadata.players.N.characters: expected map, but got: {:?}",
+					characters
+				))
+			}
 		},
 		netplay: match player.get("names") {
 			None => None,
 			Some(Value::Object(names)) => match names.get("code") {
 				None => None,
 				Some(Value::String(code)) => match names.get("netplay") {
-					None => { warn!("ignoring netplay name without code"); None },
+					None => {
+						warn!("ignoring netplay name without code");
+						None
+					}
 					Some(Value::String(name)) => Some(Netplay {
 						code: code.clone(),
 						name: name.clone(),
 					}),
-					name => return Err(err!("metadata.players.N.names.netplay: expected str, but got: {:?}", name)),
+					name => {
+						return Err(err!(
+							"metadata.players.N.names.netplay: expected str, but got: {:?}",
+							name
+						))
+					}
 				},
-				code => return Err(err!("metadata.players.N.names.code: expected str, but got: {:?}", code)),
+				code => {
+					return Err(err!(
+						"metadata.players.N.names.code: expected str, but got: {:?}",
+						code
+					))
+				}
 			},
-			names => return Err(err!("metadata.players.N.names: expected map, but got: {:?}", names)),
+			names => {
+				return Err(err!(
+					"metadata.players.N.names: expected map, but got: {:?}",
+					names
+				))
+			}
 		},
 	})
 }
@@ -158,19 +224,32 @@ fn players(json: &Map<String, Value>) -> Result<Option<Vec<Player>>> {
 					Ok(port) => match Port::try_from(port) {
 						Ok(port) => match player {
 							Value::Object(player) => result.push(metadata_player(port, player)?),
-							player => return Err(err!("metadata.players.{:?}: expected map, but got: {:?}", port, player)),
+							player => {
+								return Err(err!(
+									"metadata.players.{:?}: expected map, but got: {:?}",
+									port,
+									player
+								))
+							}
 						},
-						Err(e) => return Err(err!("metadata.players: invalid port: {}, {:?}", port, e)),
+						Err(e) => {
+							return Err(err!("metadata.players: invalid port: {}, {:?}", port, e))
+						}
 					},
-					Err(e) => return Err(err!("metadata.players: invalid port: {}, {:?}", port, e)),
+					Err(e) => {
+						return Err(err!("metadata.players: invalid port: {}, {:?}", port, e))
+					}
 				};
 			}
 			match result.len() {
 				0 => Ok(None),
 				_ => Ok(Some(result)),
 			}
-		},
-		players => Err(err!("metadata.players: expected map, but got: {:?}", players)),
+		}
+		players => Err(err!(
+			"metadata.players: expected map, but got: {:?}",
+			players
+		)),
 	}
 }
 
@@ -178,7 +257,10 @@ fn console(json: &Map<String, Value>) -> Result<Option<String>> {
 	match json.get("consoleNick") {
 		None => Ok(None),
 		Some(Value::String(console_nick)) => Ok(Some(console_nick.clone())),
-		console_nick => Err(err!("metadata.consoleNick: expected str, but got: {:?}", console_nick)),
+		console_nick => Err(err!(
+			"metadata.consoleNick: expected str, but got: {:?}",
+			console_nick
+		)),
 	}
 }
 

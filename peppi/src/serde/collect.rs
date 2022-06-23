@@ -6,8 +6,7 @@ use crate::{
 	model::{
 		frame::{self, Frame, PortData},
 		game::{self, Frames, Game, GeckoCodes, NUM_PORTS},
-		item,
-		metadata,
+		item, metadata,
 		primitives::Port,
 	},
 	serde::de::{self, FrameEvent, FrameId, Indexed, PortId},
@@ -131,7 +130,15 @@ impl Collector {
 	}
 }
 
-fn append_frame_event<Id, Event>(v: &mut Vec<Event>, evt: FrameEvent<Id, Event>, opts: Opts) -> Result<usize> where Id: Indexed, Event: Copy {
+fn append_frame_event<Id, Event>(
+	v: &mut Vec<Event>,
+	evt: FrameEvent<Id, Event>,
+	opts: Opts,
+) -> Result<usize>
+where
+	Id: Indexed,
+	Event: Copy,
+{
 	let idx = match opts.rollbacks {
 		true => v.len(),
 		_ => evt.id.array_index(),
@@ -140,7 +147,10 @@ fn append_frame_event<Id, Event>(v: &mut Vec<Event>, evt: FrameEvent<Id, Event>,
 	while v.len() < idx {
 		// fill in missing values by duplicating the last value
 		// FIXME: determine whether this is appropriate for Frame Start & Frame End
-		v.push(*v.last().ok_or_else(|| err!("missing initial frame data: {:?}", evt.id.index()))?);
+		v.push(
+			*v.last()
+				.ok_or_else(|| err!("missing initial frame data: {:?}", evt.id.index()))?,
+		);
 	}
 
 	if idx < v.len() {
@@ -162,7 +172,7 @@ macro_rules! append_missing_frame_data {
 				}
 			}
 		}
-	}
+	};
 }
 
 impl de::Handlers for Collector {
@@ -202,16 +212,32 @@ impl de::Handlers for Collector {
 			self.frames_index.push(evt.id.index);
 		}
 		match evt.id.is_follower {
-			true => append_frame_event(&mut self.frames_followers.pre[evt.id.port as usize], evt, self.opts)?,
-			_ => append_frame_event(&mut self.frames_leaders.pre[evt.id.port as usize], evt, self.opts)?,
+			true => append_frame_event(
+				&mut self.frames_followers.pre[evt.id.port as usize],
+				evt,
+				self.opts,
+			)?,
+			_ => append_frame_event(
+				&mut self.frames_leaders.pre[evt.id.port as usize],
+				evt,
+				self.opts,
+			)?,
 		};
 		Ok(())
 	}
 
 	fn frame_post(&mut self, evt: FrameEvent<PortId, frame::Post>) -> Result<()> {
 		match evt.id.is_follower {
-			true => append_frame_event(&mut self.frames_followers.post[evt.id.port as usize], evt, self.opts)?,
-			_ => append_frame_event(&mut self.frames_leaders.post[evt.id.port as usize], evt, self.opts)?,
+			true => append_frame_event(
+				&mut self.frames_followers.post[evt.id.port as usize],
+				evt,
+				self.opts,
+			)?,
+			_ => append_frame_event(
+				&mut self.frames_leaders.post[evt.id.port as usize],
+				evt,
+				self.opts,
+			)?,
 		};
 		Ok(())
 	}
@@ -237,7 +263,13 @@ impl de::Handlers for Collector {
 	}
 
 	fn finalize(&mut self) -> Result<()> {
-		let frame_count = self.frames_leaders.pre.iter().map(Vec::len).max().unwrap_or(0);
+		let frame_count = self
+			.frames_leaders
+			.pre
+			.iter()
+			.map(Vec::len)
+			.max()
+			.unwrap_or(0);
 
 		append_missing_frame_data!(self.frames_leaders.pre, frame_count);
 		append_missing_frame_data!(self.frames_leaders.post, frame_count);

@@ -1,4 +1,4 @@
-use std::io::{Read, Result, Error, ErrorKind};
+use std::io::{Error, ErrorKind, Read, Result};
 
 use byteorder::{BigEndian, ReadBytesExt};
 use serde_json::{Map, Value};
@@ -18,7 +18,9 @@ fn to_val<R: Read>(r: &mut R) -> Result<Value> {
 			c => Err(err!("Expected 0x55 for string length, but got: {}", c)),
 		},
 		// "l": i32
-		0x6c => Ok(Value::Number(serde_json::Number::from(r.read_i32::<BigEndian>()?))),
+		0x6c => Ok(Value::Number(serde_json::Number::from(
+			r.read_i32::<BigEndian>()?,
+		))),
 		// "{": map
 		0x7b => Ok(Value::Object(to_map(r)?)),
 		c => Err(err!("unexpected UBJSON value type: {}", c)),
@@ -36,7 +38,10 @@ fn to_key<R: Read>(r: &mut R) -> Result<Option<String>> {
 pub fn to_map<R: Read>(r: &mut R) -> Result<Map<String, Value>> {
 	let mut m = Map::new();
 	while match to_key(r)? {
-		Some(k) => {m.insert(k, to_val(r)?); true},
+		Some(k) => {
+			m.insert(k, to_val(r)?);
+			true
+		}
 		None => false,
 	} {}
 	Ok(m)

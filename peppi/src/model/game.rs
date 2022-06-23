@@ -2,14 +2,11 @@ use std::fmt::{self, Debug};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-	model::{
-		enums::{character, stage},
-		frame,
-		metadata,
-		primitives::Port,
-		slippi,
-	},
+use crate::model::{
+	enums::{character, stage},
+	frame, metadata,
+	primitives::Port,
+	slippi,
 };
 
 pub const NUM_PORTS: usize = 4;
@@ -135,7 +132,8 @@ pub struct Start {
 	pub random_seed: u32,
 
 	/// mostly-redundant copy of the raw start block, for round-tripping
-	#[serde(skip)] #[doc(hidden)]
+	#[serde(skip)]
+	#[doc(hidden)]
 	pub raw_bytes: Vec<u8>,
 
 	/// (added: v1.5)
@@ -218,7 +216,8 @@ pub struct Game {
 	pub metadata: metadata::Metadata,
 	#[serde(rename = "metadata")]
 	pub metadata_raw: serde_json::Map<String, serde_json::Value>,
-	#[serde(skip)] #[doc(hidden)]
+	#[serde(skip)]
+	#[doc(hidden)]
 	pub gecko_codes: Option<GeckoCodes>,
 }
 

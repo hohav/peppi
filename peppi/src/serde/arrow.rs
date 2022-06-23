@@ -1,20 +1,12 @@
 use arrow::{
-	array::{
-		ArrayRef,
-		ArrayBuilder,
-		StructArray,
-	},
+	array::{ArrayBuilder, ArrayRef, StructArray},
 	datatypes::DataType,
 };
 
-use crate::{
-	model::{
-		enums::action_state,
-		frame,
-		game,
-		item,
-		primitives::{Direction, Port},
-	},
+use crate::model::{
+	enums::action_state,
+	frame, game, item,
+	primitives::{Direction, Port},
 };
 
 use peppi_arrow::{Arrow, Context, SlippiVersion};
@@ -64,11 +56,7 @@ macro_rules! arrow {
 	}
 }
 
-arrow!(
-	Port: u8,
-	Direction: u8,
-	action_state::State: u16,
-);
+arrow!(Port: u8, Direction: u8, action_state::State: u16,);
 
 #[derive(Clone, Copy, Debug)]
 struct PeppiContext {
@@ -94,7 +82,10 @@ fn context(game: &game::Game, opts: Option<Opts>) -> PeppiContext {
 	}
 }
 
-fn _frames_to_arrow<const N: usize>(frames: &[frame::Frame<N>], context: PeppiContext) -> StructArray {
+fn _frames_to_arrow<const N: usize>(
+	frames: &[frame::Frame<N>],
+	context: PeppiContext,
+) -> StructArray {
 	let mut builder = frame::Frame::<N>::builder(frames.len(), context);
 	for frame in frames {
 		frame.write(&mut builder, context);
@@ -120,7 +111,10 @@ struct FrameItem {
 	item: item::Item,
 }
 
-fn _items_to_arrow<const N: usize>(frames: &[frame::Frame<N>], context: PeppiContext) -> Option<StructArray> {
+fn _items_to_arrow<const N: usize>(
+	frames: &[frame::Frame<N>],
+	context: PeppiContext,
+) -> Option<StructArray> {
 	if frames[0].items.is_some() {
 		let len = frames.iter().map(|f| f.items.as_ref().unwrap().len()).sum();
 		let mut builder = FrameItem::builder(len, context);
@@ -129,7 +123,8 @@ fn _items_to_arrow<const N: usize>(frames: &[frame::Frame<N>], context: PeppiCon
 				FrameItem {
 					frame_index: u32::try_from(idx).unwrap(),
 					item: *item,
-				}.write(&mut builder, context);
+				}
+				.write(&mut builder, context);
 			}
 		}
 		Some(builder.finish())

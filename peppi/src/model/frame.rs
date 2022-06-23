@@ -1,16 +1,11 @@
-use serde::{
-	Serialize,
-	ser::SerializeStruct,
-};
+use serde::{ser::SerializeStruct, Serialize};
 
-use crate::{
-	model::{
-		buttons,
-		enums::{action_state, attack, character, ground},
-		item,
-		primitives::{Direction, Port, Position, Velocity},
-		triggers,
-	},
+use crate::model::{
+	buttons,
+	enums::{action_state, attack, character, ground},
+	item,
+	primitives::{Direction, Port, Position, Velocity},
+	triggers,
 };
 
 use peppi_derive::Arrow;
@@ -57,14 +52,16 @@ pub struct Start {
 	/// Scene frame counter. Starts at 0 when game starts. Continues to count frames
 	/// even if the game is paused.
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "3.10")] pub scene_frame_counter: Option<u32>,
+	#[slippi(version = "3.10")]
+	pub scene_frame_counter: Option<u32>,
 }
 
 /// End-of-frame data.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct End {
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "3.7")] pub latest_finalized_frame: Option<i32>,
+	#[slippi(version = "3.7")]
+	pub latest_finalized_frame: Option<i32>,
 }
 
 /// The game tracks two different "velocities" per character, autogenous (self-induced)
@@ -78,7 +75,8 @@ pub struct Velocities {
 	pub knockback: Velocity,
 	/// For ergonomics we merge air+ground autogenous velocities into `.autogenous`, based on
 	/// the character's `airborne` state. But we also keep the original values for round-tripping.
-	#[serde(skip)] #[doc(hidden)]
+	#[serde(skip)]
+	#[doc(hidden)]
 	pub autogenous_x: AutogenousXVelocity,
 }
 
@@ -102,9 +100,11 @@ pub struct Pre {
 	pub buttons: Buttons,
 	pub state: action_state::State,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "1.2")] pub raw_analog_x: Option<u8>,
+	#[slippi(version = "1.2")]
+	pub raw_analog_x: Option<u8>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "1.4")] pub damage: Option<f32>,
+	#[slippi(version = "1.4")]
+	pub damage: Option<f32>,
 }
 
 /// Post-frame update data, for computing stats etc.
@@ -128,33 +128,44 @@ pub struct Post {
 	/// stocks remaining
 	pub stocks: u8,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "0.2")] pub state_age: Option<f32>,
+	#[slippi(version = "0.2")]
+	pub state_age: Option<f32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "2.0")] pub flags: Option<StateFlags>,
+	#[slippi(version = "2.0")]
+	pub flags: Option<StateFlags>,
 	/// used for multiple things, including hitstun frames remaining
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "2.0")] pub misc_as: Option<f32>,
+	#[slippi(version = "2.0")]
+	pub misc_as: Option<f32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "2.0")] pub airborne: Option<bool>,
+	#[slippi(version = "2.0")]
+	pub airborne: Option<bool>,
 	/// ground the character is standing on, if any
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "2.0")] pub ground: Option<ground::Ground>,
+	#[slippi(version = "2.0")]
+	pub ground: Option<ground::Ground>,
 	/// jumps remaining
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "2.0")] pub jumps: Option<u8>,
+	#[slippi(version = "2.0")]
+	pub jumps: Option<u8>,
 	/// true = successful L-Cancel
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "2.0")] pub l_cancel: Option<Option<bool>>,
+	#[slippi(version = "2.0")]
+	pub l_cancel: Option<Option<bool>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "2.1")] pub hurtbox_state: Option<HurtboxState>,
+	#[slippi(version = "2.1")]
+	pub hurtbox_state: Option<HurtboxState>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "3.5")] pub velocities: Option<Velocities>,
+	#[slippi(version = "3.5")]
+	pub velocities: Option<Velocities>,
 	/// hitlag remaining
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "3.8")] pub hitlag: Option<f32>,
+	#[slippi(version = "3.8")]
+	pub hitlag: Option<f32>,
 	/// animation the character is in (for Wait: 2 = Wait1, 3 = Wait2, 4 = Wait3)
 	#[serde(skip_serializing_if = "Option::is_none")]
-	#[slippi(version = "3.11")] pub animation_index: Option<u32>,
+	#[slippi(version = "3.11")]
+	pub animation_index: Option<u32>,
 }
 
 /// Frame data for a single character. Includes both pre-frame and post-frame data.
@@ -189,14 +200,20 @@ pub struct Frame<const N: usize> {
 	pub index: i32,
 	/// Frame data for each port. The player with the lowest port is always at index 0.
 	pub ports: [PortData; N],
-	#[slippi(version = "2.2")] pub start: Option<Start>,
-	#[slippi(version = "3.0")] pub end: Option<End>,
-	#[slippi(version = "3.0")] pub items: Option<Vec<item::Item>>,
+	#[slippi(version = "2.2")]
+	pub start: Option<Start>,
+	#[slippi(version = "3.0")]
+	pub end: Option<End>,
+	#[slippi(version = "3.0")]
+	pub items: Option<Vec<item::Item>>,
 }
 
 // workaround for Serde not supporting const generics
 impl<const N: usize> Serialize for Frame<N> {
-	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
 		let mut state = serializer.serialize_struct("Frame", 1)?;
 
 		state.serialize_field("index", &self.index)?;
