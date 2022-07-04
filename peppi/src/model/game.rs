@@ -22,7 +22,7 @@ pub const FIRST_FRAME_INDEX: i32 = -123;
 /// We can parse files with higher versions than this, but we won't expose all information.
 /// When converting a replay with a higher version number to another format like Arrow,
 /// the conversion will be lossy.
-pub const MAX_SUPPORTED_VERSION: slippi::Version = slippi::Version(3, 9, 0);
+pub const MAX_SUPPORTED_VERSION: slippi::Version = slippi::Version(3, 12, 0);
 
 pseudo_enum!(PlayerType: u8 {
 	0 => HUMAN,
