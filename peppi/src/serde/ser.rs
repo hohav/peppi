@@ -214,8 +214,12 @@ fn frame_post<W: Write>(w: &mut W, p: &frame::Post, v: slippi::Version, id: Port
 		w.write_f32::<BE>(vel.autogenous_x.ground)?;
 	}
 
-	if v >= ver(3,8) {
+	if v >= ver(3, 8) {
 		w.write_f32::<BE>(p.hitlag.unwrap())?;
+	}
+
+	if v >= ver(3, 11) {
+		w.write_u32::<BE>(p.animation_index.unwrap())?;
 	}
 
 	Ok(())
