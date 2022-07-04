@@ -100,7 +100,7 @@ impl<R: Read> Read for TrackingReader<R> {
 }
 
 /// Parse a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn parse<R: Read, H: serde::de::Handlers>(r: &mut R, handlers: &mut H, opts: Option<serde::de::Opts>) -> std::result::Result<(), ParseError> {
+pub fn parse<R: Read, H: serde::de::Handlers>(r: &mut R, handlers: &mut H, opts: Option<&serde::de::Opts>) -> std::result::Result<(), ParseError> {
 	let mut r = TrackingReader {
 		pos: 0,
 		reader: r,
@@ -110,9 +110,9 @@ pub fn parse<R: Read, H: serde::de::Handlers>(r: &mut R, handlers: &mut H, opts:
 }
 
 /// Parse a Slippi replay from `r`, returning a `game::Game` object.
-pub fn game<R: Read>(r: &mut R, parse_opts: Option<serde::de::Opts>, collect_opts: Option<serde::collect::Opts>) -> Result<model::game::Game, ParseError> {
+pub fn game<R: Read>(r: &mut R, parse_opts: Option<&serde::de::Opts>, collect_opts: Option<&serde::collect::Opts>) -> Result<model::game::Game, ParseError> {
 	let mut game_parser = serde::collect::Collector {
-		opts: collect_opts.unwrap_or_default(),
+		opts: collect_opts.map(|o| *o).unwrap_or_default(),
 		..Default::default()
 	};
 	parse(r, &mut game_parser, parse_opts)

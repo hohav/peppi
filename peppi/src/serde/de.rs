@@ -1,7 +1,9 @@
 use std::{
 	cmp::min,
 	collections::HashMap,
-	io::{self, Read, Result},
+	fs::{self, File},
+	io::{self, Read, Result, Write},
+	path::{Path, PathBuf},
 };
 
 use byteorder::ReadBytesExt;
@@ -800,12 +802,14 @@ fn handle_splitter_event(buf: &[u8], accumulator: &mut Option<Vec<u8>>) -> Resul
 /// the parsed event.
 ///
 /// Returns the number of bytes read by this function.
-fn event<R: Read, H: Handlers>(
+fn event<R: Read, H: Handlers, P: AsRef<Path>>(
 		mut r: R,
 		payload_sizes: &HashMap<u8, u16>,
 		last_char_states: &mut [CharState; NUM_PORTS],
 		handlers: &mut H,
 		splitter_accumulator: &mut Option<Vec<u8>>,
+		event_counts: &mut HashMap<u8, usize>,
+		debug_dir: Option<P>,
 	) -> Result<(usize, Option<Event>)> {
 	let mut code = r.read_u8()?;
 	debug!("Event: {:#x}", code);
@@ -821,6 +825,17 @@ fn event<R: Read, H: Handlers>(
 			buf.append(splitter_accumulator.as_mut().unwrap());
 		}
 	};
+
+	if let Some(dir) = debug_dir {
+		// write the event's raw data to "{debug_dir}/{code}/{count}",
+		// where `count` is how many of that event we've seen already
+		let code_dir = dir.as_ref().join(format!("{}", code));
+		fs::create_dir_all(&code_dir)?;
+		let count = event_counts.get(&code).unwrap_or(&0);
+		let mut f = File::create(code_dir.join(format!("{}", count)))?;
+		f.write_all(&buf)?;
+		event_counts.insert(code, count + 1);
+	}
 
 	let event = Event::try_from(code).ok();
 	if let Some(event) = event {
@@ -841,15 +856,16 @@ fn event<R: Read, H: Handlers>(
 }
 
 /// Options for parsing replays.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Opts {
 	/// Skip all frame data when parsing a replay for speed
 	/// (when you only need start/end/metadata).
 	pub skip_frames: bool,
+	pub debug_dir: Option<PathBuf>,
 }
 
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn deserialize<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: Option<Opts>) -> Result<()> {
+pub fn deserialize<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: Option<&Opts>) -> Result<()> {
 	// For speed, assume the `raw` element comes first and handle it manually.
 	// The official JS parser does this too, so it should be reliable.
 	expect_bytes(&mut r,
@@ -864,6 +880,10 @@ pub fn deserialize<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: 
 	let skip_frames = opts.map(|o| o.skip_frames).unwrap_or(false);
 
 	let mut splitter_accumulator = None;
+
+	let debug_dir = opts.map(|o| o.debug_dir.as_ref()).unwrap_or(None);
+	// track how many of each event we've seen so we know where to put the debug output
+	let mut event_counts = HashMap::<u8, usize>::new();
 
 	// `raw_len` will be 0 for an in-progress replay
 	while (raw_len == 0 || bytes_read < raw_len) && last_event != Some(Event::GameEnd) {
@@ -881,6 +901,8 @@ pub fn deserialize<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: 
 			&mut last_char_states,
 			handlers,
 			&mut splitter_accumulator,
+			&mut event_counts,
+			debug_dir,
 		)?;
 		bytes_read += bytes;
 		last_event = event;
