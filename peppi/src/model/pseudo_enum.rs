@@ -15,7 +15,7 @@ impl std::error::Error for ConversionError { }
 // An open "enum" that supports named and unnamed values.
 // Used when not all possible values are known.
 macro_rules! pseudo_enum {
-	($name: ident : $type: ty { $( $value: expr => $variant: ident ),* $(,)? }) => {
+	($name: ident : $type: ty { $( $value: expr => $variant: ident $( ( $($short: ident),* $(,)? ) )?),* $(,)? }) => {
 		#[derive(Copy, Clone, Default, PartialEq, Eq, Hash, serde::Deserialize)]
 		#[serde(transparent)]
 		pub struct $name(pub $type);
@@ -43,7 +43,8 @@ macro_rules! pseudo_enum {
 			/// Returns the enum value with the given name, if any.
 			fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
 				match s {
-					$( stringify!($variant) => Ok($name::$variant), )*
+					$( stringify!($variant) => Ok($name::$variant),
+					$($( stringify!($short) => Ok($name::$variant), )*)? )*
 					_ => Err(Self::Error {
 						r#type: format!("{}::{}", module_path!(), stringify!($name)),
 						value: s.to_string(),
