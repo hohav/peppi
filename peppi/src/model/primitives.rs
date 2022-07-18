@@ -4,7 +4,7 @@ use serde::Serialize;
 
 use peppi_derive::Arrow;
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, IntoPrimitive, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum Port {
 	P1 = 0,
@@ -31,7 +31,7 @@ impl Default for Port {
 	}
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, IntoPrimitive, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum Direction { Left, Right }
 

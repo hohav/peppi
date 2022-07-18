@@ -45,7 +45,7 @@ const DEFAULT_CHAR_STATE: CharState = CharState {
 	age: 0
 };
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct CharState {
 	character: Internal,
 	state: State,
@@ -73,7 +73,7 @@ pub trait Indexed {
 }
 
 /// Just a frame index, with no port number.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FrameId {
 	pub index: i32,
 }
@@ -97,7 +97,7 @@ impl Indexed for FrameId {
 }
 
 /// Frame index plus port number and `is_follower` flag (for ICs).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PortId {
 	pub index: i32,
 	pub port: Port,
@@ -126,7 +126,7 @@ impl Indexed for PortId {
 
 /// Wrapper for a frame event. Contains the event ID (`PortId` for per-port events,
 /// `FrameId` for other events like items).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FrameEvent<Id, Event> {
 	pub id: Id,
 	pub event: Event,

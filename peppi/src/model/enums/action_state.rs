@@ -9,7 +9,7 @@ macro_rules! state {
 		$common: ident ( $common_type: ident ),
 		$( $variant: ident ( $variant_type: ident ) => $internal: ident ),* $(,)?
 	}) => {
-		#[derive(Copy, Clone, PartialEq, Eq, serde::Serialize)]
+		#[derive(Clone, Copy, PartialEq, Eq, serde::Serialize)]
 		#[serde(untagged)]
 		pub enum $name {
 			$common($common_type),
