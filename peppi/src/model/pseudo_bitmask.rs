@@ -1,6 +1,6 @@
 macro_rules! pseudo_bitmask {
 	($name: ident : $type: ty { $( $value: expr => $variant: ident ),* $(,)? }) => {
-		#[derive(Copy, Clone, Default, PartialEq, Eq, serde::Serialize)]
+		#[derive(Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
 		pub struct $name(pub $type);
 
 		impl $name {

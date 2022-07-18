@@ -47,7 +47,7 @@ pseudo_enum!(TeamShade: u8 {
 	2 => DARK,
 });
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Team {
 	pub color: TeamColor,
 	pub shade: TeamShade,
@@ -69,14 +69,14 @@ pseudo_enum!(Language: u8 {
 });
 
 /// Information about the "Universal Controller Fix" mod.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Ucf {
 	pub dash_back: Option<DashBack>,
 	pub shield_drop: Option<ShieldDrop>,
 }
 
 /// Netplay name, connect code, and Slippi UID.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Netplay {
 	pub name: String,
 	pub code: String,
@@ -118,7 +118,7 @@ pub struct Player {
 	pub netplay: Option<Netplay>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Scene {
 	pub minor: u8,
 	pub major: u8,
@@ -173,7 +173,7 @@ pseudo_enum!(EndMethod: u8 {
 });
 
 /// Information about the end of the game.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct End {
 	/// how the game ended
 	pub method: EndMethod,
@@ -269,7 +269,7 @@ impl Frames {
 /// Binary blob of Gecko codes in use.
 ///
 /// Currently unparsed, but still needed for round-tripping.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct GeckoCodes {
 	pub bytes: Vec<u8>,
 	pub actual_size: u16,

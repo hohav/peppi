@@ -33,7 +33,7 @@ pub struct Metadata {
 	pub players: Option<Vec<Player>>,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct Netplay {
 	pub code: String,
 	pub name: String,
@@ -53,7 +53,7 @@ pub fn serialize_characters<S>(characters: &Option<HashMap<character::Internal, 
 	}
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct Player {
 	pub port: Port,
 	#[serde(skip_serializing_if = "Option::is_none")]
