@@ -22,6 +22,7 @@ use crate::{
 			ground,
 			item,
 			stage,
+			costume,
 		},
 		buttons,
 		frame::{self, Pre, Post},
@@ -181,7 +182,7 @@ fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3
 	let character = character::External(r.read_u8()?);
 	let r#type = game::PlayerType(r.read_u8()?);
 	let stocks = r.read_u8()?;
-	let costume = r.read_u8()?;
+	let costume = costume::Costume::from(r.read_u8()?, character);
 	r.read_exact(&mut unmapped[0..3])?;
 	let team_shade = r.read_u8()?;
 	let handicap = r.read_u8()?;
