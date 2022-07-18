@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::{
 	model::{
-		enums::{character, stage},
+		enums::{character, costume, stage},
 		frame::{Frame, PortData},
 		metadata,
 		primitives::Port,
@@ -94,7 +94,7 @@ pub struct Player {
 	pub r#type: PlayerType,
 	/// starting stock count
 	pub stocks: u8,
-	pub costume: u8,
+	pub costume: costume::Costume,
 	pub team: Option<Team>,
 	/// handicap level; affects `offense_ratio` & `defense_ratio`
 	pub handicap: u8,
