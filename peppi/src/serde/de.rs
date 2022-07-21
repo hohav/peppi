@@ -868,9 +868,7 @@ pub struct Opts {
 pub fn deserialize<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: Option<&Opts>) -> Result<()> {
 	// For speed, assume the `raw` element comes first and handle it manually.
 	// The official JS parser does this too, so it should be reliable.
-	expect_bytes(&mut r,
-		// top-level opening brace, `raw` key & type ("{U\x03raw[$U#l")
-		&[0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c])?;
+	expect_bytes(&mut r, &crate::SLIPPI_FILE_SIGNATURE)?;
 
 	let raw_len = r.read_u32::<BE>()? as usize;
 	info!("Raw length: {} bytes", raw_len);

@@ -7,6 +7,10 @@ macro_rules! err {
 	}
 }
 
+/// Every .slp file will start with a UBJSON opening brace, `raw` key & type: "{U\x03raw[$U#l"
+pub const SLIPPI_FILE_SIGNATURE: [u8; 11] =
+	[0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c];
+
 #[derive(Clone, Copy, Debug)]
 pub struct SerializationConfig {
 	/// Print enum names with numeric values (e.g. `14:WAIT`).
