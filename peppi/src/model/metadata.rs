@@ -132,7 +132,7 @@ fn metadata_player(port: Port, player: &Map<String, Value>) -> Result<Player> {
 			Some(Value::Object(names)) => match names.get("code") {
 				None => None,
 				Some(Value::String(code)) => match names.get("netplay") {
-					None => { warn!("ignoring netplay name without code"); None },
+					None => { warn!("Ignoring netplay name without code"); None },
 					Some(Value::String(name)) => Some(Netplay {
 						code: code.clone(),
 						name: name.clone(),

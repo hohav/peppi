@@ -873,7 +873,7 @@ pub fn deserialize<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: 
 		&[0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c])?;
 
 	let raw_len = r.read_u32::<BE>()? as usize;
-	info!("raw_len: {}", raw_len);
+	info!("Raw length: {} bytes", raw_len);
 	let (mut bytes_read, payload_sizes) = payload_sizes(&mut r)?;
 	let mut last_char_states = [DEFAULT_CHAR_STATE; NUM_PORTS];
 	let mut last_event: Option<Event> = None;
@@ -890,6 +890,7 @@ pub fn deserialize<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: 
 		if skip_frames && last_event == Some(Event::GameStart) {
 			// Skip to GameEnd, which we assume is the last event in the stream!
 			let skip = raw_len - bytes_read - payload_sizes[&(Event::GameEnd as u8)] as usize - 1;
+			info!("Jumping to GameEnd (skipping {} bytes)", skip);
 			// In theory we should seek() if `r` is Seekable, but it's not much
 			// faster and is very awkward to implement without specialization.
 			io::copy(&mut r.by_ref().take(skip as u64), &mut io::sink())?;
