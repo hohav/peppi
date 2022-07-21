@@ -104,7 +104,7 @@ pub fn frames_to_arrow(game: &game::Game, opts: Option<Opts>) -> StructArray {
 }
 
 fn _frames_from_arrow<const N: usize>(array: &dyn Array) -> Vec<frame::Frame<N>> {
-	let mut frames = Vec::new();
+	let mut frames = Vec::with_capacity(array.len());
 	for i in 0 .. array.len() {
 		frames.push(frame::Frame::<N>::arrow_default());
 		frames[i].arrow_read(array, i);
