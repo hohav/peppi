@@ -19,7 +19,7 @@ use crate::{
 	},
 };
 
-#[derive(Debug, Default, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Metadata {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub date: Option<DateTime<Utc>>,
@@ -33,7 +33,7 @@ pub struct Metadata {
 	pub players: Option<Vec<Player>>,
 }
 
-#[derive(Debug, Default, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Netplay {
 	pub code: String,
 	pub name: String,
@@ -53,7 +53,7 @@ pub fn serialize_characters<S>(characters: &Option<HashMap<character::Internal, 
 	}
 }
 
-#[derive(Debug, Default, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Player {
 	pub port: Port,
 	#[serde(skip_serializing_if = "Option::is_none")]

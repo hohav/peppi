@@ -1,8 +1,8 @@
 use std::fmt;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize)]
 pub struct Version(pub u8, pub u8, pub u8);
 
 pub const fn version(major: u8, minor: u8) -> Version {
@@ -38,7 +38,7 @@ impl fmt::Display for Version {
 }
 
 /// Information about the Slippi mod.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct Slippi {
 	pub version: Version,
 }

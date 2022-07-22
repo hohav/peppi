@@ -1,10 +1,10 @@
 use std::fmt::{self, Debug, Display, Formatter};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use peppi_derive::Arrow;
 
-#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize, IntoPrimitive, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum Port {
 	P1 = 0,

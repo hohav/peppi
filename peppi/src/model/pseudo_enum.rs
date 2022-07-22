@@ -16,8 +16,7 @@ impl std::error::Error for ConversionError { }
 // Used when not all possible values are known.
 macro_rules! pseudo_enum {
 	($name: ident : $type: ty { $( $value: expr => $variant: ident ),* $(,)? }) => {
-		#[derive(Copy, Clone, Default, PartialEq, Eq, Hash, serde::Deserialize)]
-		#[serde(transparent)]
+		#[derive(Copy, Clone, Default, PartialEq, Eq, Hash)]
 		pub struct $name(pub $type);
 
 		impl $name {

@@ -1,6 +1,6 @@
 use std::fmt::{self, Debug};
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::{
 	model::{
@@ -42,7 +42,7 @@ pseudo_enum!(TeamShade: u8 {
 	2 => DARK,
 });
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct Team {
 	pub color: TeamColor,
 	pub shade: TeamShade,
@@ -64,14 +64,14 @@ pseudo_enum!(Language: u8 {
 });
 
 /// Information about the "Universal Controller Fix" mod.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct Ucf {
 	pub dash_back: Option<DashBack>,
 	pub shield_drop: Option<ShieldDrop>,
 }
 
 /// Netplay name, connect code, and Slippi UID.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Netplay {
 	pub name: String,
 	pub code: String,
@@ -81,7 +81,7 @@ pub struct Netplay {
 }
 
 /// Information about each player such as character, team, stock count, etc.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Player {
 	pub port: Port,
 
@@ -113,14 +113,14 @@ pub struct Player {
 	pub netplay: Option<Netplay>,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct Scene {
 	pub minor: u8,
 	pub major: u8,
 }
 
 /// Information used to initialize the game such as the game mode, settings, characters & stage.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Start {
 	pub slippi: slippi::Slippi,
 	pub bitfield: [u8; 4],
@@ -168,7 +168,7 @@ pseudo_enum!(EndMethod: u8 {
 });
 
 /// Information about the end of the game.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct End {
 	/// how the game ended
 	pub method: EndMethod,
