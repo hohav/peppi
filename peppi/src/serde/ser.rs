@@ -327,10 +327,10 @@ fn raw_size(game: &Game, payload_sizes: &Vec<(u8, u16)>) -> u32 {
 	use Event::*;
 
 	let counts = match &game.frames {
-		Frames::P1(f) => frame_counts(&f),
-		Frames::P2(f) => frame_counts(&f),
-		Frames::P3(f) => frame_counts(&f),
-		Frames::P4(f) => frame_counts(&f),
+		Frames::P1(f) => frame_counts(f),
+		Frames::P2(f) => frame_counts(f),
+		Frames::P3(f) => frame_counts(f),
+		Frames::P4(f) => frame_counts(f),
 	};
 
 	let sizes: std::collections::HashMap<u8, u16> = payload_sizes.iter().map(|(k, v)| (*k, *v)).collect();
@@ -347,7 +347,7 @@ fn raw_size(game: &Game, payload_sizes: &Vec<(u8, u16)>) -> u32 {
 
 pub fn serialize<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 	let payload_sizes = payload_sizes(game);
-	let raw_size = raw_size(&game, &payload_sizes);
+	let raw_size = raw_size(game, &payload_sizes);
 
 	w.write_all(
 		&[0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c])?;

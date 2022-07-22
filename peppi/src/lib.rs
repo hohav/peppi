@@ -116,7 +116,7 @@ pub fn parse<R: Read, H: serde::de::Handlers>(r: &mut R, handlers: &mut H, opts:
 /// Parse a Slippi replay from `r`, returning a `game::Game` object.
 pub fn game<R: Read>(r: &mut R, parse_opts: Option<&serde::de::Opts>, collect_opts: Option<&serde::collect::Opts>) -> Result<model::game::Game, ParseError> {
 	let mut game_parser = serde::collect::Collector {
-		opts: collect_opts.map(|o| *o).unwrap_or_default(),
+		opts: collect_opts.copied().unwrap_or_default(),
 		..Default::default()
 	};
 	parse(r, &mut game_parser, parse_opts)

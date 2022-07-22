@@ -218,7 +218,7 @@ impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
 
 	fn data_type<C: Context>(context: C) -> DataType {
 		let field = Field::new("item", T::data_type(context), T::is_nullable());
-		DataType::FixedSizeList(Box::new(field), usize::try_from(N).unwrap())
+		DataType::FixedSizeList(Box::new(field), N)
 	}
 
 	fn arrow_array<C: Context>(context: C) -> Self::ArrowArray {

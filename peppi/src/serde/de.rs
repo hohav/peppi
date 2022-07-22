@@ -309,7 +309,7 @@ fn player_bytes_v1_0(r: &mut &[u8]) -> Result<[u8; 8]> {
 	Ok(buf)
 }
 
-pub(crate) fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
+pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 	let raw_bytes = r.to_vec();
 	let slippi = slippi::Slippi {
 		version: slippi::Version(r.read_u8()?, r.read_u8()?, r.read_u8()?),
@@ -352,20 +352,20 @@ pub(crate) fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 	let players_v1_0 = match r.is_empty() {
 		true => [None, None, None, None],
 		_ => [
-			Some(player_bytes_v1_0(&mut r)?),
-			Some(player_bytes_v1_0(&mut r)?),
-			Some(player_bytes_v1_0(&mut r)?),
-			Some(player_bytes_v1_0(&mut r)?),
+			Some(player_bytes_v1_0(r)?),
+			Some(player_bytes_v1_0(r)?),
+			Some(player_bytes_v1_0(r)?),
+			Some(player_bytes_v1_0(r)?),
 		],
 	};
 
 	let players_v1_3 = match r.is_empty() {
 		true => [None, None, None, None],
 		_ => [
-			Some(player_bytes_v1_3(&mut r)?),
-			Some(player_bytes_v1_3(&mut r)?),
-			Some(player_bytes_v1_3(&mut r)?),
-			Some(player_bytes_v1_3(&mut r)?),
+			Some(player_bytes_v1_3(r)?),
+			Some(player_bytes_v1_3(r)?),
+			Some(player_bytes_v1_3(r)?),
+			Some(player_bytes_v1_3(r)?),
 		],
 	};
 
@@ -379,25 +379,25 @@ pub(crate) fn game_start(mut r: &mut &[u8]) -> Result<game::Start> {
 	let players_v3_9 = match r.is_empty() {
 		true => ([None, None, None, None], [None, None, None, None]),
 		_ => ([
-			Some(player_bytes_v3_9_name(&mut r)?),
-			Some(player_bytes_v3_9_name(&mut r)?),
-			Some(player_bytes_v3_9_name(&mut r)?),
-			Some(player_bytes_v3_9_name(&mut r)?),
+			Some(player_bytes_v3_9_name(r)?),
+			Some(player_bytes_v3_9_name(r)?),
+			Some(player_bytes_v3_9_name(r)?),
+			Some(player_bytes_v3_9_name(r)?),
 		], [
-			Some(player_bytes_v3_9_code(&mut r)?),
-			Some(player_bytes_v3_9_code(&mut r)?),
-			Some(player_bytes_v3_9_code(&mut r)?),
-			Some(player_bytes_v3_9_code(&mut r)?),
+			Some(player_bytes_v3_9_code(r)?),
+			Some(player_bytes_v3_9_code(r)?),
+			Some(player_bytes_v3_9_code(r)?),
+			Some(player_bytes_v3_9_code(r)?),
 		]),
 	};
 
 	let players_v3_11 = match r.is_empty() {
 		true => [None, None, None, None],
 		_ => [
-			Some(player_bytes_v3_11(&mut r)?),
-			Some(player_bytes_v3_11(&mut r)?),
-			Some(player_bytes_v3_11(&mut r)?),
-			Some(player_bytes_v3_11(&mut r)?),
+			Some(player_bytes_v3_11(r)?),
+			Some(player_bytes_v3_11(r)?),
+			Some(player_bytes_v3_11(r)?),
+			Some(player_bytes_v3_11(r)?),
 		],
 	};
 
