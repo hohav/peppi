@@ -13,9 +13,43 @@ use crate::{
 	serde::de::{self, FrameEvent, FrameId, Indexed, PortId},
 };
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Rollback {
+	All, First, Last
+}
+
+impl Default for Rollback {
+	fn default() -> Self {
+		Self::All
+	}
+}
+
+impl TryFrom<&str> for Rollback {
+	type Error = String;
+	fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
+		match s {
+			"all" => Ok(Rollback::All),
+			"first" => Ok(Rollback::First),
+			"last" => Ok(Rollback::Last),
+			s => Err(format!("invalid Rollback: {}", s)),
+		}
+	}
+}
+
+impl From<Rollback> for &str {
+	fn from(r: Rollback) -> &'static str {
+		use Rollback::*;
+		match r {
+			All => "all",
+			First => "first",
+			Last => "last",
+		}
+	}
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Opts {
-	pub rollbacks: bool,
+	pub rollback: Rollback,
 }
 
 #[derive(Debug, Default)]
@@ -75,8 +109,8 @@ macro_rules! into_game {
 		let mut frames = Vec::with_capacity(frame_count);
 		for n in 0 .. frame_count {
 			frames.push(Frame {
-				index: match $gp.opts.rollbacks {
-					true => $gp.frames_index[n],
+				index: match $gp.opts.rollback {
+					Rollback::All => $gp.frames_index[n],
 					_ => n as i32 + game::FIRST_FRAME_INDEX,
 				},
 				start: $gp.frames_start.get(n).copied().unwrap_or(None),
@@ -134,8 +168,8 @@ impl Collector {
 }
 
 fn append_frame_event<Id, Event>(v: &mut Vec<Option<Event>>, evt: FrameEvent<Id, Event>, frame_count: usize, opts: Opts) -> Result<usize> where Id: Indexed, Event: Copy {
-	let idx = match opts.rollbacks {
-		true => frame_count - 1,
+	let idx = match opts.rollback {
+		Rollback::All => frame_count - 1,
 		_ => evt.id.array_index(),
 	};
 
@@ -143,10 +177,12 @@ fn append_frame_event<Id, Event>(v: &mut Vec<Option<Event>>, evt: FrameEvent<Id,
 		v.push(None);
 	}
 
-	if idx < v.len() {
-		v[idx] = Some(evt.event); // rollback
-	} else {
+	if idx > v.len() {
+		unreachable!();
+	} else if idx == v.len() {
 		v.push(Some(evt.event));
+	} else if opts.rollback == Rollback::Last {
+		v[idx] = Some(evt.event);
 	}
 
 	Ok(idx)
@@ -189,7 +225,9 @@ impl de::Handlers for Collector {
 		while self.items.len() <= idx {
 			self.items.push(Vec::new());
 		}
-		self.items[idx] = Vec::new();
+		if self.opts.rollback == Rollback::Last {
+			self.items[idx].clear();
+		}
 		Ok(())
 	}
 
@@ -222,8 +260,8 @@ impl de::Handlers for Collector {
 
 	fn item(&mut self, evt: FrameEvent<FrameId, item::Item>) -> Result<()> {
 		assert!(!self.items.is_empty());
-		let idx = match self.opts.rollbacks {
-			true => self.items.len() - 1,
+		let idx = match self.opts.rollback {
+			Rollback::All => self.items.len() - 1,
 			_ => evt.id.array_index(),
 		};
 		self.items[idx].push(evt.event);
