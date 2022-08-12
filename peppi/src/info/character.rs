@@ -1,5 +1,6 @@
 use crate::model::enums::character::External;
 
+#[non_exhaustive]
 #[derive(Clone)]
 pub struct Info {
 	pub external: External,
