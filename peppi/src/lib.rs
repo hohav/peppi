@@ -52,6 +52,10 @@ pub mod model {
 	}
 }
 
+pub mod info {
+	pub mod character;
+}
+
 pub mod serde {
 	pub mod arrow;
 	pub mod collect;
