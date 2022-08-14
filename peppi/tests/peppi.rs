@@ -54,7 +54,7 @@ fn slippi_old_version() -> Result<(), String> {
 	let game = game("v0.1")?;
 	let players = game.start.players;
 
-	assert_eq!(game.start.slippi.version, Version(0, 1, 0));
+	assert_eq!(game.start.slippi.version, Version(0, 1, 0, 0));
 	assert_eq!(game.metadata.duration, None);
 
 	assert_eq!(players.len(), 2);
@@ -96,7 +96,7 @@ fn basic_game() -> Result<(), String> {
 	});
 
 	assert_eq!(game.start, Start {
-		slippi: Slippi { version: Version(1, 0, 0) },
+		slippi: Slippi { version: Version(1, 0, 0, 0) },
 		bitfield: [50, 1, 134, 76],
 		is_raining_bombs: false,
 		is_teams: false,
@@ -366,7 +366,7 @@ fn console_name() -> Result<(), String> {
 #[test]
 fn v2() -> Result<(), String> {
 	let game = game("v2.0")?;
-	assert_eq!(game.start.slippi.version, Version(2, 0, 1));
+	assert_eq!(game.start.slippi.version, Version(2, 0, 1, 0));
 	Ok(())
 }
 
@@ -375,7 +375,7 @@ fn v3_12() -> Result<(), String> {
 	let game = game("v3.12")?;
 
 	assert_eq!(game.start, Start {
-		slippi: Slippi { version: Version(3, 12, 0) },
+		slippi: Slippi { version: Version(3, 12, 0, 0) },
 		bitfield: [50, 1, 142, 76],
 		is_raining_bombs: false,
 		is_teams: false,
