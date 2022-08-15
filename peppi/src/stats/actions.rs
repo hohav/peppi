@@ -119,14 +119,14 @@ impl ActionComputer {
                     continue;
                 }
 
-                stat_state.count_actions(curr_state);
+                stat_state.count_actions(curr_state, &post);
             }
         }
     }
 }
 
 impl PlayerStatState {
-    fn count_actions(&mut self, curr_state: State) -> () {
+    fn count_actions(&mut self, curr_state: State, _post: &Post) -> () {
         let actions: &mut ActionStat = &mut self.actions;
         match curr_state {
             State::Common(Common::ATTACK_11) => actions.jab1 += 1,
