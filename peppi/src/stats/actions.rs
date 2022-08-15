@@ -3,7 +3,7 @@ use crate::stats::interface::StatComputer;
 use crate::model::{
     game::{self, Start, Frames},
     frame::Frame,
-    enums::action_state::{State, Common},
+    enums::action_state::*,
 };
 
 #[derive(Clone, Default, Debug)]
@@ -105,44 +105,61 @@ impl ActionComputer {
 
                 // update state_state for the next frame
                 stat_state.last_three_states.pop_front();
-                stat_state.last_three_states.push_back(post.state);
+                stat_state.last_three_states.push_back(curr_state);
                 stat_state.last_state_age = curr_age;
 
                 if !is_new_action {
                     continue;
                 }
 
-                // TODO streamline this pattern
-                match curr_state {
-                    State::Common(Common::ATTACK_11) => stat_state.actions.jab1 += 1,
-                    State::Common(Common::ATTACK_12) => stat_state.actions.jab2 += 1,
-                    State::Common(Common::ATTACK_13) => stat_state.actions.jab3 += 1,
-                    State::Common(Common::ATTACK_100_START) => stat_state.actions.jabm += 1,
-                    State::Common(Common::ATTACK_DASH) => stat_state.actions.dash += 1,
-                    State::Common(Common::ATTACK_S_3_HI) => stat_state.actions.ftilt += 1,
-                    State::Common(Common::ATTACK_S_3_HI_S) => stat_state.actions.ftilt += 1,
-                    State::Common(Common::ATTACK_S_3_S) => stat_state.actions.ftilt += 1,
-                    State::Common(Common::ATTACK_S_3_LW_S) => stat_state.actions.ftilt += 1,
-                    State::Common(Common::ATTACK_S_3_LW) => stat_state.actions.ftilt += 1,
-                    State::Common(Common::ATTACK_HI_3) => stat_state.actions.utilt += 1,
-                    State::Common(Common::ATTACK_LW_3) => stat_state.actions.dtilt += 1,
-                    State::Common(Common::ATTACK_S_4_HI) => stat_state.actions.fsmash += 1,
-                    State::Common(Common::ATTACK_S_4_HI_S) => stat_state.actions.fsmash += 1,
-                    State::Common(Common::ATTACK_S_4_S) => stat_state.actions.fsmash += 1,
-                    State::Common(Common::ATTACK_S_4_LW_S) => stat_state.actions.fsmash += 1,
-                    State::Common(Common::ATTACK_S_4_LW) => stat_state.actions.fsmash += 1,
-                    State::Common(Common::ATTACK_HI_4) => stat_state.actions.usmash += 1,
-                    State::Common(Common::ATTACK_LW_4) => stat_state.actions.dsmash += 1,
-                    State::Common(Common::ATTACK_AIR_N) => stat_state.actions.nair += 1,
-                    State::Common(Common::ATTACK_AIR_F) => stat_state.actions.fair += 1,
-                    State::Common(Common::ATTACK_AIR_B) => stat_state.actions.bair += 1,
-                    State::Common(Common::ATTACK_AIR_HI) => stat_state.actions.uair += 1,
-                    State::Common(Common::ATTACK_AIR_LW) => stat_state.actions.dair += 1,
-                    //TODO GnW & Peach quirks
-                    _ => (),
-                }
-
+                stat_state.count_actions(curr_state);
             }
+        }
+    }
+}
+
+impl PlayerStatState {
+    fn count_actions(&mut self, curr_state: State) -> () {
+        let actions: &mut ActionStat = &mut self.actions;
+        match curr_state {
+            State::Common(Common::ATTACK_11) => actions.jab1 += 1,
+            State::Common(Common::ATTACK_12) => actions.jab2 += 1,
+            State::Common(Common::ATTACK_13) => actions.jab3 += 1,
+            State::Common(Common::ATTACK_100_START) => actions.jabm += 1,
+            State::Common(Common::ATTACK_DASH) => actions.dash += 1,
+            State::Common(Common::ATTACK_S_3_HI) => actions.ftilt += 1,
+            State::Common(Common::ATTACK_S_3_HI_S) => actions.ftilt += 1,
+            State::Common(Common::ATTACK_S_3_S) => actions.ftilt += 1,
+            State::Common(Common::ATTACK_S_3_LW_S) => actions.ftilt += 1,
+            State::Common(Common::ATTACK_S_3_LW) => actions.ftilt += 1,
+            State::Common(Common::ATTACK_HI_3) => actions.utilt += 1,
+            State::Common(Common::ATTACK_LW_3) => actions.dtilt += 1,
+            State::Common(Common::ATTACK_S_4_HI) => actions.fsmash += 1,
+            State::Common(Common::ATTACK_S_4_HI_S) => actions.fsmash += 1,
+            State::Common(Common::ATTACK_S_4_S) => actions.fsmash += 1,
+            State::Common(Common::ATTACK_S_4_LW_S) => actions.fsmash += 1,
+            State::Common(Common::ATTACK_S_4_LW) => actions.fsmash += 1,
+            State::Common(Common::ATTACK_HI_4) => actions.usmash += 1,
+            State::Common(Common::ATTACK_LW_4) => actions.dsmash += 1,
+            State::Common(Common::ATTACK_AIR_N) => actions.nair += 1,
+            State::Common(Common::ATTACK_AIR_F) => actions.fair += 1,
+            State::Common(Common::ATTACK_AIR_B) => actions.bair += 1,
+            State::Common(Common::ATTACK_AIR_HI) => actions.uair += 1,
+            State::Common(Common::ATTACK_AIR_LW) => actions.dair += 1,
+
+            State::GameAndWatch(GameAndWatch::JAB) => actions.jab1 += 1,
+            State::GameAndWatch(GameAndWatch::RAPID_JABS_START) => actions.jabm += 1,
+            State::GameAndWatch(GameAndWatch::DOWN_TILT) => actions.dtilt += 1,
+            State::GameAndWatch(GameAndWatch::SIDE_SMASH) => actions.fsmash += 1,
+            State::GameAndWatch(GameAndWatch::NAIR) => actions.nair += 1,
+            State::GameAndWatch(GameAndWatch::BAIR) => actions.bair += 1,
+            State::GameAndWatch(GameAndWatch::UAIR) => actions.uair += 1,
+
+            State::Peach(Peach::SIDE_SMASH_GOLF_CLUB) => actions.fsmash += 1,
+            State::Peach(Peach::SIDE_SMASH_FRYING_PAN) => actions.fsmash += 1,
+            State::Peach(Peach::SIDE_SMASH_TENNIS_RACKET) => actions.fsmash += 1,
+
+            _ => (),
         }
     }
 }
