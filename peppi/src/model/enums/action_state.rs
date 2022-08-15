@@ -624,8 +624,8 @@ pseudo_enum!(Fox: u16 {
 
 pseudo_enum!(GameAndWatch: u16 {
 	341 => JAB,
-	342 => JAB_2,
-	343 => RAPID_JABS,
+	342 => RAPID_JABS_START,
+	343 => RAPID_JABS_LOOP,
 	344 => RAPID_JABS_END,
 	345 => DOWN_TILT,
 	346 => SIDE_SMASH,
