@@ -114,13 +114,12 @@ impl ActionComputer {
             for (stat_state, post) in stat_state_iter.zip(post_iter) {
 
                 // get state/age values
-                let last_state = stat_state.last_states.back().unwrap();
+                let last_state = *stat_state.last_states.back().unwrap();
                 let last_age = stat_state.last_state_age;
                 let curr_state = post.state;
                 let curr_age = post.state_age.unwrap();
 
-                let is_new_action = curr_state != *last_state || last_age > curr_age;
-                drop(last_state);
+                let is_new_action = curr_state != last_state || last_age > curr_age;
 
                 // update stat_state for the next frame
 				// we pop from back and push to front so .get(n) returns the 
