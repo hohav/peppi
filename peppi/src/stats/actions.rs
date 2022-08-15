@@ -34,7 +34,6 @@ impl Default for PlayerStatState {
     }
 }
 
-// TODO add more fields/subfields
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
 pub struct ActionStat {
 	jab1: u16,
@@ -53,6 +52,14 @@ pub struct ActionStat {
 	bair: u16,
 	uair: u16,
 	dair: u16,
+    fthrow: u16,
+    bthrow: u16,
+    uthrow: u16,
+    dthrow: u16,
+    roll: u16,
+    spotdodge: u16,
+    airdodge: u16,
+    ledgegrab: u16,
 }
 
 impl StatComputer for ActionComputer {
@@ -127,18 +134,10 @@ impl PlayerStatState {
             State::Common(Common::ATTACK_13) => actions.jab3 += 1,
             State::Common(Common::ATTACK_100_START) => actions.jabm += 1,
             State::Common(Common::ATTACK_DASH) => actions.dash += 1,
-            State::Common(Common::ATTACK_S_3_HI) => actions.ftilt += 1,
-            State::Common(Common::ATTACK_S_3_HI_S) => actions.ftilt += 1,
-            State::Common(Common::ATTACK_S_3_S) => actions.ftilt += 1,
-            State::Common(Common::ATTACK_S_3_LW_S) => actions.ftilt += 1,
-            State::Common(Common::ATTACK_S_3_LW) => actions.ftilt += 1,
+            State::Common(s) if s.0 >= Common::ATTACK_S_3_HI.0 && s.0 <= Common::ATTACK_S_3_LW.0 => actions.ftilt += 1,
             State::Common(Common::ATTACK_HI_3) => actions.utilt += 1,
             State::Common(Common::ATTACK_LW_3) => actions.dtilt += 1,
-            State::Common(Common::ATTACK_S_4_HI) => actions.fsmash += 1,
-            State::Common(Common::ATTACK_S_4_HI_S) => actions.fsmash += 1,
-            State::Common(Common::ATTACK_S_4_S) => actions.fsmash += 1,
-            State::Common(Common::ATTACK_S_4_LW_S) => actions.fsmash += 1,
-            State::Common(Common::ATTACK_S_4_LW) => actions.fsmash += 1,
+            State::Common(s) if s.0 >= Common::ATTACK_S_4_HI.0 && s.0 <= Common::ATTACK_S_4_LW.0 => actions.ftilt += 1,
             State::Common(Common::ATTACK_HI_4) => actions.usmash += 1,
             State::Common(Common::ATTACK_LW_4) => actions.dsmash += 1,
             State::Common(Common::ATTACK_AIR_N) => actions.nair += 1,
@@ -147,6 +146,7 @@ impl PlayerStatState {
             State::Common(Common::ATTACK_AIR_HI) => actions.uair += 1,
             State::Common(Common::ATTACK_AIR_LW) => actions.dair += 1,
 
+            // GnW has standard moves coded as special moves
             State::GameAndWatch(GameAndWatch::JAB) => actions.jab1 += 1,
             State::GameAndWatch(GameAndWatch::RAPID_JABS_START) => actions.jabm += 1,
             State::GameAndWatch(GameAndWatch::DOWN_TILT) => actions.dtilt += 1,
@@ -155,9 +155,23 @@ impl PlayerStatState {
             State::GameAndWatch(GameAndWatch::BAIR) => actions.bair += 1,
             State::GameAndWatch(GameAndWatch::UAIR) => actions.uair += 1,
 
+            // Peach fsmashes are coded as special moves
             State::Peach(Peach::SIDE_SMASH_GOLF_CLUB) => actions.fsmash += 1,
             State::Peach(Peach::SIDE_SMASH_FRYING_PAN) => actions.fsmash += 1,
             State::Peach(Peach::SIDE_SMASH_TENNIS_RACKET) => actions.fsmash += 1,
+
+            // Throws
+            State::Common(Common::THROW_F) => actions.fthrow += 1,
+            State::Common(Common::THROW_B) => actions.bthrow += 1,
+            State::Common(Common::THROW_HI) => actions.uthrow += 1,
+            State::Common(Common::THROW_LW) => actions.dthrow += 1,
+
+            // Other
+            State::Common(Common::ESCAPE_F) => actions.roll += 1,
+            State::Common(Common::ESCAPE_B) => actions.roll += 1,
+            State::Common(Common::ESCAPE) => actions.spotdodge += 1,
+            //State::Common(Common::ESCAPE_AIR) => actions.airdodge += 1,
+            State::Common(Common::CLIFF_CATCH) => actions.ledgegrab += 1,
 
             _ => (),
         }
