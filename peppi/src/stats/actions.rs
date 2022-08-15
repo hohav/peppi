@@ -2,8 +2,8 @@ use std::collections::VecDeque;
 use crate::stats::interface::StatComputer;
 use crate::model::{
     game::{self, Start, Frames},
-    frame::Frame,
     slippi::Version,
+    frame::{Frame, Post},
     enums::action_state::*,
 };
 
@@ -17,20 +17,20 @@ pub struct ActionComputer {
 struct PlayerStatState {
     actions: ActionStat,
     last_state_age: f32,
-	last_three_states: VecDeque<State>,
+	last_states: VecDeque<State>,
 }
 
 impl Default for PlayerStatState {
     fn default() -> Self {
         let actions = Default::default();
         let last_state_age = -1.0;
-        let mut last_three_states = VecDeque::new();
-        last_three_states.resize_with(3, Default::default);
+        let mut last_states = VecDeque::new();
+        last_states.resize_with(8, Default::default);
 
         PlayerStatState {
             actions,
             last_state_age,
-            last_three_states,
+            last_states,
         }
     }
 }
@@ -41,7 +41,7 @@ pub struct ActionStat {
 	pub jab2: u16,
 	pub jab3: u16,
 	pub jabm: u16,
-	pub dash: u16,
+	pub dash_attack: u16,
 	pub ftilt: u16,
 	pub utilt: u16,
 	pub dtilt: u16,
@@ -58,9 +58,14 @@ pub struct ActionStat {
     pub uthrow: u16,
     pub dthrow: u16,
     pub roll: u16,
-    pub spotdodge: u16,
-    pub airdodge: u16,
-    pub ledgegrab: u16,
+    pub spot_dodge: u16,
+    pub air_dodge: u16,
+    pub ledge_grab: u16,
+    pub dash_dance: u16,
+    pub wavedash: u16,
+    pub waveland: u16,
+    pub grab: u16,
+    pub grab_success: u16,
 }
 
 impl StatComputer for ActionComputer {
@@ -109,7 +114,7 @@ impl ActionComputer {
             for (stat_state, post) in stat_state_iter.zip(post_iter) {
 
                 // get state/age values
-                let last_state = stat_state.last_three_states.back().unwrap();
+                let last_state = stat_state.last_states.back().unwrap();
                 let last_age = stat_state.last_state_age;
                 let curr_state = post.state;
                 let curr_age = post.state_age.unwrap();
@@ -117,9 +122,11 @@ impl ActionComputer {
                 let is_new_action = curr_state != *last_state || last_age > curr_age;
                 drop(last_state);
 
-                // update state_state for the next frame
-                stat_state.last_three_states.pop_front();
-                stat_state.last_three_states.push_back(curr_state);
+                // update stat_state for the next frame
+				// we pop from back and push to front so .get(n) returns the 
+				// nth most recent state (0 index is current state)
+                stat_state.last_states.pop_back();
+                stat_state.last_states.push_front(curr_state);
                 stat_state.last_state_age = curr_age;
 
                 if !is_new_action {
@@ -140,11 +147,11 @@ impl PlayerStatState {
             State::Common(Common::ATTACK_12) => actions.jab2 += 1,
             State::Common(Common::ATTACK_13) => actions.jab3 += 1,
             State::Common(Common::ATTACK_100_START) => actions.jabm += 1,
-            State::Common(Common::ATTACK_DASH) => actions.dash += 1,
-            State::Common(s) if s.0 >= Common::ATTACK_S_3_HI.0 && s.0 <= Common::ATTACK_S_3_LW.0 => actions.ftilt += 1,
+            State::Common(Common::ATTACK_DASH) => actions.dash_attack += 1,
+            State::Common(s) if is_ftilt(s) => actions.ftilt += 1,
             State::Common(Common::ATTACK_HI_3) => actions.utilt += 1,
             State::Common(Common::ATTACK_LW_3) => actions.dtilt += 1,
-            State::Common(s) if s.0 >= Common::ATTACK_S_4_HI.0 && s.0 <= Common::ATTACK_S_4_LW.0 => actions.ftilt += 1,
+            State::Common(s) if is_fsmash(s) => actions.fsmash += 1,
             State::Common(Common::ATTACK_HI_4) => actions.usmash += 1,
             State::Common(Common::ATTACK_LW_4) => actions.dsmash += 1,
             State::Common(Common::ATTACK_AIR_N) => actions.nair += 1,
@@ -176,11 +183,99 @@ impl PlayerStatState {
             // Other
             State::Common(Common::ESCAPE_F) => actions.roll += 1,
             State::Common(Common::ESCAPE_B) => actions.roll += 1,
-            State::Common(Common::ESCAPE) => actions.spotdodge += 1,
-            //State::Common(Common::ESCAPE_AIR) => actions.airdodge += 1,
-            State::Common(Common::CLIFF_CATCH) => actions.ledgegrab += 1,
+            State::Common(Common::ESCAPE) => actions.spot_dodge += 1,
+            State::Common(Common::ESCAPE_AIR) => actions.air_dodge += 1,
+            State::Common(Common::CLIFF_CATCH) => actions.ledge_grab += 1,
+            State::Common(Common::DASH) if is_dash_dance(&self.last_states)
+                => actions.dash_dance += 1,
 
             _ => (),
         }
+
+        self.handle_wavething();
+        self.handle_grab();
     }
+
+    // Share code for wavedash and waveland
+    fn handle_wavething(&mut self) -> () {
+        // Must be in special landing
+        let curr_state: State = *self.last_states.get(0).unwrap();
+        if curr_state != State::Common(Common::LANDING_FALL_SPECIAL) {
+            return;
+        }
+
+        // Previous state must have been airdodge or a jump/falling state
+        let prev_state: State = *self.last_states.get(1).unwrap();
+        if let State::Common(prev_state) = prev_state {
+            if !(prev_state == Common::ESCAPE_AIR ||
+                (prev_state.0 >= Common::KNEE_BEND.0 &&
+                prev_state.0 <= Common::FALL_AERIAL_B.0)) {
+                return;
+            }
+        }
+
+        // If many of the previous states are an airdodge then it was probably
+        // an airdodge (it's a long animation)
+        if self.last_states.range(1..8).all(|s| *s == State::Common(Common::ESCAPE_AIR)) {
+            return;
+        }
+
+        // Don't count imperfect wavelands/wavedashes as an air dodge action
+        if self.last_states.range(1..8).any(|s| *s == State::Common(Common::ESCAPE_AIR)) {
+            self.actions.air_dodge -= 1;
+        }
+
+        // Recent knee bend means it's a wavedash
+        // Otherwise, it's a waveland
+        if self.last_states.range(1..8).any(|s| *s == State::Common(Common::KNEE_BEND)) {
+            self.actions.wavedash += 1;
+        } else {
+            self.actions.waveland += 1;
+        }
+    }
+
+    fn handle_grab(&mut self) -> () {
+        let curr_state: State = *self.last_states.get(0).unwrap();
+        let prev_state: State = *self.last_states.get(1).unwrap();
+        match curr_state {
+            State::Common(s) if is_grabbing(s) => self.actions.grab += 1,
+            State::Common(s) if is_grab_action(s) => {
+                if let State::Common(prev_state) = prev_state {
+                    if is_grabbing(prev_state) {
+                        self.actions.grab_success += 1;
+                    }
+                }
+            }
+            // Don't count boost grabs as dash attack
+            State::Common(Common::CATCH_DASH) => {
+                if prev_state == State::Common(Common::ATTACK_DASH) {
+                    self.actions.dash_attack -= 1;
+                }
+            },
+            _ => ()
+        }
+    }
+}
+
+fn is_ftilt(state: Common) -> bool {
+	state.0 >= Common::ATTACK_S_3_HI.0 && state.0 <= Common::ATTACK_S_3_LW.0
+}
+
+fn is_fsmash(state: Common) -> bool {
+	state.0 >= Common::ATTACK_S_4_HI.0 && state.0 <= Common::ATTACK_S_4_LW.0
+}
+
+fn is_grabbing(state: Common) -> bool {
+	state.0 == Common::CATCH.0 || state.0 == Common::CATCH_DASH.0
+}
+
+// returns true for any state that could happen after a successful grab
+fn is_grab_action(state: Common) -> bool {
+	state.0 > Common::CATCH.0 && state.0 <= Common::THROW_LW.0 && state != Common::CATCH_DASH
+}
+
+fn is_dash_dance(last_states: &VecDeque<State>) -> bool {
+	*last_states.get(0).unwrap() == State::Common(Common::DASH) &&
+	*last_states.get(1).unwrap() == State::Common(Common::TURN) &&
+	*last_states.get(2).unwrap() == State::Common(Common::DASH)
 }
