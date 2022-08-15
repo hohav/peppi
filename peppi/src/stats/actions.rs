@@ -3,6 +3,7 @@ use crate::stats::interface::StatComputer;
 use crate::model::{
     game::{self, Start, Frames},
     frame::Frame,
+    slippi::Version,
     enums::action_state::*,
 };
 
@@ -65,7 +66,13 @@ pub struct ActionStat {
 impl StatComputer for ActionComputer {
 	type Stat = Vec<ActionStat>;
 
+    // Requires action state frame counter field to work properly
+    const MIN_VERSION: Version = Version(0, 2, 0);
+
 	fn new(start: &Start) -> Self {
+        if start.slippi.version < Self::MIN_VERSION {
+            panic!("Minimum version required: {} given: {}", Self::MIN_VERSION, start.slippi.version);
+        }
         let last_frame_processed = game::FIRST_FRAME_INDEX - 1;
 		let mut player_stat_states: Vec<PlayerStatState> = Vec::new();
         player_stat_states.resize_with(start.players.len(), Default::default);
@@ -105,7 +112,7 @@ impl ActionComputer {
                 let last_state = stat_state.last_three_states.back().unwrap();
                 let last_age = stat_state.last_state_age;
                 let curr_state = post.state;
-                let curr_age = post.state_age.unwrap(); // TODO handle old versions
+                let curr_age = post.state_age.unwrap();
 
                 let is_new_action = curr_state != *last_state || last_age > curr_age;
                 drop(last_state);
