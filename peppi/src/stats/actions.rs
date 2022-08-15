@@ -16,20 +16,20 @@ pub struct ActionComputer {
 #[derive(Clone, Debug)]
 struct PlayerStatState {
     actions: ActionStat,
-    last_state_age: f32,
+    prev_age: f32,
 	last_states: VecDeque<State>,
 }
 
 impl Default for PlayerStatState {
     fn default() -> Self {
         let actions = Default::default();
-        let last_state_age = -1.0;
+        let prev_age = -1.0;
         let mut last_states = VecDeque::new();
         last_states.resize_with(8, Default::default);
 
         PlayerStatState {
             actions,
-            last_state_age,
+            prev_age,
             last_states,
         }
     }
@@ -114,19 +114,19 @@ impl ActionComputer {
             for (stat_state, post) in stat_state_iter.zip(post_iter) {
 
                 // get state/age values
-                let last_state = *stat_state.last_states.back().unwrap();
-                let last_age = stat_state.last_state_age;
+                let prev_state = *stat_state.last_states.front().unwrap();
+                let prev_age = stat_state.prev_age;
                 let curr_state = post.state;
                 let curr_age = post.state_age.unwrap();
 
-                let is_new_action = curr_state != last_state || last_age > curr_age;
+                let is_new_action = curr_state != prev_state || prev_age > curr_age;
 
                 // update stat_state for the next frame
 				// we pop from back and push to front so .get(n) returns the 
 				// nth most recent state (0 index is current state)
                 stat_state.last_states.pop_back();
                 stat_state.last_states.push_front(curr_state);
-                stat_state.last_state_age = curr_age;
+                stat_state.prev_age = curr_age;
 
                 if !is_new_action {
                     continue;
