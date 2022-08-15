@@ -237,18 +237,19 @@ impl PlayerStatState {
         let curr_state: State = *self.last_states.get(0).unwrap();
         let prev_state: State = *self.last_states.get(1).unwrap();
         match curr_state {
-            State::Common(s) if is_grabbing(s) => self.actions.grab += 1,
+            State::Common(Common::CATCH) => self.actions.grab += 1,
+            State::Common(Common::CATCH_DASH) => {
+                self.actions.grab += 1;
+                // Don't count boost grabs as dash attack
+                if prev_state == State::Common(Common::ATTACK_DASH) {
+                    self.actions.dash_attack -= 1;
+                }
+            },
             State::Common(s) if is_grab_action(s) => {
                 if let State::Common(prev_state) = prev_state {
                     if is_grabbing(prev_state) {
                         self.actions.grab_success += 1;
                     }
-                }
-            }
-            // Don't count boost grabs as dash attack
-            State::Common(Common::CATCH_DASH) => {
-                if prev_state == State::Common(Common::ATTACK_DASH) {
-                    self.actions.dash_attack -= 1;
                 }
             },
             _ => ()
