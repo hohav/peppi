@@ -103,7 +103,7 @@ impl StatComputer for ActionComputer {
 		}
 	}
 
-	fn process(&mut self, frames: &Frames) -> () {
+	fn process(&mut self, frames: &Frames) {
 		match frames {
 			Frames::P1(fs) => self.process_impl(fs),
 			Frames::P2(fs) => self.process_impl(fs),
@@ -118,7 +118,7 @@ impl StatComputer for ActionComputer {
 }
 
 impl ActionComputer {
-	fn process_impl<const N: usize>(&mut self, frames: &[Frame<N>]) -> () {
+	fn process_impl<const N: usize>(&mut self, frames: &[Frame<N>]) {
 		for frame in frames {
 			if frame.index <= self.last_frame_processed {
 				continue;
@@ -154,7 +154,7 @@ impl ActionComputer {
 }
 
 impl PlayerStatState {
-	fn count_actions(&mut self, post: &Post) -> () {
+	fn count_actions(&mut self, post: &Post) {
 		let actions: &mut ActionStat = &mut self.actions;
 		match post.state {
 			// Basic attacks
@@ -226,7 +226,7 @@ impl PlayerStatState {
 	}
 
 	// Share code for wavedash and waveland
-	fn handle_wavething(&mut self) -> () {
+	fn handle_wavething(&mut self) {
 		// Must be in special landing
 		let curr_state: State = *self.last_states.get(0).unwrap();
 		if curr_state != State::Common(Common::LANDING_FALL_SPECIAL) {
@@ -263,7 +263,7 @@ impl PlayerStatState {
 		}
 	}
 
-	fn handle_grab(&mut self) -> () {
+	fn handle_grab(&mut self) {
 		let curr_state: State = *self.last_states.get(0).unwrap();
 		let prev_state: State = *self.last_states.get(1).unwrap();
 		match curr_state {
@@ -286,7 +286,7 @@ impl PlayerStatState {
 		}
 	}
 
-	fn handle_l_cancel(&mut self, post: &Post) -> () {
+	fn handle_l_cancel(&mut self, post: &Post) {
 		match (&mut self.actions.l_cancel, post.l_cancel, post.state) {
 			(None, Some(_), _) => {
 				self.actions.l_cancel = Some(LCancel { success: 0, fail: 0 });
@@ -302,7 +302,7 @@ impl PlayerStatState {
 		}
 	}
 
-	fn handle_wall_tech(&mut self) -> () {
+	fn handle_wall_tech(&mut self) {
 		let curr_state: State = *self.last_states.get(0).unwrap();
 		let prev_state: State = *self.last_states.get(1).unwrap();
 
