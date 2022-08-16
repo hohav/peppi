@@ -61,6 +61,14 @@ pub struct ActionStat {
 	pub spot_dodge: u16,
 	pub air_dodge: u16,
 	pub ledge_grab: u16,
+	pub ground_tech_neutral: u16,
+	pub ground_tech_roll: u16,
+	pub ground_bounce: u16,
+	pub wall_tech_neutral: u16,
+	pub wall_tech_jump: u16,
+	pub wall_bounce: u16,
+	pub ceiling_tech: u16,
+	pub ceiling_bounce: u16,
 	pub dash_dance: u16,
 	pub wavedash: u16,
 	pub waveland: u16,
@@ -179,6 +187,16 @@ impl PlayerStatState {
 			State::Common(Common::ESCAPE) => actions.spot_dodge += 1,
 			State::Common(Common::ESCAPE_AIR) => actions.air_dodge += 1,
 
+			// Techs
+			State::Common(Common::PASSIVE) => actions.ground_tech_neutral += 1,
+			State::Common(Common::PASSIVE_STAND_F) |
+			State::Common(Common::PASSIVE_STAND_B) => actions.ground_tech_roll += 1,
+			State::Common(Common::PASSIVE_CEIL) => actions.ceiling_tech += 1,
+			State::Common(Common::DOWN_BOUND_U) |
+			State::Common(Common::DOWN_BOUND_D) => actions.ground_bounce += 1,
+			State::Common(Common::FLY_REFLECT_WALL) => actions.wall_bounce += 1,
+			State::Common(Common::FLY_REFLECT_CEIL) => actions.ceiling_bounce += 1,
+
 			// Other
 			State::Common(Common::CLIFF_CATCH) => actions.ledge_grab += 1,
 			State::Common(Common::DASH) if is_dash_dance(&self.last_states)
@@ -204,6 +222,7 @@ impl PlayerStatState {
 		self.handle_wavething();
 		self.handle_grab();
 		self.handle_l_cancel(post);
+		self.handle_wall_tech();
 	}
 
 	// Share code for wavedash and waveland
@@ -283,6 +302,22 @@ impl PlayerStatState {
 		}
 	}
 
+	fn handle_wall_tech(&mut self) -> () {
+		let curr_state: State = *self.last_states.get(0).unwrap();
+		let prev_state: State = *self.last_states.get(1).unwrap();
+
+		match curr_state {
+			State::Common(Common::PASSIVE_WALL) => self.actions.wall_tech_neutral += 1,
+			State::Common(Common::PASSIVE_WALL_JUMP) => {
+				self.actions.wall_tech_jump += 1;
+				// Don't double count if we were in passive before
+				if prev_state == State::Common(Common::PASSIVE_WALL) {
+					self.actions.wall_tech_neutral -= 1;
+				}
+			},
+			_ => ()
+		}
+	}
 }
 
 fn is_ftilt(state: Common) -> bool {
