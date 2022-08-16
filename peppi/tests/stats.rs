@@ -37,6 +37,7 @@ fn throw_grab() -> Result<(), String> {
 
 	Ok(())
 }
+
 #[test]
 fn gnw_actions() -> Result<(), String> {
 	let game = game("gnw_actions")?;
@@ -55,8 +56,8 @@ fn gnw_actions() -> Result<(), String> {
 	assert_eq!(actions.bair, 1);
 	assert_eq!(actions.uair, 1);
 	assert_eq!(actions.dair, 1);
-	//TODOassert_eq!(actions.LCancelSuccess, 2);
-	//assert_eq!(actions.LCancelFail, 0);
+	assert_eq!(actions.l_cancel.as_ref().unwrap().success, 2);
+	assert_eq!(actions.l_cancel.as_ref().unwrap().fail, 0);
 
 	Ok(())
 }

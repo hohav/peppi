@@ -66,6 +66,13 @@ pub struct ActionStat {
 	pub waveland: u16,
 	pub grab: u16,
 	pub grab_success: u16,
+	pub l_cancel: Option<LCancel> // v2.0.0 and later only
+}
+
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
+pub struct LCancel {
+	pub success: u16,
+	pub fail: u16,
 }
 
 impl StatComputer for ActionComputer {
@@ -132,16 +139,17 @@ impl ActionComputer {
 					continue;
 				}
 
-				stat_state.count_actions(curr_state, &post);
+				stat_state.count_actions(&post);
 			}
 		}
 	}
 }
 
 impl PlayerStatState {
-	fn count_actions(&mut self, curr_state: State, _post: &Post) -> () {
+	fn count_actions(&mut self, post: &Post) -> () {
 		let actions: &mut ActionStat = &mut self.actions;
-		match curr_state {
+		match post.state {
+			// Basic attacks
 			State::Common(Common::ATTACK_11) => actions.jab1 += 1,
 			State::Common(Common::ATTACK_12) => actions.jab2 += 1,
 			State::Common(Common::ATTACK_13) => actions.jab3 += 1,
@@ -159,6 +167,23 @@ impl PlayerStatState {
 			State::Common(Common::ATTACK_AIR_HI) => actions.uair += 1,
 			State::Common(Common::ATTACK_AIR_LW) => actions.dair += 1,
 
+			// Throws
+			State::Common(Common::THROW_F) => actions.fthrow += 1,
+			State::Common(Common::THROW_B) => actions.bthrow += 1,
+			State::Common(Common::THROW_HI) => actions.uthrow += 1,
+			State::Common(Common::THROW_LW) => actions.dthrow += 1,
+
+			// Dodges
+			State::Common(Common::ESCAPE_F) |
+			State::Common(Common::ESCAPE_B) => actions.roll += 1,
+			State::Common(Common::ESCAPE) => actions.spot_dodge += 1,
+			State::Common(Common::ESCAPE_AIR) => actions.air_dodge += 1,
+
+			// Other
+			State::Common(Common::CLIFF_CATCH) => actions.ledge_grab += 1,
+			State::Common(Common::DASH) if is_dash_dance(&self.last_states)
+				=> actions.dash_dance += 1,
+
 			// GnW has standard moves coded as special moves
 			State::GameAndWatch(GameAndWatch::JAB) => actions.jab1 += 1,
 			State::GameAndWatch(GameAndWatch::RAPID_JABS_START) => actions.jabm += 1,
@@ -173,26 +198,12 @@ impl PlayerStatState {
 			State::Peach(Peach::SIDE_SMASH_FRYING_PAN) |
 			State::Peach(Peach::SIDE_SMASH_TENNIS_RACKET) => actions.fsmash += 1,
 
-			// Throws
-			State::Common(Common::THROW_F) => actions.fthrow += 1,
-			State::Common(Common::THROW_B) => actions.bthrow += 1,
-			State::Common(Common::THROW_HI) => actions.uthrow += 1,
-			State::Common(Common::THROW_LW) => actions.dthrow += 1,
-
-			// Other
-			State::Common(Common::ESCAPE_F) |
-			State::Common(Common::ESCAPE_B) => actions.roll += 1,
-			State::Common(Common::ESCAPE) => actions.spot_dodge += 1,
-			State::Common(Common::ESCAPE_AIR) => actions.air_dodge += 1,
-			State::Common(Common::CLIFF_CATCH) => actions.ledge_grab += 1,
-			State::Common(Common::DASH) if is_dash_dance(&self.last_states)
-				=> actions.dash_dance += 1,
-
 			_ => (),
 		}
 
 		self.handle_wavething();
 		self.handle_grab();
+		self.handle_l_cancel(post);
 	}
 
 	// Share code for wavedash and waveland
@@ -255,6 +266,23 @@ impl PlayerStatState {
 			_ => ()
 		}
 	}
+
+	fn handle_l_cancel(&mut self, post: &Post) -> () {
+		match (&mut self.actions.l_cancel, post.l_cancel, post.state) {
+			(None, Some(_), _) => {
+				self.actions.l_cancel = Some(LCancel { success: 0, fail: 0 });
+			},
+			(Some(l_cancel_stat), Some(Some(l_cancel_post)), State::Common(state))
+			if is_aerial_landing(state) => {
+				match l_cancel_post {
+					true => l_cancel_stat.success += 1,
+					false => l_cancel_stat.fail += 1,
+				}
+			}
+			_ => (),
+		}
+	}
+
 }
 
 fn is_ftilt(state: Common) -> bool {
@@ -263,6 +291,10 @@ fn is_ftilt(state: Common) -> bool {
 
 fn is_fsmash(state: Common) -> bool {
 	state.0 >= Common::ATTACK_S_4_HI.0 && state.0 <= Common::ATTACK_S_4_LW.0
+}
+
+fn is_aerial_landing(state: Common) -> bool {
+	state.0 >= Common::LANDING_AIR_N.0 || state.0 <= Common::LANDING_AIR_LW.0
 }
 
 fn is_grabbing(state: Common) -> bool {
