@@ -55,6 +55,7 @@ pub mod model {
 pub mod info {
 	#[macro_use] #[doc(hidden)] pub(crate) mod info;
 	pub mod character;
+	pub mod stage;
 }
 
 pub mod serde {
