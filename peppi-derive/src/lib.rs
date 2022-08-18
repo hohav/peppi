@@ -180,7 +180,6 @@ impl ToTokens for MyInputReceiver {
 					let num_fields = builder.num_fields();
 					#arrow_writers
 					builder.append(true)
-						.expect(stringify!(Failed to append for: #ident));
 				}
 
 				fn write_null<C: ::peppi_arrow::Context>(builder: &mut dyn ::arrow::array::ArrayBuilder, context: C) {
@@ -189,7 +188,6 @@ impl ToTokens for MyInputReceiver {
 					let num_fields = builder.num_fields();
 					#arrow_null_writers
 					builder.append(false)
-						.expect(stringify!(Failed to append null for: #ident));
 				}
 
 				fn read(&mut self, array: ::arrow::array::ArrayRef, idx: usize) {
