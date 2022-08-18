@@ -256,6 +256,7 @@ pub mod internal {
         pub internal: Internal,
         pub jumpsquat: u8,
         pub empty_landing_lag: u8,
+        pub can_walljump: bool,
     }
 
     info!(Internal => Info {
@@ -263,180 +264,210 @@ pub mod internal {
             internal: Internal::MARIO,
             jumpsquat: 4,
             empty_landing_lag: 4,
+            can_walljump: true,
         };
 
         FOX {
             internal: Internal::FOX,
             jumpsquat: 3,
             empty_landing_lag: 4,
+            can_walljump: true,
         };
 
         CAPTAIN_FALCON {
             internal: Internal::CAPTAIN_FALCON,
             jumpsquat: 4,
             empty_landing_lag: 4,
+            can_walljump: true,
         };
 
         DONKEY_KONG {
             internal: Internal::DONKEY_KONG,
             jumpsquat: 5,
             empty_landing_lag: 5,
+            can_walljump: false,
         };
 
         KIRBY {
             internal: Internal::KIRBY,
             jumpsquat: 3,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         BOWSER {
             internal: Internal::BOWSER,
             jumpsquat: 8,
             empty_landing_lag: 6,
+            can_walljump: false,
         };
 
         LINK {
             internal: Internal::LINK,
             jumpsquat: 6,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         SHEIK {
             internal: Internal::SHEIK,
             jumpsquat: 3,
             empty_landing_lag: 4,
+            can_walljump: true,
         };
 
         NESS {
             internal: Internal::NESS,
             jumpsquat: 4,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         PEACH {
             internal: Internal::PEACH,
             jumpsquat: 5,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         POPO {
             internal: Internal::POPO,
             jumpsquat: 3,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         NANA {
             internal: Internal::NANA,
             jumpsquat: 3,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         PIKACHU {
             internal: Internal::PIKACHU,
             jumpsquat: 3,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         SAMUS {
             internal: Internal::SAMUS,
             jumpsquat: 3,
             empty_landing_lag: 4,
+            can_walljump: true,
         };
 
         YOSHI {
             internal: Internal::YOSHI,
             jumpsquat: 5,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         JIGGLYPUFF {
             internal: Internal::JIGGLYPUFF,
             jumpsquat: 5,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         MEWTWO {
             internal: Internal::MEWTWO,
             jumpsquat: 5,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         LUIGI {
             internal: Internal::LUIGI,
             jumpsquat: 4,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         MARTH {
             internal: Internal::MARTH,
             jumpsquat: 4,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         ZELDA {
             internal: Internal::ZELDA,
             jumpsquat: 6,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         YOUNG_LINK {
             internal: Internal::YOUNG_LINK,
             jumpsquat: 4,
             empty_landing_lag: 4,
+            can_walljump: true,
         };
 
         DR_MARIO {
             internal: Internal::DR_MARIO,
             jumpsquat: 4,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         FALCO {
             internal: Internal::FALCO,
             jumpsquat: 5,
             empty_landing_lag: 4,
+            can_walljump: true,
         };
 
         PICHU {
             internal: Internal::PICHU,
             jumpsquat: 3,
             empty_landing_lag: 2,
+            can_walljump: true,
         };
 
         GAME_AND_WATCH {
             internal: Internal::GAME_AND_WATCH,
             jumpsquat: 4,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         GANONDORF {
             internal: Internal::GANONDORF,
             jumpsquat: 6,
             empty_landing_lag: 5,
+            can_walljump: false,
         };
 
         ROY {
             internal: Internal::ROY,
             jumpsquat: 5,
             empty_landing_lag: 4,
+            can_walljump: false,
         };
 
         WIRE_FRAME_MALE {
             internal: Internal::WIRE_FRAME_MALE,
             jumpsquat: 7,
             empty_landing_lag: 15,
+            can_walljump: false,
         };
 
         WIRE_FRAME_FEMALE {
             internal: Internal::WIRE_FRAME_FEMALE,
             jumpsquat: 7,
             empty_landing_lag: 15,
+            can_walljump: false,
         };
 
         GIGA_BOWSER {
             internal: Internal::GIGA_BOWSER,
             jumpsquat: 6,
             empty_landing_lag: 30,
+            can_walljump: false,
         };
     });
 }
