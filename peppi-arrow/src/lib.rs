@@ -67,11 +67,11 @@ macro_rules! primitives {
 			}
 
 			fn write<C: Context>(&self, builder: &mut dyn ArrayBuilder, _context: C) {
-				builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap().append_value(*self).unwrap()
+				builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap().append_value(*self)
 			}
 
 			fn write_null<C: Context>(builder: &mut dyn ArrayBuilder, _context: C) {
-				builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap().append_null().unwrap()
+				builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap().append_null()
 			}
 
 			fn read(&mut self, array: ArrayRef, idx: usize) {
@@ -109,11 +109,11 @@ impl Arrow for bool {
 	}
 
 	fn write<C: Context>(&self, builder: &mut dyn ArrayBuilder, _context: C) {
-		builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap().append_value(*self).unwrap()
+		builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap().append_value(*self)
 	}
 
 	fn write_null<C: Context>(builder: &mut dyn ArrayBuilder, _context: C) {
-		builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap().append_null().unwrap()
+		builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap().append_null()
 	}
 
 	fn read(&mut self, array: ArrayRef, idx: usize) {
@@ -212,12 +212,12 @@ impl<T> Arrow for Vec<T> where T: Arrow {
 		for x in self {
 			x.write(builder.values(), context);
 		}
-		builder.append(true).unwrap();
+		builder.append(true);
 	}
 
 	fn write_null<C: Context>(builder: &mut dyn ArrayBuilder, _context: C) {
 		let builder = builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap();
-		builder.append(false).unwrap();
+		builder.append(false);
 	}
 
 	fn read(&mut self, array: ArrayRef, idx: usize) {
@@ -275,7 +275,7 @@ impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
 		for (i, x) in self.iter().enumerate() {
 			x.write(builder.field_builder::<T::Builder>(i).unwrap(), context);
 		}
-		builder.append(true).unwrap();
+		builder.append(true);
 	}
 
 	fn write_null<C: Context>(builder: &mut dyn ArrayBuilder, context: C) {
@@ -283,7 +283,7 @@ impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
 		for i in 0 .. N {
 			T::write_null(builder.field_builder::<T::Builder>(i).unwrap(), context);
 		}
-		builder.append(false).unwrap();
+		builder.append(false);
 	}
 
 	fn read(&mut self, array: ArrayRef, idx: usize) {
@@ -323,12 +323,12 @@ impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
 		for i in 0 .. N {
 			self[i].write(builder.values(), context);
 		}
-		builder.append(true).unwrap();
+		builder.append(true);
 	}
 
 	fn write_null<C: Context>(builder: &mut dyn ArrayBuilder, context: C) {
 		let builder = builder.as_any_mut().downcast_mut::<Self::Builder>().unwrap();
-		builder.append(false).unwrap();
+		builder.append(false);
 	}
 
 	fn read(&mut self, array: ArrayRef, idx: usize) {

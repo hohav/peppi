@@ -8,4 +8,4 @@ repository = "https://github.com/hohav/peppi"
 version = "0.2.3"
 
 [dependencies]
-arrow = "7.0"
+arrow = "20.0.0"
