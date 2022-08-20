@@ -11,14 +11,17 @@ use peppi::{
 			item,
 			stage::Stage,
 		},
-		frame::Buttons,
+		frame::{self, Buttons},
 		game::{DashBack, End, EndMethod, Frames, Game, Language, Netplay, Player, PlayerType, Scene, Start, ShieldDrop, Ucf},
 		item::Item,
 		metadata::{self, Metadata},
 		primitives::{Direction, Port, Position, Velocity},
 		slippi::{Slippi, Version},
 	},
-	serde,
+	serde::{
+		self,
+		collect::{self, Rollback},
+	},
 };
 
 fn read_game(path: &str) -> Result<Game, String> {
@@ -524,7 +527,7 @@ fn items() -> Result<(), String> {
 
 #[test]
 fn round_trip() -> Result<(), String> {
-	let game1 = game("v2.0")?;
+	let game1 = game("ics2")?;
 	let path = "/tmp/peppi_test_round_trip.slp";
 	let mut buf = fs::File::create(path).unwrap();
 	serde::ser::serialize(&mut buf, &game1).map_err(|e| format!("couldn't serialize game: {:?}", e))?;
@@ -542,8 +545,34 @@ fn round_trip() -> Result<(), String> {
 				assert_eq!(f1[idx], f2[idx], "frame: {}", idx);
 			}
 		},
-		_ => Err("wrong number of ports")?,
+		_ => return Err("wrong number of ports".to_string()),
 	}
 
+	Ok(())
+}
+
+fn rollback_frames(rollback: Rollback) -> Result<Vec<frame::Frame<2>>, String> {
+	let mut buf = io::BufReader::new(
+		fs::File::open("tests/data/ics2.slp").unwrap());
+	let opts = collect::Opts { rollback };
+	let game = peppi::game(&mut buf, None, Some(&opts)).map_err(|e| format!("couldn't deserialize game: {:?}", e))?;
+	match game.frames {
+		Frames::P2(frames) => Ok(frames),
+		_ => Err("not a 2-player game".to_string()),
+	}
+}
+
+#[test]
+fn rollback() -> Result<(), String> {
+	let frames_all = rollback_frames(Rollback::All)?;
+	let frames_first = rollback_frames(Rollback::First)?;
+	let frames_last = rollback_frames(Rollback::Last)?;
+	assert_eq!(frames_all.len(), 9530);
+	assert_eq!(frames_first.len(), 9519);
+	assert_eq!(frames_last.len(), 9519);
+	assert_eq!(frames_all[474], frames_first[474]);
+	assert_eq!(frames_all[475], frames_last[474]);
+	assert_eq!(frames_all[476], frames_first[475]);
+	assert_eq!(frames_all[476], frames_last[475]);
 	Ok(())
 }
