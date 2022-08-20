@@ -159,8 +159,8 @@ pub struct Start {
 }
 
 impl Start {
-	pub fn from_bytes(bytes: &[u8]) -> std::io::Result<Self> {
-		de::game_start(&mut bytes.clone())
+	pub fn from_bytes(bytes: &[u8]) -> io::Result<Self> {
+		de::game_start(&mut &bytes[..])
 	}
 }
 
@@ -188,8 +188,8 @@ pub struct End {
 }
 
 impl End {
-	pub fn from_bytes(bytes: &[u8]) -> std::io::Result<Self> {
-		de::game_end(&mut bytes.clone())
+	pub fn from_bytes(bytes: &[u8]) -> io::Result<Self> {
+		de::game_end(&mut &bytes[..])
 	}
 }
 

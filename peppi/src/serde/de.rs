@@ -173,6 +173,7 @@ fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, HashMap<u8, u16>)> {
 	Ok((1 + size as usize, sizes)) // +1 byte for the event code
 }
 
+#[allow(clippy::too_many_arguments)]
 fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3: Option<[u8; 16]>, v3_9_name: Option<[u8; 31]>, v3_9_code: Option<[u8; 10]>, v3_11: Option<[u8; 29]>) -> Result<Option<Player>> {
 	let mut r = &v0[..];
 	let mut unmapped = [0; 15];

@@ -239,6 +239,7 @@ impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
 
 	fn arrow_read(&mut self, array: &dyn Array, idx: usize) {
 		let slice = array.as_any().downcast_ref::<FixedSizeListArray>().unwrap().value(idx);
+		#[allow(clippy::needless_range_loop)]
 		for i in 0 .. slice.len() {
 			self[i].arrow_read(slice.as_ref(), i);
 		}
