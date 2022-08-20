@@ -8,4 +8,4 @@ repository = "https://github.com/hohav/peppi"
 version = "0.2.3"
 
 [dependencies]
-arrow2 = { path = "../../arrow2" }
+arrow2 = { git = "https://github.com/jorgecarleitao/arrow2.git", rev = "f75ce4266e04c4084fa5666c6c5ff5efd6b5036f" }
