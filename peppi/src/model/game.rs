@@ -1,11 +1,16 @@
-use std::fmt::{self, Debug};
+use std::{
+	any::Any,
+	error,
+	fmt::{self, Display, Debug, Formatter},
+	io,
+};
 
 use serde::Serialize;
 
 use crate::{
 	model::{
 		enums::{character, stage},
-		frame,
+		frame::{Frame, PortData},
 		metadata,
 		primitives::Port,
 		slippi,
@@ -188,20 +193,50 @@ impl End {
 	}
 }
 
-/// Encapsulates the frame data.
-///
-/// Exists because `peppi::model::frame::Frame` is a const-generic type whose size varies.
+/// Type-erasing wrapper for frame data. This allows `Game` not to be generic.
 #[derive(Debug, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Frames {
-	P1(Vec<frame::Frame<1>>),
-	P2(Vec<frame::Frame<2>>),
-	P3(Vec<frame::Frame<3>>),
-	P4(Vec<frame::Frame<4>>),
+	P1(Vec<Frame<1>>),
+	P2(Vec<Frame<2>>),
+	P3(Vec<Frame<3>>),
+	P4(Vec<Frame<4>>),
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct UnexpectedPortCountError {
+	pub expected: usize,
+	pub actual: usize,
+}
+
+impl Display for UnexpectedPortCountError {
+	fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+		write!(f, "expected {} ports, got {}", self.expected, self.actual)
+	}
+}
+
+impl error::Error for UnexpectedPortCountError { }
+
 impl Frames {
-	pub fn len(&self) -> usize {
+	/// Tries to downcast our inner value to a `Vec<Frame<N>>`.
+	pub fn downcast<const N: usize>(&self) -> Result<&Vec<Frame<N>>, UnexpectedPortCountError> {
+		match self {
+			Self::P1(frames) => (frames as &dyn Any)
+				.downcast_ref::<Vec<Frame<N>>>()
+				.ok_or(UnexpectedPortCountError {expected: N, actual: 1}),
+			Self::P2(frames) => (frames as &dyn Any)
+				.downcast_ref::<Vec<Frame<N>>>()
+				.ok_or(UnexpectedPortCountError {expected: N, actual: 2}),
+			Self::P3(frames) => (frames as &dyn Any)
+				.downcast_ref::<Vec<Frame<N>>>()
+				.ok_or(UnexpectedPortCountError {expected: N, actual: 3}),
+			Self::P4(frames) => (frames as &dyn Any)
+				.downcast_ref::<Vec<Frame<N>>>()
+				.ok_or(UnexpectedPortCountError {expected: N, actual: 4}),
+		}
+	}
+
+	pub fn frame_count(&self) -> usize {
 		match self {
 			Self::P1(frames) => frames.len(),
 			Self::P2(frames) => frames.len(),
@@ -210,8 +245,24 @@ impl Frames {
 		}
 	}
 
-	pub fn is_empty(&self) -> bool {
-		self.len() == 0
+	pub fn port_count(&self) -> usize {
+		match self {
+			Self::P1(_) => 1,
+			Self::P2(_) => 2,
+			Self::P3(_) => 3,
+			Self::P4(_) => 4,
+		}
+	}
+
+	/// Returns the port data for this frame & port index.
+	/// Frames are indexed from zero here, not -123.
+	pub fn port_data(&self, frame_idx: usize, port_idx: usize) -> Option<&PortData> {
+		match self {
+			Self::P1(frames) => frames.get(frame_idx).and_then(|f| f.ports.get(port_idx)),
+			Self::P2(frames) => frames.get(frame_idx).and_then(|f| f.ports.get(port_idx)),
+			Self::P3(frames) => frames.get(frame_idx).and_then(|f| f.ports.get(port_idx)),
+			Self::P4(frames) => frames.get(frame_idx).and_then(|f| f.ports.get(port_idx)),
+		}
 	}
 }
 
@@ -241,7 +292,7 @@ pub struct Game {
 }
 
 impl Debug for Game {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		f.debug_struct("Game")
 			.field("metadata", &self.metadata)
 			.field("start", &self.start)
