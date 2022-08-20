@@ -97,7 +97,7 @@ impl Indexed for FrameId {
 }
 
 /// Frame index plus port number and `is_follower` flag (for ICs).
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PortId {
 	pub index: i32,
 	pub port: Port,
@@ -126,7 +126,7 @@ impl Indexed for PortId {
 
 /// Wrapper for a frame event. Contains the event ID (`PortId` for per-port events,
 /// `FrameId` for other events like items).
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct FrameEvent<Id, Event> {
 	pub id: Id,
 	pub event: Event,
