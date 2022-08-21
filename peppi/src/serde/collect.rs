@@ -13,7 +13,7 @@ use crate::{
 	serde::de::{self, FrameEvent, FrameId, Indexed, PortId},
 };
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Rollback {
 	All, First, Last
 }

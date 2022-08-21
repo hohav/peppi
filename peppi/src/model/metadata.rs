@@ -19,7 +19,7 @@ use crate::{
 	},
 };
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct Metadata {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub date: Option<DateTime<Utc>>,

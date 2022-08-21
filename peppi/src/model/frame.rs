@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// Controller button state.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Arrow)]
 pub struct Buttons {
 	pub logical: buttons::Logical,
 	pub physical: buttons::Physical,
@@ -50,7 +50,7 @@ pseudo_enum!(HurtboxState: u8 {
 });
 
 /// Start-of-frame data.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Arrow)]
 pub struct Start {
 	pub random_seed: u32,
 	/// Scene frame counter. Starts at 0 when game starts. Continues to count frames
@@ -60,7 +60,7 @@ pub struct Start {
 }
 
 /// End-of-frame data.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Arrow)]
 pub struct End {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "3.7")] pub latest_finalized_frame: Option<i32>,

@@ -14,7 +14,7 @@ use arrow2::{
 	datatypes::{DataType, Field},
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SlippiVersion (pub u8, pub u8, pub u8);
 
 pub trait Context: Copy {
