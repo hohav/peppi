@@ -478,9 +478,7 @@ fn items() -> Result<(), String> {
 			let mut items: HashMap<u32, Item> = HashMap::new();
 			for f in frames {
 				for i in f.items.unwrap() {
-					if !items.contains_key(&i.id) {
-						items.insert(i.id, i);
-					}
+					items.entry(i.id).or_insert(i);
 				}
 			}
 			assert_eq!(items[&0], Item {
