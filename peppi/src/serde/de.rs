@@ -81,7 +81,7 @@ pub struct FrameId {
 impl FrameId {
 	fn new(index: i32) -> FrameId {
 		FrameId {
-			index: index,
+			index,
 		}
 	}
 }
@@ -106,10 +106,11 @@ pub struct PortId {
 
 impl PortId {
 	pub fn new(index: i32, port: u8, is_follower: bool) -> Result<PortId> {
+		let port = Port::try_from(port).map_err(|e| err!("invalid port: {:?}", e))?;
 		Ok(PortId {
-			index: index,
-			port: Port::try_from(port).map_err(|e| err!("invalid port: {:?}", e))?,
-			is_follower: is_follower,
+			index,
+			port,
+			is_follower,
 		})
 	}
 }
@@ -257,24 +258,24 @@ fn player(port: Port, v0: &[u8; 36], is_teams: bool, v1_0: Option<[u8; 8]>, v1_3
 
 	Ok(match r#type {
 		PlayerType::HUMAN | PlayerType::CPU | PlayerType::DEMO => Some(Player {
-			port: port,
-			character: character,
-			r#type: r#type,
-			stocks: stocks,
-			costume: costume,
-			team: team,
-			handicap: handicap,
-			bitfield: bitfield,
-			cpu_level: cpu_level,
-			offense_ratio: offense_ratio,
-			defense_ratio: defense_ratio,
-			model_scale: model_scale,
+			port,
+			character,
+			r#type,
+			stocks,
+			costume,
+			team,
+			handicap,
+			bitfield,
+			cpu_level,
+			offense_ratio,
+			defense_ratio,
+			model_scale,
 			// v1_0
-			ucf: ucf,
+			ucf,
 			// v1_3
-			name_tag: name_tag,
+			name_tag,
 			// v3.9
-			netplay: netplay,
+			netplay,
 		}),
 		_ => None,
 	})
@@ -409,30 +410,30 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 		}
 	}
 
-	let lang = if_more(r, |r| Ok(game::Language(r.read_u8()?)))?;
+	let language = if_more(r, |r| Ok(game::Language(r.read_u8()?)))?;
 
 	Ok(game::Start {
-		slippi: slippi,
-		bitfield: bitfield,
-		is_raining_bombs: is_raining_bombs,
-		is_teams: is_teams,
-		item_spawn_frequency: item_spawn_frequency,
-		self_destruct_score: self_destruct_score,
-		stage: stage,
-		timer: timer,
-		item_spawn_bitfield: item_spawn_bitfield,
-		damage_ratio: damage_ratio,
-		players: players,
-		random_seed: random_seed,
-		raw_bytes: raw_bytes,
+		slippi,
+		bitfield,
+		is_raining_bombs,
+		is_teams,
+		item_spawn_frequency,
+		self_destruct_score,
+		stage,
+		timer,
+		item_spawn_bitfield,
+		damage_ratio,
+		players,
+		random_seed,
+		raw_bytes,
 		// v1.5
-		is_pal: is_pal,
+		is_pal,
 		// v2.0
-		is_frozen_ps: is_frozen_ps,
+		is_frozen_ps,
 		// v3.7
-		scene: scene,
+		scene,
 		// v3.12
-		language: lang,
+		language,
 	})
 }
 
@@ -558,21 +559,24 @@ fn frame_pre(r: &mut &[u8], last_char_states: &[CharState; NUM_PORTS]) -> Result
 		},
 	};
 
+	let raw_analog_x = if_more(r, |r| r.read_u8())?;
+	let damage = if_more(r, |r| r.read_f32::<BE>())?;
+
 	Ok(FrameEvent {
-		id: id,
+		id,
 		event: Pre {
-			random_seed: random_seed,
-			state: state,
-			position: position,
-			direction: direction,
-			joystick: joystick,
-			cstick: cstick,
-			triggers: triggers,
-			buttons: buttons,
+			random_seed,
+			state,
+			position,
+			direction,
+			joystick,
+			cstick,
+			triggers,
+			buttons,
 			// v1.2
-			raw_analog_x: if_more(r, |r| r.read_u8())?,
+			raw_analog_x,
 			// v1.4
-			damage: if_more(r, |r| r.read_f32::<BE>())?,
+			damage,
 		}
 	})
 }
@@ -699,35 +703,35 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 	update_last_char_state(id, character, state, last_char_states);
 
 	Ok(FrameEvent {
-		id: id,
+		id,
 		event: Post {
-			character: character,
-			state: state,
-			position: position,
-			direction: direction,
-			damage: damage,
-			shield: shield,
-			last_attack_landed: last_attack_landed,
-			combo_count: combo_count,
-			last_hit_by: last_hit_by,
-			stocks: stocks,
+			character,
+			state,
+			position,
+			direction,
+			damage,
+			shield,
+			last_attack_landed,
+			combo_count,
+			last_hit_by,
+			stocks,
 			// v0.2
-			state_age: state_age,
+			state_age,
 			// v2.0
-			flags: flags,
-			misc_as: misc_as,
-			airborne: airborne,
-			ground: ground,
-			jumps: jumps,
-			l_cancel: l_cancel,
+			flags,
+			misc_as,
+			airborne,
+			ground,
+			jumps,
+			l_cancel,
 			// v2.1
-			hurtbox_state: hurtbox_state,
+			hurtbox_state,
 			// v3.5
-			velocities: velocities,
+			velocities,
 			// v3.8
-			hitlag: hitlag,
+			hitlag,
 			// v3.11
-			animation_index: animation_index,
+			animation_index,
 		},
 	})
 }
