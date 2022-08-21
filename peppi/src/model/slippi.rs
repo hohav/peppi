@@ -25,7 +25,7 @@ impl TryFrom<&str> for Version {
 			0 => unreachable!(),
 			1 => Ok(Version(v[0], 0, 0)),
 			2 => Ok(Version(v[0], v[1], 0)),
-			3 => Ok(Version(v[0], v[1], v[3])),
+			3 => Ok(Version(v[0], v[1], v[2])),
 			_ => Err(ParseVersionError("too many components".to_string())),
 		}
 	}
