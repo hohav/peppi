@@ -208,43 +208,6 @@ pub mod external {
             long: "Popo",
         };
     });
-
-
-    info_regex!(Info {
-        CAPTAIN_FALCON: r"(?i-u)^(capt(ain|\.)?[ _]?)?falcon$",
-        DONKEY_KONG: r"(?i-u)^dk|(donkey[ _]?kong$",
-        FOX: r"(?i-u)^fox$",
-        GAME_AND_WATCH: r"(?i-u)^(g|game)[ _]?(and|&|n)[ _]?(w|watch)$",
-        KIRBY: r"(?i-u)^kirby$",
-        BOWSER: r"(?i-u)^bowser$",
-        LINK: r"(?i-u)^link$",
-        LUIGI: r"(?i-u)^luigi$",
-        MARIO: r"(?i-u)^mario$",
-        MARTH: r"(?i-u)^marth$",
-        MEWTWO: r"(?i-u)^mewtwo|mew2|m2$",
-        NESS: r"(?i-u)^ness$",
-        PEACH: r"(?i-u)^peach$",
-        PIKACHU: r"(?i-u)^pika(chu)?$",
-        ICE_CLIMBERS: r"(?i-u)^ic(|s|ies|e[ _]?climbers)$",
-        JIGGLYPUFF: r"(?i-u)^(jiggly)?puff|jiggs$",
-        SAMUS: r"(?i-u)^samus$",
-        YOSHI: r"(?i-u)^yoshi$",
-        ZELDA: r"(?i-u)^zelda$",
-        SHEIK: r"(?i-u)^sheik$",
-        FALCO: r"(?i-u)^falco$",
-        YOUNG_LINK: r"(?i-u)^(y\.?|young)[ _]?(l|link$",
-        DR_MARIO: r"(?i-u)^doc|dr\.?[ _]?mario$",
-        ROY: r"(?i-u)^roy$",
-        PICHU: r"(?i-u)^pichu$",
-        GANONDORF: r"(?i-u)^ganon(dorf)?$",
-        MASTER_HAND: r"(?i-u)^master[ _]?hand$",
-        WIRE_FRAME_MALE: r"(?i-u)^male[ _]?wire[ _]?frame|wire[ _]?frame[ _]?male$",
-        WIRE_FRAME_FEMALE: r"(?i-u)^female[ _]?wire[ _]?frame|wire[ _]?frame[ _]?female$",
-        GIGA_BOWSER: r"(?i-u)^giga[ _]?bowser$",
-        CRAZY_HAND: r"(?i-u)^crazy[ _]?hand$",
-        SANDBAG: r"(?i-u)^sandbag$",
-        POPO: r"(?i-u)^popo$",
-    });
 }
 
 pub mod internal {
