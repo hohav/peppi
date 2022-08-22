@@ -21,6 +21,14 @@ macro_rules! costume {
 				}
 			}
 
+			#[cfg(feature = "regex_match")]
+			pub fn try_match(character: External, s: &str) -> Option<$name> {
+				match character {
+					$( External::$external => $variant_type::try_match(s).map($name::$variant), )*
+					_ => None,
+				}
+			}
+
 			pub fn default(character: External) -> $name {
 				match character {
 					$( External::$external => $name::$variant($variant_type(0)), )*
