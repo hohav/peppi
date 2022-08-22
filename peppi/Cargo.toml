@@ -12,12 +12,17 @@ arrow2 = { git = "https://github.com/jorgecarleitao/arrow2.git", rev = "f75ce426
 byteorder = "1"
 chrono = { version = "0.4", features = ["serde"] }
 encoding_rs = "0.8"
+lazy_static = { version = "1.4.0", optional = true }
 log = "0.4"
 num_enum = "0.5"
 peppi-arrow = { path = "../peppi-arrow" }
 peppi-derive = { path = "../peppi-derive" }
+regex = { version = "1", default-features = false, features = ["perf"], optional = true}
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
+
+[features]
+regex_match = ["dep:regex", "dep:lazy_static"]
 
 [lib]
 name = "peppi"
