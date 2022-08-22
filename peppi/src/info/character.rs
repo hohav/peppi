@@ -5,207 +5,207 @@ pub mod external {
     #[derive(Clone, Debug)]
     pub struct Info {
         pub external: External,
-        pub short: &'static str,
-        pub long: &'static str,
+        pub short_name: &'static str,
+        pub long_name: &'static str,
     }
 
     info!(External => Info {
         CAPTAIN_FALCON {
             external: External::CAPTAIN_FALCON,
-            short: "Falcon",
-            long: "Captain Falcon",
+            short_name: "Falcon",
+            long_name: "Captain Falcon",
         };
 
         DONKEY_KONG {
             external: External::DONKEY_KONG,
-            short: "DK",
-            long: "Donkey Kong",
+            short_name: "DK",
+            long_name: "Donkey Kong",
         };
 
         FOX {
             external: External::FOX,
-            short: "Fox",
-            long: "Fox",
+            short_name: "Fox",
+            long_name: "Fox",
         };
 
         GAME_AND_WATCH {
             external: External::GAME_AND_WATCH,
-            short: "G&W",
-            long: "Game and Watch",
+            short_name: "G&W",
+            long_name: "Game and Watch",
         };
 
         KIRBY {
             external: External::KIRBY,
-            short: "Kirby",
-            long: "Kirby",
+            short_name: "Kirby",
+            long_name: "Kirby",
         };
 
         BOWSER {
             external: External::BOWSER,
-            short: "Bowser",
-            long: "Bowser",
+            short_name: "Bowser",
+            long_name: "Bowser",
         };
 
         LINK {
             external: External::LINK,
-            short: "Link",
-            long: "Link",
+            short_name: "Link",
+            long_name: "Link",
         };
 
         LUIGI {
             external: External::LUIGI,
-            short: "Luigi",
-            long: "Luigi",
+            short_name: "Luigi",
+            long_name: "Luigi",
         };
 
         MARIO {
             external: External::MARIO,
-            short: "Mario",
-            long: "Mario",
+            short_name: "Mario",
+            long_name: "Mario",
         };
 
         MARTH {
             external: External::MARTH,
-            short: "Marth",
-            long: "Marth",
+            short_name: "Marth",
+            long_name: "Marth",
         };
 
         MEWTWO {
             external: External::MEWTWO,
-            short: "Mewtwo",
-            long: "Mewtwo",
+            short_name: "Mewtwo",
+            long_name: "Mewtwo",
         };
 
         NESS {
             external: External::NESS,
-            short: "Ness",
-            long: "Ness",
+            short_name: "Ness",
+            long_name: "Ness",
         };
 
         PEACH {
             external: External::PEACH,
-            short: "Peach",
-            long: "Peach",
+            short_name: "Peach",
+            long_name: "Peach",
         };
 
         PIKACHU {
             external: External::PIKACHU,
-            short: "Pika",
-            long: "Pikachu",
+            short_name: "Pika",
+            long_name: "Pikachu",
         };
 
         ICE_CLIMBERS {
             external: External::ICE_CLIMBERS,
-            short: "ICs",
-            long: "Ice Climbers",
+            short_name: "ICs",
+            long_name: "Ice Climbers",
         };
 
         JIGGLYPUFF {
             external: External::JIGGLYPUFF,
-            short: "Puff",
-            long: "Jigglypuff",
+            short_name: "Puff",
+            long_name: "Jigglypuff",
         };
 
         SAMUS {
             external: External::SAMUS,
-            short: "Samus",
-            long: "Samus",
+            short_name: "Samus",
+            long_name: "Samus",
         };
 
         YOSHI {
             external: External::YOSHI,
-            short: "Yoshi",
-            long: "Yoshi",
+            short_name: "Yoshi",
+            long_name: "Yoshi",
         };
 
         ZELDA {
             external: External::ZELDA,
-            short: "Zelda",
-            long: "Zelda",
+            short_name: "Zelda",
+            long_name: "Zelda",
         };
 
         SHEIK {
             external: External::SHEIK,
-            short: "Sheik",
-            long: "Sheik",
+            short_name: "Sheik",
+            long_name: "Sheik",
         };
 
         FALCO {
             external: External::FALCO,
-            short: "Falco",
-            long: "Falco",
+            short_name: "Falco",
+            long_name: "Falco",
         };
 
         YOUNG_LINK {
             external: External::YOUNG_LINK,
-            short: "YL",
-            long: "Young Link",
+            short_name: "YL",
+            long_name: "Young Link",
         };
 
         DR_MARIO {
             external: External::DR_MARIO,
-            short: "Doc",
-            long: "Dr. Mario",
+            short_name: "Doc",
+            long_name: "Dr. Mario",
         };
 
         ROY {
             external: External::ROY,
-            short: "Roy",
-            long: "Roy",
+            short_name: "Roy",
+            long_name: "Roy",
         };
 
         PICHU {
             external: External::PICHU,
-            short: "Pichu",
-            long: "Pichu",
+            short_name: "Pichu",
+            long_name: "Pichu",
         };
 
         GANONDORF {
             external: External::GANONDORF,
-            short: "Ganon",
-            long: "Ganondorf",
+            short_name: "Ganon",
+            long_name: "Ganondorf",
         };
 
         MASTER_HAND {
             external: External::MASTER_HAND,
-            short: "Master Hand",
-            long: "Master Hand",
+            short_name: "Master Hand",
+            long_name: "Master Hand",
         };
 
         WIRE_FRAME_MALE {
             external: External::WIRE_FRAME_MALE,
-            short: "Male Wireframe",
-            long: "Male Wireframe",
+            short_name: "Male Wireframe",
+            long_name: "Male Wireframe",
         };
 
         WIRE_FRAME_FEMALE {
             external: External::WIRE_FRAME_FEMALE,
-            short: "Female Wireframe",
-            long: "Female Wireframe",
+            short_name: "Female Wireframe",
+            long_name: "Female Wireframe",
         };
 
         GIGA_BOWSER {
             external: External::GIGA_BOWSER,
-            short: "Giga Bowser",
-            long: "Giga Bowser",
+            short_name: "Giga Bowser",
+            long_name: "Giga Bowser",
         };
 
         CRAZY_HAND {
             external: External::CRAZY_HAND,
-            short: "Crazy Hand",
-            long: "Crazy Hand",
+            short_name: "Crazy Hand",
+            long_name: "Crazy Hand",
         };
 
         SANDBAG {
             external: External::SANDBAG,
-            short: "Sandbag",
-            long: "Sandbag",
+            short_name: "Sandbag",
+            long_name: "Sandbag",
         };
 
         POPO {
             external: External::POPO,
-            short: "Popo",
-            long: "Popo",
+            short_name: "Popo",
+            long_name: "Popo",
         };
     });
 }
