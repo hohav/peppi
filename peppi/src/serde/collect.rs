@@ -24,18 +24,6 @@ impl Default for Rollback {
 	}
 }
 
-impl TryFrom<&str> for Rollback {
-	type Error = String;
-	fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
-		match s {
-			"all" => Ok(Rollback::All),
-			"first" => Ok(Rollback::First),
-			"last" => Ok(Rollback::Last),
-			s => Err(format!("invalid Rollback: {}", s)),
-		}
-	}
-}
-
 impl From<Rollback> for &str {
 	fn from(r: Rollback) -> &'static str {
 		use Rollback::*;

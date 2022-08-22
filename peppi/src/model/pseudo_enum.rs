@@ -37,20 +37,6 @@ macro_rules! pseudo_enum {
 			}
 		}
 
-		impl std::convert::TryFrom<&str> for $name {
-			type Error = crate::model::pseudo_enum::ConversionError;
-			/// Returns the enum value with the given name, if any.
-			fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
-				match s {
-					$( stringify!($variant) => Ok($name::$variant), )*
-					_ => Err(Self::Error {
-						r#type: format!("{}::{}", module_path!(), stringify!($name)),
-						value: s.to_string(),
-					}),
-				}
-			}
-		}
-
 		impl std::fmt::Debug for $name {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 				match unsafe { crate::SERIALIZATION_CONFIG.enum_names } {
