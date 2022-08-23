@@ -237,8 +237,8 @@ impl PlayerStatState {
 		let prev_state: State = *self.last_states.get(1).unwrap();
 		if let State::Common(prev_state) = prev_state {
 			if !(prev_state == Common::ESCAPE_AIR ||
-				(prev_state.0 >= Common::KNEE_BEND.0 &&
-				prev_state.0 <= Common::FALL_AERIAL_B.0)) {
+				(prev_state >= Common::KNEE_BEND &&
+				prev_state <= Common::FALL_AERIAL_B)) {
 				return;
 			}
 		}
@@ -321,24 +321,24 @@ impl PlayerStatState {
 }
 
 fn is_ftilt(state: Common) -> bool {
-	state.0 >= Common::ATTACK_S_3_HI.0 && state.0 <= Common::ATTACK_S_3_LW.0
+	state >= Common::ATTACK_S_3_HI && state <= Common::ATTACK_S_3_LW
 }
 
 fn is_fsmash(state: Common) -> bool {
-	state.0 >= Common::ATTACK_S_4_HI.0 && state.0 <= Common::ATTACK_S_4_LW.0
+	state >= Common::ATTACK_S_4_HI && state <= Common::ATTACK_S_4_LW
 }
 
 fn is_aerial_landing(state: Common) -> bool {
-	state.0 >= Common::LANDING_AIR_N.0 || state.0 <= Common::LANDING_AIR_LW.0
+	state >= Common::LANDING_AIR_N || state <= Common::LANDING_AIR_LW
 }
 
 fn is_grabbing(state: Common) -> bool {
-	state.0 == Common::CATCH.0 || state.0 == Common::CATCH_DASH.0
+	state == Common::CATCH || state == Common::CATCH_DASH
 }
 
 // returns true for any state that could happen after a successful grab
 fn is_grab_action(state: Common) -> bool {
-	state.0 > Common::CATCH.0 && state.0 <= Common::THROW_LW.0 && state != Common::CATCH_DASH
+	state > Common::CATCH && state <= Common::THROW_LW && state != Common::CATCH_DASH
 }
 
 fn is_dash_dance(last_states: &VecDeque<State>) -> bool {
