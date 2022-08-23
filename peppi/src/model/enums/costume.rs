@@ -23,7 +23,7 @@ macro_rules! costume {
 
 			#[cfg(feature = "regex_match")]
 			pub fn try_match(character: External, s: &str) -> Option<$name> {
-                use crate::regex::Regex;
+				use crate::regex::Regex;
 				match character {
 					$( External::$external => $variant_type::try_match(s).map($name::$variant), )*
 					_ => None,

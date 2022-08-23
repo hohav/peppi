@@ -3,7 +3,7 @@ use crate::model::enums::stage::Stage;
 use crate::model::enums::costume::*;
 
 pub trait Regex {
-    fn try_match(s: &str) -> Option<Self> where Self: Sized;
+	fn try_match(s: &str) -> Option<Self> where Self: Sized;
 }
 
 macro_rules! regex_match {
@@ -103,7 +103,7 @@ regex_match!(stage : Stage {
 	KONGO_JUNGLE_N64: r"(?i-u)^(kj|kongo[ _]?jungle)[ _]?(N?64)$",
 });
 
-regex_match!(captainfalcon : CaptainFalcon {
+regex_match!(costume_captainfalcon : CaptainFalcon {
 	INDIGO: r"(?i-u)^default|indigo$",
 	BLACK: r"(?i-u)^black$",
 	RED: r"(?i-u)^red$",
@@ -112,7 +112,7 @@ regex_match!(captainfalcon : CaptainFalcon {
 	BLUE: r"(?i-u)^blue$",
 });
 
-regex_match!(donkeykong : DonkeyKong {
+regex_match!(costume_donkeykong : DonkeyKong {
 	BROWN: r"(?i-u)^default|brown$",
 	BLACK: r"(?i-u)^black$",
 	RED: r"(?i-u)^red$",
@@ -120,21 +120,21 @@ regex_match!(donkeykong : DonkeyKong {
 	GREEN: r"(?i-u)^green$",
 });
 
-regex_match!(fox : Fox {
+regex_match!(costume_fox : Fox {
 	WHITE: r"(?i-u)^default|white|tan$",
 	RED: r"(?i-u)^red|orange$",
 	BLUE: r"(?i-u)^blue|lavender|purple$",
 	GREEN: r"(?i-u)^green$",
 });
 
-regex_match!(gameandwatch : GameAndWatch {
+regex_match!(costume_gameandwatch : GameAndWatch {
 	BLACK: r"(?i-u)^default|black$",
 	RED: r"(?i-u)^red$",
 	BLUE: r"(?i-u)^blue$",
 	GREEN: r"(?i-u)^green$",
 });
 
-regex_match!(kirby : Kirby {
+regex_match!(costume_kirby : Kirby {
 	PINK: r"(?i-u)^default|pink$",
 	YELLOW: r"(?i-u)^yellow$",
 	BLUE: r"(?i-u)^blue$",
@@ -143,14 +143,14 @@ regex_match!(kirby : Kirby {
 	WHITE: r"(?i-u)^white$",
 });
 
-regex_match!(bowser : Bowser {
+regex_match!(costume_bowser : Bowser {
 	GREEN: r"(?i-u)^default|green$",
 	RED: r"(?i-u)^red$",
 	BLUE: r"(?i-u)^blue$",
 	BLACK: r"(?i-u)^black$",
 });
 
-regex_match!(link : Link {
+regex_match!(costume_link : Link {
 	GREEN: r"(?i-u)^default|green$",
 	RED: r"(?i-u)^red$",
 	BLUE: r"(?i-u)^blue$",
@@ -158,14 +158,14 @@ regex_match!(link : Link {
 	WHITE: r"(?i-u)^white$",
 });
 
-regex_match!(luigi : Luigi {
+regex_match!(costume_luigi : Luigi {
 	GREEN: r"(?i-u)^default|green$",
 	WHITE: r"(?i-u)^white$",
 	BLUE: r"(?i-u)^blue$",
 	RED: r"(?i-u)^red|pink$",
 });
 
-regex_match!(mario : Mario {
+regex_match!(costume_mario : Mario {
 	RED: r"(?i-u)^default|red$",
 	YELLOW: r"(?i-u)^yellow|wario$",
 	BLACK: r"(?i-u)^black|brown$",
@@ -173,7 +173,7 @@ regex_match!(mario : Mario {
 	GREEN: r"(?i-u)^green$",
 });
 
-regex_match!(marth : Marth {
+regex_match!(costume_marth : Marth {
 	BLUE: r"(?i-u)^default|blue$",
 	RED: r"(?i-u)^red$",
 	GREEN: r"(?i-u)^green$",
@@ -181,21 +181,21 @@ regex_match!(marth : Marth {
 	WHITE: r"(?i-u)^white$",
 });
 
-regex_match!(mewtwo : Mewtwo {
+regex_match!(costume_mewtwo : Mewtwo {
 	PURPLE: r"(?i-u)^default|purple|white$",
 	RED: r"(?i-u)^red|orange$",
 	BLUE: r"(?i-u)^blue$",
 	GREEN: r"(?i-u)^green$",
 });
 
-regex_match!(ness : Ness {
+regex_match!(costume_ness : Ness {
 	RED: r"(?i-u)^default|red$",
 	YELLOW: r"(?i-u)^yellow$",
 	BLUE: r"(?i-u)^blue|purple$",
 	GREEN: r"(?i-u)^green$",
 });
 
-regex_match!(peach : Peach {
+regex_match!(costume_peach : Peach {
 	RED: r"(?i-u)^default|red|pink$",
 	YELLOW: r"(?i-u)^yellow|daisy$",
 	WHITE: r"(?i-u)^white$",
@@ -203,21 +203,21 @@ regex_match!(peach : Peach {
 	GREEN: r"(?i-u)^green$",
 });
 
-regex_match!(pikachu : Pikachu {
+regex_match!(costume_pikachu : Pikachu {
 	YELLOW: r"(?i-u)^default|yellow$",
 	RED: r"(?i-u)^red$",
 	BLUE: r"(?i-u)^blue$",
 	GREEN: r"(?i-u)^green$",
 });
 
-regex_match!(iceclimbers : IceClimbers {
+regex_match!(costume_iceclimbers : IceClimbers {
 	BLUE: r"(?i-u)^default|blue|purple$",
 	GREEN: r"(?i-u)^green$",
 	ORANGE: r"(?i-u)^orange$",
 	RED: r"(?i-u)^red$",
 });
 
-regex_match!(jigglypuff : Jigglypuff {
+regex_match!(costume_jigglypuff : Jigglypuff {
 	PINK: r"(?i-u)^default|pink$",
 	RED: r"(?i-u)^red|flower$",
 	BLUE: r"(?i-u)^blue|bow$",
@@ -225,7 +225,7 @@ regex_match!(jigglypuff : Jigglypuff {
 	YELLOW: r"(?i-u)^yellow|gold|crown$",
 });
 
-regex_match!(samus : Samus {
+regex_match!(costume_samus : Samus {
 	RED: r"(?i-u)^default|red|orange$",
 	PINK: r"(?i-u)^pink$",
 	BLACK: r"(?i-u)^black|brown$",
@@ -233,7 +233,7 @@ regex_match!(samus : Samus {
 	BLUE: r"(?i-u)^blue|purple$",
 });
 
-regex_match!(yoshi : Yoshi {
+regex_match!(costume_yoshi : Yoshi {
 	GREEN: r"(?i-u)^default|green$",
 	RED: r"(?i-u)^red$",
 	BLUE: r"(?i-u)^(dark[ _]?)?blue$",
@@ -242,7 +242,7 @@ regex_match!(yoshi : Yoshi {
 	CYAN: r"(?i-u)^cyan|light[ _]?blue$",
 });
 
-regex_match!(zelda : Zelda {
+regex_match!(costume_zelda : Zelda {
 	PINK: r"(?i-u)^default|pink$",
 	RED: r"(?i-u)^red$",
 	BLUE: r"(?i-u)^blue$",
@@ -250,7 +250,7 @@ regex_match!(zelda : Zelda {
 	WHITE: r"(?i-u)^white$",
 });
 
-regex_match!(sheik : Sheik {
+regex_match!(costume_sheik : Sheik {
 	NAVY: r"(?i-u)^default|navy$",
 	RED: r"(?i-u)^red$",
 	BLUE: r"(?i-u)^blue$",
@@ -258,14 +258,14 @@ regex_match!(sheik : Sheik {
 	WHITE: r"(?i-u)^white$",
 });
 
-regex_match!(falco : Falco {
+regex_match!(costume_falco : Falco {
 	TAN: r"(?i-u)^default|tan$",
 	RED: r"(?i-u)^red$",
 	BLUE: r"(?i-u)^blue$",
 	GREEN: r"(?i-u)^green$",
 });
 
-regex_match!(younglink : YoungLink {
+regex_match!(costume_younglink : YoungLink {
 	GREEN: r"(?i-u)^default|green$",
 	RED: r"(?i-u)^red$",
 	BLUE: r"(?i-u)^blue$",
@@ -273,7 +273,7 @@ regex_match!(younglink : YoungLink {
 	BLACK: r"(?i-u)^black$",
 });
 
-regex_match!(drmario : DrMario {
+regex_match!(costume_drmario : DrMario {
 	WHITE: r"(?i-u)^default|white$",
 	RED: r"(?i-u)^red|salmon|pink$",
 	BLUE: r"(?i-u)^blue|purple$",
@@ -281,7 +281,7 @@ regex_match!(drmario : DrMario {
 	BLACK: r"(?i-u)^black$",
 });
 
-regex_match!(roy : Roy {
+regex_match!(costume_roy : Roy {
 	PURPLE: r"(?i-u)^default|purple$",
 	RED: r"(?i-u)^red$",
 	BLUE: r"(?i-u)^blue$",
@@ -289,14 +289,14 @@ regex_match!(roy : Roy {
 	YELLOW: r"(?i-u)^yellow|gold$",
 });
 
-regex_match!(pichu : Pichu {
+regex_match!(costume_pichu : Pichu {
 	YELLOW: r"(?i-u)^default|yellow$",
 	RED: r"(?i-u)^red$",
 	BLUE: r"(?i-u)^blue$",
 	GREEN: r"(?i-u)^green$",
 });
 
-regex_match!(ganondorf : Ganondorf {
+regex_match!(costume_ganondorf : Ganondorf {
 	BROWN: r"(?i-u)^default|brown$",
 	RED: r"(?i-u)^red$",
 	BLUE: r"(?i-u)^blue$",
