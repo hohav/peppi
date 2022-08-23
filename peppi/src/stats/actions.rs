@@ -157,65 +157,74 @@ impl PlayerStatState {
 	fn count_actions(&mut self, post: &Post) {
 		let actions: &mut ActionStat = &mut self.actions;
 		match post.state {
-			// Basic attacks
-			State::Common(Common::ATTACK_11) => actions.jab1 += 1,
-			State::Common(Common::ATTACK_12) => actions.jab2 += 1,
-			State::Common(Common::ATTACK_13) => actions.jab3 += 1,
-			State::Common(Common::ATTACK_100_START) => actions.jabm += 1,
-			State::Common(Common::ATTACK_DASH) => actions.dash_attack += 1,
-			State::Common(s) if is_ftilt(s) => actions.ftilt += 1,
-			State::Common(Common::ATTACK_HI_3) => actions.utilt += 1,
-			State::Common(Common::ATTACK_LW_3) => actions.dtilt += 1,
-			State::Common(s) if is_fsmash(s) => actions.fsmash += 1,
-			State::Common(Common::ATTACK_HI_4) => actions.usmash += 1,
-			State::Common(Common::ATTACK_LW_4) => actions.dsmash += 1,
-			State::Common(Common::ATTACK_AIR_N) => actions.nair += 1,
-			State::Common(Common::ATTACK_AIR_F) => actions.fair += 1,
-			State::Common(Common::ATTACK_AIR_B) => actions.bair += 1,
-			State::Common(Common::ATTACK_AIR_HI) => actions.uair += 1,
-			State::Common(Common::ATTACK_AIR_LW) => actions.dair += 1,
+			State::Common(s) => match s {
+				// Basic attacks
+				Common::ATTACK_11 => actions.jab1 += 1,
+				Common::ATTACK_12 => actions.jab2 += 1,
+				Common::ATTACK_13 => actions.jab3 += 1,
+				Common::ATTACK_100_START => actions.jabm += 1,
+				Common::ATTACK_DASH => actions.dash_attack += 1,
+				s if is_ftilt(s) => actions.ftilt += 1,
+				Common::ATTACK_HI_3 => actions.utilt += 1,
+				Common::ATTACK_LW_3 => actions.dtilt += 1,
+				s if is_fsmash(s) => actions.fsmash += 1,
+				Common::ATTACK_HI_4 => actions.usmash += 1,
+				Common::ATTACK_LW_4 => actions.dsmash += 1,
+				Common::ATTACK_AIR_N => actions.nair += 1,
+				Common::ATTACK_AIR_F => actions.fair += 1,
+				Common::ATTACK_AIR_B => actions.bair += 1,
+				Common::ATTACK_AIR_HI => actions.uair += 1,
+				Common::ATTACK_AIR_LW => actions.dair += 1,
 
-			// Throws
-			State::Common(Common::THROW_F) => actions.fthrow += 1,
-			State::Common(Common::THROW_B) => actions.bthrow += 1,
-			State::Common(Common::THROW_HI) => actions.uthrow += 1,
-			State::Common(Common::THROW_LW) => actions.dthrow += 1,
+				// Throws
+				Common::THROW_F => actions.fthrow += 1,
+				Common::THROW_B => actions.bthrow += 1,
+				Common::THROW_HI => actions.uthrow += 1,
+				Common::THROW_LW => actions.dthrow += 1,
 
-			// Dodges
-			State::Common(Common::ESCAPE_F) |
-			State::Common(Common::ESCAPE_B) => actions.roll += 1,
-			State::Common(Common::ESCAPE) => actions.spot_dodge += 1,
-			State::Common(Common::ESCAPE_AIR) => actions.air_dodge += 1,
+				// Dodges
+				Common::ESCAPE_F |
+				Common::ESCAPE_B => actions.roll += 1,
+				Common::ESCAPE => actions.spot_dodge += 1,
+				Common::ESCAPE_AIR => actions.air_dodge += 1,
 
-			// Techs
-			State::Common(Common::PASSIVE) => actions.ground_tech_neutral += 1,
-			State::Common(Common::PASSIVE_STAND_F) |
-			State::Common(Common::PASSIVE_STAND_B) => actions.ground_tech_roll += 1,
-			State::Common(Common::PASSIVE_CEIL) => actions.ceiling_tech += 1,
-			State::Common(Common::DOWN_BOUND_U) |
-			State::Common(Common::DOWN_BOUND_D) => actions.ground_bounce += 1,
-			State::Common(Common::FLY_REFLECT_WALL) => actions.wall_bounce += 1,
-			State::Common(Common::FLY_REFLECT_CEIL) => actions.ceiling_bounce += 1,
+				// Techs
+				Common::PASSIVE => actions.ground_tech_neutral += 1,
+				Common::PASSIVE_STAND_F |
+				Common::PASSIVE_STAND_B => actions.ground_tech_roll += 1,
+				Common::PASSIVE_CEIL => actions.ceiling_tech += 1,
+				Common::DOWN_BOUND_U |
+				Common::DOWN_BOUND_D => actions.ground_bounce += 1,
+				Common::FLY_REFLECT_WALL => actions.wall_bounce += 1,
+				Common::FLY_REFLECT_CEIL => actions.ceiling_bounce += 1,
 
-			// Other
-			State::Common(Common::CLIFF_CATCH) => actions.ledge_grab += 1,
-			State::Common(Common::DASH) if is_dash_dance(&self.last_states)
-				=> actions.dash_dance += 1,
+				// Other
+				Common::CLIFF_CATCH => actions.ledge_grab += 1,
+				Common::DASH if is_dash_dance(&self.last_states) => actions.dash_dance += 1,
 
-			// GnW has standard moves coded as special moves
-			State::GameAndWatch(GameAndWatch::JAB) => actions.jab1 += 1,
-			State::GameAndWatch(GameAndWatch::RAPID_JABS_START) => actions.jabm += 1,
-			State::GameAndWatch(GameAndWatch::DOWN_TILT) => actions.dtilt += 1,
-			State::GameAndWatch(GameAndWatch::SIDE_SMASH) => actions.fsmash += 1,
-			State::GameAndWatch(GameAndWatch::NAIR) => actions.nair += 1,
-			State::GameAndWatch(GameAndWatch::BAIR) => actions.bair += 1,
-			State::GameAndWatch(GameAndWatch::UAIR) => actions.uair += 1,
+				_ => ()
 
-			// Peach fsmashes are coded as special moves
-			State::Peach(Peach::SIDE_SMASH_GOLF_CLUB) |
-			State::Peach(Peach::SIDE_SMASH_FRYING_PAN) |
-			State::Peach(Peach::SIDE_SMASH_TENNIS_RACKET) => actions.fsmash += 1,
+			},
 
+			State::GameAndWatch(s) => match s {
+				// GnW has standard moves coded as special moves
+				GameAndWatch::JAB => actions.jab1 += 1,
+				GameAndWatch::RAPID_JABS_START => actions.jabm += 1,
+				GameAndWatch::DOWN_TILT => actions.dtilt += 1,
+				GameAndWatch::SIDE_SMASH => actions.fsmash += 1,
+				GameAndWatch::NAIR => actions.nair += 1,
+				GameAndWatch::BAIR => actions.bair += 1,
+				GameAndWatch::UAIR => actions.uair += 1,
+				_ => ()
+			},
+
+			State::Peach(s) => match s {
+				// Peach fsmashes are coded as special moves
+				Peach::SIDE_SMASH_GOLF_CLUB |
+				Peach::SIDE_SMASH_FRYING_PAN |
+				Peach::SIDE_SMASH_TENNIS_RACKET => actions.fsmash += 1,
+				_ => ()
+			},
 			_ => (),
 		}
 
