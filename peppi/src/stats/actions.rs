@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use crate::stats::interface::StatComputer;
+use crate::stats::StatComputer;
 use crate::model::{
 	game::{self, Start, Frames},
 	slippi::Version,

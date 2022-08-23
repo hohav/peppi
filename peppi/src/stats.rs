@@ -1,3 +1,5 @@
+pub mod actions;
+
 use crate::model::game::{Start, Frames};
 use crate::model::slippi::Version;
 

@@ -52,10 +52,7 @@ pub mod model {
 	}
 }
 
-pub mod stats {
-	pub mod interface;
-	pub mod actions;
-}
+pub mod stats;
 
 pub mod serde {
 	pub mod arrow;

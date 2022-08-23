@@ -2,7 +2,7 @@ use std::{fs, io};
 use peppi::{
 	model::game::Game,
 	stats::{
-		interface::StatComputer,
+		StatComputer,
 		actions::{ActionComputer, ActionStat},
 	},
 };
