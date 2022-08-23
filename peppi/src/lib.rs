@@ -32,7 +32,6 @@ pub(crate) mod ubjson {
 pub mod model {
 	#[macro_use] #[doc(hidden)] pub(crate) mod pseudo_bitmask;
 	#[macro_use] #[doc(hidden)] pub(crate) mod pseudo_enum;
-	#[macro_use] #[doc(hidden)] pub(crate) mod regex_match;
 
 	pub mod buttons;
 	pub mod frame;
@@ -52,6 +51,9 @@ pub mod model {
 		pub mod stage;
 	}
 }
+
+#[cfg(feature = "regex_match")]
+pub mod regex;
 
 pub mod serde {
 	pub mod arrow;
