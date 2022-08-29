@@ -1,15 +1,23 @@
 use std::collections::VecDeque;
-use crate::stats::StatComputer;
-use crate::model::{
-	game::{self, Start, Frames},
-	slippi::Version,
-	frame::{Frame, Post},
-	enums::action_state::*,
+use crate::{
+	model::{
+		enums::action_state::*,
+		frame::{Frame, Post},
+		game::{self, Game, Start},
+		slippi::Version,
+	},
+	stats::{
+		Computer,
+		PartialComputer,
+		StatError,
+		StatResult,
+	},
 };
 
 #[derive(Clone, Default, Debug)]
 pub struct ActionComputer {
 	last_frame_processed: i32,
+	num_players: u8,
 	player_stat_states: Vec<PlayerStatState>,
 }
 
@@ -83,73 +91,75 @@ pub struct LCancel {
 	pub fail: u16,
 }
 
-impl StatComputer for ActionComputer {
+impl Computer for ActionComputer {
 	type Stat = Vec<ActionStat>;
-
-	// Requires action state frame counter field to work properly
 	const MIN_VERSION: Version = Version(0, 2, 0);
 
-	fn new(start: &Start) -> Self {
-		if start.slippi.version < Self::MIN_VERSION {
-			panic!("Minimum version required: {} given: {}", Self::MIN_VERSION, start.slippi.version);
-		}
+	fn compute_game(game: &Game) -> StatResult<Self::Stat> {
+		<Self as PartialComputer>::compute_game(game)
+	}
+}
+
+impl<'a> PartialComputer<'a> for ActionComputer {
+	type PartialStat = Vec<&'a ActionStat>;
+
+	fn new(start: &Start) -> StatResult<Self> where Self: Sized {
+		Self::check_version(start.slippi.version)?;
 		let last_frame_processed = game::FIRST_FRAME_INDEX - 1;
+		let num_players = start.players.len() as u8;
 		let mut player_stat_states: Vec<PlayerStatState> = Vec::new();
 		player_stat_states.resize_with(start.players.len(), Default::default);
 
-		ActionComputer {
+		Ok(ActionComputer {
 			last_frame_processed,
+			num_players,
 			player_stat_states,
-		}
+		})
 	}
 
-	fn process(&mut self, frames: &Frames) {
-		match frames {
-			Frames::P1(fs) => self.process_impl(fs),
-			Frames::P2(fs) => self.process_impl(fs),
-			Frames::P3(fs) => self.process_impl(fs),
-			Frames::P4(fs) => self.process_impl(fs),
+	fn process_frame<const N: usize>(&mut self, frame: &Frame<N>) -> StatResult<()> {
+		if N as u8 != self.num_players {
+			return Err(StatError::MalformedInput)
 		}
+		if frame.index <= self.last_frame_processed {
+			return Ok(());
+		}
+
+		let stat_state_iter = self.player_stat_states.iter_mut();
+		let post_iter = frame.ports.iter().map(|pd| pd.leader.post);
+		for (stat_state, post) in stat_state_iter.zip(post_iter) {
+
+			// get state/age values
+			let prev_state = *stat_state.last_states.front().unwrap();
+			let prev_age = stat_state.prev_age;
+			let curr_state = post.state;
+			let curr_age = post.state_age.unwrap();
+
+			let is_new_action = curr_state != prev_state || prev_age > curr_age;
+
+			// update stat_state for the next frame
+			// we pop from back and push to front so .get(n) returns the 
+			// nth most recent state (0 index is current state)
+			stat_state.last_states.pop_back();
+			stat_state.last_states.push_front(curr_state);
+			stat_state.prev_age = curr_age;
+
+			if !is_new_action {
+				continue;
+			}
+
+			stat_state.count_actions(&post);
+		}
+
+		Ok(())
 	}
 
 	fn into_inner(self) -> Self::Stat {
 		self.player_stat_states.into_iter().map(|s| s.actions).collect()
 	}
-}
 
-impl ActionComputer {
-	fn process_impl<const N: usize>(&mut self, frames: &[Frame<N>]) {
-		for frame in frames {
-			if frame.index <= self.last_frame_processed {
-				continue;
-			}
-
-			let stat_state_iter = self.player_stat_states.iter_mut();
-			let post_iter = frame.ports.iter().map(|pd| pd.leader.post);
-			for (stat_state, post) in stat_state_iter.zip(post_iter) {
-
-				// get state/age values
-				let prev_state = *stat_state.last_states.front().unwrap();
-				let prev_age = stat_state.prev_age;
-				let curr_state = post.state;
-				let curr_age = post.state_age.unwrap();
-
-				let is_new_action = curr_state != prev_state || prev_age > curr_age;
-
-				// update stat_state for the next frame
-				// we pop from back and push to front so .get(n) returns the 
-				// nth most recent state (0 index is current state)
-				stat_state.last_states.pop_back();
-				stat_state.last_states.push_front(curr_state);
-				stat_state.prev_age = curr_age;
-
-				if !is_new_action {
-					continue;
-				}
-
-				stat_state.count_actions(&post);
-			}
-		}
+	fn peek_inner(&'a self) -> Self::PartialStat {
+		self.player_stat_states.iter().map(|s| &s.actions).collect()
 	}
 }
 

@@ -2,8 +2,8 @@ use std::{fs, io};
 use peppi::{
 	model::game::Game,
 	stats::{
-		StatComputer,
-		actions::{ActionComputer, ActionStat},
+		Computer,
+		actions::{ActionComputer, ActionStat,},
 	},
 };
 
@@ -18,9 +18,7 @@ fn game(name: &str) -> Result<Game, String> {
 }
 
 fn actions(game: &Game) -> Vec<ActionStat> {
-	let mut comp: ActionComputer = ActionComputer::new(&game.start);
-	comp.process(&game.frames);
-	comp.into_inner()
+	ActionComputer::compute_game(game).unwrap()
 }
 
 #[test]
