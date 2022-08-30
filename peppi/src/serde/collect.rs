@@ -184,8 +184,8 @@ where
 		_ => evt.id.array_index(),
 	};
 
-	while v.len() < idx {
-		v.push(None);
+	if v.len() < idx {
+		v.resize(idx, None);
 	}
 
 	if idx > v.len() {
@@ -203,9 +203,7 @@ where
 macro_rules! append_missing_frame_data {
 	( $arr: expr, $count: expr ) => {
 		for f in $arr.iter_mut() {
-			while f.len() < $count {
-				f.push(None);
-			}
+			f.resize($count, None)
 		}
 	};
 }
@@ -238,8 +236,8 @@ impl de::Handlers for Collector {
 			self.opts,
 		)?;
 		// reset items list in case of rollback
-		while self.items.len() <= idx {
-			self.items.push(Vec::new());
+		if self.items.len() <= idx {
+			self.items.resize(idx + 1, Vec::new());
 		}
 		if self.opts.rollback == Rollback::Last {
 			self.items[idx].clear();
@@ -331,9 +329,7 @@ impl de::Handlers for Collector {
 		append_missing_frame_data!(self.frames_followers.pre, frame_count);
 		append_missing_frame_data!(self.frames_followers.post, frame_count);
 
-		while self.items.len() < frame_count {
-			self.items.push(Vec::new());
-		}
+		self.items.resize(frame_count, Vec::new());
 
 		Ok(())
 	}
