@@ -469,13 +469,40 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 	})
 }
 
+pub fn player_end(port: Port, placement: i8) -> Result<Option<game::PlayerEnd>> {
+	match placement {
+		-1 => Ok(None),
+		0..=3 => Ok(Some(game::PlayerEnd {
+			port,
+			placement: placement as u8,
+		})),
+		p => Err(err!("Invalid player placement {}", p)),
+	}
+}
+
 pub(crate) fn game_end(r: &mut &[u8]) -> Result<game::End> {
 	let raw_bytes = r.to_vec();
+	let method = game::EndMethod(r.read_u8()?);
+	// v2.0
+	let lras_initiator = if_more(r, |r| Ok(Port::try_from(r.read_u8()?).ok()))?;
+
+	// v3.13
+	let players = if_more(r, |r| {
+		let mut players = Vec::new();
+		let placements = [r.read_i8()?, r.read_i8()?, r.read_i8()?, r.read_i8()?];
+		for n in 0..NUM_PORTS {
+			if let Some(p) = player_end(Port::try_from(n as u8).unwrap(), placements[n])? {
+				players.push(p);
+			}
+		}
+		Ok(players)
+	})?;
+
 	Ok(game::End {
-		method: game::EndMethod(r.read_u8()?),
-		raw_bytes: raw_bytes,
-		// v2.0
-		lras_initiator: if_more(r, |r| Ok(Port::try_from(r.read_u8()?).ok()))?,
+		method,
+		raw_bytes,
+		lras_initiator,
+		players,
 	})
 }
 

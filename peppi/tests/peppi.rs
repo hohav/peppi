@@ -190,8 +190,9 @@ fn basic_game() {
 		game.end,
 		End {
 			method: EndMethod::RESOLVED,
-			lras_initiator: None,
 			raw_bytes: vec![3],
+			lras_initiator: None,
+			players: None,
 		}
 	);
 
