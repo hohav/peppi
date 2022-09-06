@@ -267,6 +267,10 @@ impl<H> Handlers for Hook<H> where H: HandlersAbs {
 		Ok(())
 	}
 	fn finalize(&mut self) -> Result<()> {
+        // publish remaining frames here in case game_end never triggered
+		while let Some(frame) = self.frames.pop_front() {
+			self.publish_frame(frame)?;
+		}
 		self.hook.finalize();
 		Ok(())
 	}
