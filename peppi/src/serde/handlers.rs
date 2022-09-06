@@ -144,7 +144,11 @@ impl<H> Hook<H> where H: HandlersAbs {
 		}
 	}
 
-	fn get_frame_state(&mut self, index: i32) -> Result<&mut FrameState> {
+	pub fn into_inner(self) -> H {
+		self.hook
+	}
+
+	fn get_frame_state(&mut self, index: i32) -> Result<Option<&mut FrameState>> {
 		if index > self.highest_frame + 1 {
 			// Frame skipped forward which shouldn't happen
 			return Err(err!("replay skips frame {:?}", self.highest_frame + 1));
