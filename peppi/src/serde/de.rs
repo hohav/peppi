@@ -32,6 +32,7 @@ use crate::{
 		slippi,
 		triggers,
 	},
+	serde::handlers::Handlers,
 	ubjson,
 };
 
@@ -735,40 +736,6 @@ fn frame_post(r: &mut &[u8], last_char_states: &mut [CharState; NUM_PORTS]) -> R
 			animation_index,
 		},
 	})
-}
-
-/// Callbacks for events encountered while parsing a replay.
-///
-/// For frame events, there will be one event per frame per character
-/// (Ice Climbers are two characters).
-pub trait Handlers {
-	// Descriptions below partially copied from the Slippi spec:
-	// https://github.com/project-slippi/slippi-wiki/blob/master/SPEC.md
-
-	/// List of enabled Gecko codes. Currently unparsed.
-	fn gecko_codes(&mut self, _codes: &[u8], _actual_size: u16) -> Result<()> { Ok(()) }
-
-	/// How the game is set up; also includes the version of the extraction code.
-	fn game_start(&mut self, _: game::Start) -> Result<()> { Ok(()) }
-	/// The end of the game.
-	fn game_end(&mut self, _: game::End) -> Result<()> { Ok(()) }
-	/// Miscellaneous data not directly provided by Melee.
-	fn metadata(&mut self, _: serde_json::Map<String, serde_json::Value>) -> Result<()> { Ok(()) }
-
-	/// RNG seed and frame number at the start of a frame's processing.
-	fn frame_start(&mut self, _: FrameEvent<FrameId, frame::Start>) -> Result<()> { Ok(()) }
-	/// Pre-frame update, collected right before controller inputs are used to figure out the character's next action. Used to reconstruct a replay.
-	fn frame_pre(&mut self, _: FrameEvent<PortId, Pre>) -> Result<()> { Ok(()) }
-	/// Post-frame update, collected at the end of the Collision detection which is the last consideration of the game engine. Useful for making decisions about game states, such as computing stats.
-	fn frame_post(&mut self, _: FrameEvent<PortId, Post>) -> Result<()> { Ok(()) }
-	/// Indicates an entire frame's worth of data has been transferred/processed.
-	fn frame_end(&mut self, _: FrameEvent<FrameId, frame::End>) -> Result<()> { Ok(()) }
-
-	/// One event per frame per item, with a maximum of 15 updates per frame. Can be used for stats, training AIs, or visualization engines to handle items. Items include projectiles like lasers or needles.
-	fn item(&mut self, _: FrameEvent<FrameId, Item>) -> Result<()> { Ok(()) }
-
-	/// Called after all parse events have been handled.
-	fn finalize(&mut self) -> Result<()> { Ok(()) }
 }
 
 fn expect_bytes<R: Read>(r: &mut R, expected: &[u8]) -> Result<()> {

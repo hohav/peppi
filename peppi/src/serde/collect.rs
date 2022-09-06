@@ -10,7 +10,10 @@ use crate::{
 		metadata::Metadata,
 		primitives::Port,
 	},
-	serde::de::{self, FrameEvent, FrameId, Indexed, PortId},
+	serde::{
+		de::{FrameEvent, FrameId, Indexed, PortId},
+		handlers::Handlers,
+	}
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -199,7 +202,7 @@ macro_rules! append_missing_frame_data {
 	}
 }
 
-impl de::Handlers for Collector {
+impl Handlers for Collector {
 	fn gecko_codes(&mut self, codes: &[u8], actual_size: u16) -> Result<()> {
 		self.gecko_codes = Some(GeckoCodes {
 			bytes: codes.to_vec(),

@@ -55,6 +55,7 @@ pub mod model {
 pub mod serde {
 	pub mod arrow;
 	pub mod collect;
+	pub mod handlers;
 	pub mod de;
 	pub mod ser;
 }
@@ -105,7 +106,7 @@ impl<R: Read> Read for TrackingReader<R> {
 }
 
 /// Parse a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn parse<R: Read, H: serde::de::Handlers>(r: &mut R, handlers: &mut H, opts: Option<&serde::de::Opts>) -> std::result::Result<(), ParseError> {
+pub fn parse<R: Read, H: serde::handlers::Handlers>(r: &mut R, handlers: &mut H, opts: Option<&serde::de::Opts>) -> std::result::Result<(), ParseError> {
 	let mut r = TrackingReader {
 		pos: 0,
 		reader: r,
