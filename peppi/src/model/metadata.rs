@@ -5,62 +5,53 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use log::warn;
-use serde::{
-	Serialize,
-	ser::SerializeMap,
-};
 use serde_json::{Map, Value};
 
-use crate::{
-	model::{
-		enums::character,
-		game::FIRST_FRAME_INDEX,
-		primitives::Port,
-	},
+use crate::model::{
+	enums::character,
+	game::FIRST_FRAME_INDEX,
+	primitives::Port,
 };
 
-#[derive(Debug, PartialEq, Eq, Serialize)]
-pub struct Metadata {
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub date: Option<DateTime<Utc>>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub duration: Option<usize>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub platform: Option<String>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub console: Option<String>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub players: Option<Vec<Player>>,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Platform {
+	Dolphin,
+	Network,
+	Nintendont,
+	Unknown(String),
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize)]
-pub struct Netplay {
-	pub code: String,
-	pub name: String,
-}
-
-// needed for JMESPath
-pub fn serialize_characters<S>(characters: &Option<HashMap<character::Internal, usize>>, serializer: S) -> std::result::Result<S::Ok, S::Error> where S: serde::Serializer {
-	match characters {
-		Some(characters) => {
-			let mut map = serializer.serialize_map(Some(characters.len()))?;
-			for (k, v) in characters {
-				map.serialize_entry(&format!("{:?}", k), v)?;
-			}
-			map.end()
-		},
-		_ => serializer.serialize_none(),
+impl From<Platform> for String {
+	fn from(platform: Platform) -> String {
+		match platform {
+			Platform::Dolphin => String::from("dolphin"),
+			Platform::Network => String::from("network"),
+			Platform::Nintendont => String::from("nintendont"),
+			Platform::Unknown(s) => s,
+		}
 	}
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Metadata {
+	pub date: Option<DateTime<Utc>>,
+	pub duration: Option<usize>,
+	pub platform: Option<Platform>,
+	pub console: Option<String>,
+	pub players: Option<Vec<Player>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Player {
 	pub port: Port,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	#[serde(serialize_with = "serialize_characters")]
 	pub characters: Option<HashMap<character::Internal, usize>>,
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub netplay: Option<Netplay>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Netplay {
+	pub code: String,
+	pub name: String,
 }
 
 fn date(json: &Map<String, Value>) -> Result<Option<DateTime<Utc>>> {
@@ -93,10 +84,18 @@ fn duration(json: &Map<String, Value>) -> Result<Option<usize>> {
 	}
 }
 
-fn platform(json: &Map<String, Value>) -> Result<Option<String>> {
+fn platform(json: &Map<String, Value>) -> Result<Option<Platform>> {
 	match json.get("playedOn") {
 		None => Ok(None),
-		Some(Value::String(played_on)) => Ok(Some(played_on.clone())),
+		Some(Value::String(platform)) => match platform.as_str() {
+			"dolphin" => Ok(Some(Platform::Dolphin)),
+			"network" => Ok(Some(Platform::Network)),
+			"nintendont" => Ok(Some(Platform::Nintendont)),
+			s => {
+				warn!("Unrecognized metadata.playedOn {:?}", s);
+				Ok(Some(Platform::Unknown(platform.clone())))
+			},
+		},
 		played_on => Err(err!("metadata.playedOn: expected str, but got: {:?}", played_on)),
 	}
 }
