@@ -21,8 +21,8 @@ use peppi::{
 		},
 		frame::{self, Buttons, Frame},
 		game::{
-			DashBack, End, EndMethod, Frames, Game, Language, Netplay, Player, PlayerType, Scene,
-			ShieldDrop, Start, Ucf,
+			DashBack, End, EndMethod, Frames, Game, Language, Netplay, Player, PlayerEnd,
+			PlayerType, Scene, ShieldDrop, Start, Ucf,
 		},
 		item::Item,
 		metadata::{self, Metadata},
@@ -532,8 +532,30 @@ fn v3_12() {
 }
 
 #[test]
+fn v3_13() {
+	let game = game("v3.13");
+	assert_eq!(
+		game.end,
+		End {
+			method: EndMethod::GAME,
+			raw_bytes: vec![2, 255, 1, 255, 0, 255],
+			lras_initiator: Some(None),
+			players: Some(vec![
+				PlayerEnd {
+					port: Port::P1,
+					placement: 1
+				},
+				PlayerEnd {
+					port: Port::P3,
+					placement: 0
+				},
+			]),
+		}
+	);
+}
+
+#[test]
 fn unknown_event() {
-	// shouldn't panic
 	// TODO: check for warning
 	game("unknown_event");
 }
