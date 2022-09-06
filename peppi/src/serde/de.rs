@@ -151,7 +151,7 @@ where
 /// codes to payload sizes. This map uses raw event codes as keys (as opposed
 /// to `Event` enum values) for forwards compatibility, as it allows us to
 /// skip unknown event types. We use an array for speed.
-fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, [u16; 256])> {
+fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, [Option<u16>; 256])> {
 	let code = r.read_u8()?;
 	if code != PAYLOADS_EVENT_CODE {
 		return Err(err!("expected event payloads, but got: {}", code));
@@ -165,11 +165,11 @@ fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, [u16; 256])> {
 		return Err(err!("invalid payload size: {}", size));
 	}
 
-	let mut sizes: [u16; 256] = [0; 256];
+	let mut sizes: [Option<u16>; 256] = [None; 256];
 	for _ in (0..size - 1).step_by(3) {
 		let code = r.read_u8()?;
 		let size = r.read_u16::<BE>()?;
-		sizes[code as usize] = size;
+		sizes[code as usize] = Some(size);
 	}
 
 	debug!(
@@ -178,9 +178,9 @@ fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, [u16; 256])> {
 			.iter()
 			.enumerate()
 			.filter_map(|(c, s)| {
-				match c {
-					0 => None,
-					c => Some(format!("0x{:x}: {}", c, s)),
+				match s {
+					None => None,
+					Some(s) => Some(format!("0x{:x}: {}", c, s)),
 				}
 			})
 			.collect::<Vec<_>>()
@@ -888,7 +888,7 @@ fn handle_splitter_event(buf: &[u8], accumulator: &mut SplitAccumulator) -> Resu
 /// Returns the number of bytes read by this function.
 fn event<R: Read, H: Handlers, P: AsRef<Path>>(
 	mut r: R,
-	payload_sizes: &[u16; 256],
+	payload_sizes: &[Option<u16>; 256],
 	last_char_states: &mut [CharState; NUM_PORTS],
 	handlers: &mut H,
 	splitter_accumulator: &mut SplitAccumulator,
@@ -898,10 +898,7 @@ fn event<R: Read, H: Handlers, P: AsRef<Path>>(
 	let mut code = r.read_u8()?;
 	debug!("Event: {:#x}", code);
 
-	let size = payload_sizes[code as usize] as usize;
-	if size == 0 {
-		err!("unknown event: {}", code);
-	}
+	let size = payload_sizes[code as usize].ok_or_else(|| err!("unknown event {}", code))? as usize;
 	let mut buf = vec![0; size];
 	r.read_exact(&mut *buf)?;
 
@@ -979,7 +976,9 @@ pub fn deserialize<R: Read, H: Handlers>(
 	while (raw_len == 0 || bytes_read < raw_len) && last_event != Some(Event::GameEnd) {
 		if skip_frames && last_event == Some(Event::GameStart) {
 			// Skip to GameEnd, which we assume is the last event in the stream!
-			let end_offset = payload_sizes[Event::GameEnd as usize] as usize + 1;
+			let end_offset = payload_sizes[Event::GameEnd as usize]
+				.ok_or_else(|| err!("No Game End payload size"))? as usize
+				+ 1;
 			if raw_len == 0 || raw_len - bytes_read < end_offset {
 				return Err(err!(
 					"Cannot skip to game end. Replay in-progress or corrupted."
