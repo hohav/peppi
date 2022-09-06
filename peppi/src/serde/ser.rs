@@ -56,7 +56,16 @@ fn payload_sizes(game: &Game) -> Vec<(u8, u16)> {
 		},
 	));
 
-	sizes.push((Event::GameEnd as u8, if ver.gte(2, 0) { 2 } else { 1 }));
+	sizes.push((
+		Event::GameEnd as u8,
+		if ver.gte(3, 13) {
+			6
+		} else if ver.gte(2, 0) {
+			2
+		} else {
+			1
+		},
+	));
 
 	if ver.gte(2, 2) {
 		sizes.push((Event::FrameStart as u8, if ver.gte(3, 10) { 12 } else { 8 }));
@@ -121,6 +130,13 @@ fn game_end<W: Write>(w: &mut W, e: &game::End, ver: Version) -> Result<()> {
 				.map(|p| p.into())
 				.unwrap_or(u8::MAX),
 		)?;
+	}
+	if ver.gte(3, 13) {
+		let players = e.players.as_ref().unwrap();
+		w.write_all(&players.iter().fold([u8::MAX; 4], |mut acc, p| {
+			acc[p.port as usize] = p.placement;
+			acc
+		}))?;
 	}
 	Ok(())
 }

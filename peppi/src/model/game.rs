@@ -224,7 +224,7 @@ pub struct End {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub lras_initiator: Option<Option<Port>>,
 
-	/// player-specific data (added v3.13)
+	/// player-specific data (added: v3.13)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub players: Option<Vec<PlayerEnd>>,
 }
