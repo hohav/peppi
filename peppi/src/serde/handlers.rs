@@ -99,7 +99,7 @@ pub struct Hook<H> where H: HandlersAbs {
 	ports: Option<Vec<usize>>,
 }
 
-macro_rules! into_frame {
+macro_rules! publish_frame {
 	($hook: ident, $fs: expr, $const_generic: expr => $( $idx: expr ),* $(,)?) => {{
 		let ports = $hook.ports.as_ref().unwrap();
 		let frame = Frame {
@@ -190,10 +190,10 @@ impl<H> Hook<H> where H: HandlersAbs {
 		match &self.ports {
 			None => return Err(err!("missing start event")),
 			Some(ports) => match ports.len() {
-				1 => into_frame!(self, frame, 1 => 0),
-				2 => into_frame!(self, frame, 2 => 0, 1),
-				3 => into_frame!(self, frame, 3 => 0, 1, 2),
-				4 => into_frame!(self, frame, 4 => 0, 1, 2, 3),
+				1 => publish_frame!(self, frame, 1 => 0),
+				2 => publish_frame!(self, frame, 2 => 0, 1),
+				3 => publish_frame!(self, frame, 3 => 0, 1, 2),
+				4 => publish_frame!(self, frame, 4 => 0, 1, 2, 3),
 				n => return Err(err!("unsupported number of ports: {}", n)),
 			}
 		}
