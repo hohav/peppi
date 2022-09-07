@@ -67,6 +67,19 @@ pub trait HandlersAbs {
 	fn finalize(&mut self) { }
 }
 
+/// Defines rollback behavior of `Hook`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Rollback {
+	/// last ocurrence of a frame overwrites the previous ocurrences
+	Overwrite,
+	/// all ocurrences of every frame preserved in order they appear
+	Preserve,
+	/// ignore all rollbacks providing only the first ocurrence of each frame
+	Ignore,
+	/// consider rollbacks to be an error
+	Error,
+}
+
 #[derive(Clone, Debug, Default)]
 struct FrameEvents {
 	pre: [Option<frame::Pre>; game::NUM_PORTS],
@@ -94,8 +107,10 @@ impl FrameState {
 
 pub struct Hook<H> where H: HandlersAbs {
 	hook: H,
+	rollback: Rollback,
 	frames: VecDeque<FrameState>,
 	highest_frame: i32,
+	ignore_frame: i32,
 	ports: Option<Vec<usize>>,
 }
 
@@ -134,18 +149,49 @@ macro_rules! publish_frame {
 }
 
 impl<H> Hook<H> where H: HandlersAbs {
-	pub fn new(hook: H) -> Self {
+	pub fn new(hook: H, rollback: Rollback) -> Self {
 		let frames = VecDeque::new();
 		Self {
 			hook,
+			rollback,
 			frames,
 			highest_frame: game::FIRST_FRAME_INDEX - 1,
+			ignore_frame: game::FIRST_FRAME_INDEX - 1,
 			ports: None,
 		}
 	}
 
 	pub fn into_inner(self) -> H {
 		self.hook
+	}
+
+	fn rollback(&mut self, index: i32) -> Result<()> {
+		match self.rollback {
+			Rollback::Error => return Err(err!("Rollback considered error")),
+			Rollback::Ignore => {
+				self.ignore_frame = index;
+			},
+			Rollback::Overwrite => {
+				if index < self.highest_frame - LARGEST_ROLLBACK as i32 {
+					return Err(err!("rollback size too large"));
+				}
+				// All later frames are no longer valid
+				self.highest_frame = index;
+				while matches!(self.frames.back(), Some(fs) if fs.index >= index) {
+					self.frames.pop_back();
+				}
+				self.add_new_frame(index);
+			},
+			Rollback::Preserve => {
+				self.highest_frame = index;
+				// publish all frames in order on rollback
+				while let Some(frame) = self.frames.pop_front() {
+					self.publish_frame(frame)?;
+				}
+				self.add_new_frame(index);
+			}
+		}
+		Ok(())
 	}
 
 	fn get_frame_state(&mut self, index: i32) -> Result<Option<&mut FrameState>> {
@@ -163,27 +209,23 @@ impl<H> Hook<H> where H: HandlersAbs {
 				self.publish_frame(frame)?;
 			}
 		} else if index < self.highest_frame {
-			// Rollback encountered
-			if index < self.highest_frame - LARGEST_ROLLBACK as i32 {
-				return Err(err!("rollback size too large"));
+			if index == self.ignore_frame {
+				return Ok(None);
+			} else {
+				return Err(err!("Unexpected rollback without frame start"));
 			}
-
-			// All later frames are no longer valid
-			self.highest_frame = index;
-			while matches!(self.frames.back(), Some(fs) if fs.index >= index) {
-				self.frames.pop_back();
-			}
-			self.add_new_frame(index);
 		}
 
 		// Saftey: index should always be <= self.highest_frame
 		let idx = usize::try_from(self.highest_frame - index).unwrap();
-		self.frames.get_mut(idx).ok_or(err!("frame not in buffer"))
+		let fs = self.frames.get_mut(idx).ok_or(err!("frame not in buffer"))?;
+		Ok(Some(fs))
 	}
 
 	fn add_new_frame(&mut self, index: i32) {
 		let mut new_frame = FrameState::new(index);
 		if let Some(latest_frame) = self.frames.back() {
+			// TODO: rework to copy only when needed
 			new_frame.leader = latest_frame.leader.clone();
 			new_frame.follow = latest_frame.follow.clone();
 		}
@@ -226,52 +268,60 @@ impl<H> Handlers for Hook<H> where H: HandlersAbs {
 	}
 
 	fn frame_start(&mut self, evt: FrameEvent<FrameId, frame::Start>) -> Result<()> {
-		let frame_state = self.get_frame_state(evt.id.index)?;
-		frame_state.start = Some(evt.event);
+		if evt.id.index <= self.highest_frame {
+			self.rollback(evt.id.index)?;
+		}
+		if let Some(frame_state) = self.get_frame_state(evt.id.index)? {
+			frame_state.start = Some(evt.event);
+		}
 		Ok(())
 	}
 	fn frame_pre(&mut self, evt: FrameEvent<PortId, Pre>) -> Result<()> {
-		let frame_state = self.get_frame_state(evt.id.index)?;
-		if evt.id.is_follower {
-			frame_state.follow.pre[evt.id.port as usize] = Some(evt.event);
-		} else {
-			frame_state.leader.pre[evt.id.port as usize] = Some(evt.event);
+		if let Some(frame_state) = self.get_frame_state(evt.id.index)? {
+			if evt.id.is_follower {
+				frame_state.follow.pre[evt.id.port as usize] = Some(evt.event);
+			} else {
+				frame_state.leader.pre[evt.id.port as usize] = Some(evt.event);
+			}
 		}
 		Ok(())
 	}
 	fn frame_post(&mut self, evt: FrameEvent<PortId, Post>) -> Result<()> {
-		let frame_state = self.get_frame_state(evt.id.index)?;
-		if evt.id.is_follower {
-			frame_state.follow.post[evt.id.port as usize] = Some(evt.event);
-		} else {
-			frame_state.leader.post[evt.id.port as usize] = Some(evt.event);
+		if let Some(frame_state) = self.get_frame_state(evt.id.index)? {
+			if evt.id.is_follower {
+				frame_state.follow.post[evt.id.port as usize] = Some(evt.event);
+			} else {
+				frame_state.leader.post[evt.id.port as usize] = Some(evt.event);
+			}
 		}
 		Ok(())
 	}
 	fn frame_end(&mut self, evt: FrameEvent<FrameId, frame::End>) -> Result<()> {
-		let frame_state = self.get_frame_state(evt.id.index)?;
-		frame_state.end = Some(evt.event);
+		if let Some(frame_state) = self.get_frame_state(evt.id.index)? {
+			frame_state.end = Some(evt.event);
 
-		// Uses latest finalized frame field (v3.7.0+) to publish
-		if let Some(lff) = evt.event.latest_finalized_frame {
-			while matches!(self.frames.front(), Some(fs) if fs.index <= lff) {
-				let frame = self.frames.pop_front().unwrap();
-				self.publish_frame(frame)?;
+			// Uses latest finalized frame field (v3.7.0+) to publish
+			// TODO: potentially superfluous, disable if inefficient
+			if let Some(lff) = evt.event.latest_finalized_frame {
+				while matches!(self.frames.front(), Some(fs) if fs.index <= lff) {
+					let frame = self.frames.pop_front().unwrap();
+					self.publish_frame(frame)?;
+				}
 			}
 		}
 		Ok(())
 	}
 	fn item(&mut self, evt: FrameEvent<FrameId, Item>) -> Result<()> {
-		let frame_state = self.get_frame_state(evt.id.index)?;
-
-		if frame_state.items == None {
-			frame_state.items = Some(Vec::new());
+		if let Some(frame_state) = self.get_frame_state(evt.id.index)? {
+			if frame_state.items == None {
+				frame_state.items = Some(Vec::new());
+			}
+			frame_state.items.as_mut().unwrap().push(evt.event);
 		}
-		frame_state.items.as_mut().unwrap().push(evt.event);
 		Ok(())
 	}
 	fn finalize(&mut self) -> Result<()> {
-        // publish remaining frames here in case game_end never triggered
+		// publish remaining frames here in case game_end never triggered
 		while let Some(frame) = self.frames.pop_front() {
 			self.publish_frame(frame)?;
 		}
