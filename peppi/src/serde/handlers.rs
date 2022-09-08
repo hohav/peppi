@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use crate::{
 	model::{
 		frame::{self, Frame, Pre, Post},
-		game,
+		game::{self, GeckoCodes},
 		item::Item,
 		metadata::Metadata,
 	},
@@ -62,7 +62,7 @@ pub trait HandlersAbs {
 	/// Miscellaneous data not directly provided by Melee.
 	fn metadata(&mut self, _: Metadata) { }
 	/// List of enabled Gecko codes. Currently unparsed.
-	//fn gecko_codes(&mut self, _codes: Result<&[u8]>, _actual_size: u16) -> Result<()> { Ok(()) }
+	fn gecko_codes(&mut self, _: GeckoCodes) { }
 	/// Called after all parse events have been handled.
 	fn finalize(&mut self) { }
 }
@@ -318,6 +318,13 @@ impl<H> Handlers for Hook<H> where H: HandlersAbs {
 			}
 			frame_state.items.as_mut().unwrap().push(evt.event);
 		}
+		Ok(())
+	}
+	fn gecko_codes(&mut self, codes: &[u8], actual_size: u16) -> Result<()> {
+		self.hook.gecko_codes(game::GeckoCodes {
+			bytes: codes.to_vec(),
+			actual_size,
+		});
 		Ok(())
 	}
 	fn finalize(&mut self) -> Result<()> {
