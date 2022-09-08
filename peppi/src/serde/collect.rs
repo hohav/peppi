@@ -82,7 +82,7 @@ macro_rules! into_game {
 		let ports: Vec<_> = start.players.iter().map(|p| p.port as usize).collect();
 
 		let metadata_raw = $gp.metadata.unwrap_or_default();
-		let metadata = Metadata::parse(&metadata_raw)?;
+		let metadata = Metadata::parse(metadata_raw)?;
 		if let Some(ref players) = metadata.players {
 			let meta_ports: Vec<_> = players.iter().map(|p| p.port as usize).collect();
 			if meta_ports != ports {
@@ -147,7 +147,6 @@ macro_rules! into_game {
 			end: end,
 			frames: Frames::$frames_type(frames),
 			metadata: metadata,
-			metadata_raw: metadata_raw,
 		}
 	}}
 }

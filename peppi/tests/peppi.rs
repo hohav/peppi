@@ -15,7 +15,7 @@ use peppi::{
 		frame::{self, Buttons},
 		game::{DashBack, End, EndMethod, Frames, Game, Language, Netplay, Player, PlayerType, Scene, Start, ShieldDrop, Ucf},
 		item::Item,
-		metadata::{self, Metadata, Platform},
+		metadata::{self, Platform},
 		primitives::{Direction, Port, Position, Velocity},
 		slippi::{Slippi, Version},
 	},
@@ -72,32 +72,31 @@ fn slippi_old_version() -> Result<(), String> {
 fn basic_game() -> Result<(), String> {
 	let game = game("game")?;
 
-	assert_eq!(game.metadata, Metadata {
-		date: "2018-06-22T07:52:59Z".parse::<DateTime<Utc>>().ok(),
-		duration: Some(5209),
-		platform: Some(Platform::Dolphin),
-		players: Some(vec![
-			metadata::Player {
-				port: Port::P1,
-				characters: {
-					let mut m = HashMap::new();
-					m.insert(Internal::MARTH, 5209);
-					Some(m)
-				},
-				netplay: None,
+	let date = "2018-06-22T07:52:59Z".parse::<DateTime<Utc>>().ok();
+	let players = Some(vec![
+		metadata::Player {
+			port: Port::P1,
+			characters: {
+				let mut m = HashMap::new();
+				m.insert(Internal::MARTH, 5209);
+				Some(m)
 			},
-			metadata::Player {
-				port: Port::P2,
-				characters: {
-					let mut m = HashMap::new();
-					m.insert(Internal::FOX, 5209);
-					Some(m)
-				},
-				netplay: None,
+			netplay: None,
+		},
+		metadata::Player {
+			port: Port::P2,
+			characters: {
+				let mut m = HashMap::new();
+				m.insert(Internal::FOX, 5209);
+				Some(m)
 			},
-		]),
-		console: None,
-	});
+			netplay: None,
+		},
+	]);
+	assert_eq!(game.metadata.date, date);
+	assert_eq!(game.metadata.duration, Some(5209));
+	assert_eq!(game.metadata.platform, Some(Platform::Dolphin));
+	assert_eq!(game.metadata.players, players);
 
 	assert_eq!(game.start, Start {
 		slippi: Slippi { version: Version(1, 0, 0) },
@@ -535,7 +534,6 @@ fn round_trip() -> Result<(), String> {
 	assert_eq!(game1.start, game2.start);
 	assert_eq!(game1.end, game2.end);
 	assert_eq!(game1.metadata, game2.metadata);
-	assert_eq!(game1.metadata_raw, game2.metadata_raw);
 
 	match (game1.frames, game2.frames) {
 		(Frames::P2(f1), Frames::P2(f2)) => {

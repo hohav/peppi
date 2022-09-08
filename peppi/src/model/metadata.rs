@@ -39,6 +39,7 @@ pub struct Metadata {
 	pub platform: Option<Platform>,
 	pub console: Option<String>,
 	pub players: Option<Vec<Player>>,
+	pub raw: Map<String, Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -182,13 +183,14 @@ fn console(json: &Map<String, Value>) -> Result<Option<String>> {
 }
 
 impl Metadata {
-	pub fn parse(json: &Map<String, Value>) -> Result<Metadata> {
+	pub fn parse(json: Map<String, Value>) -> Result<Metadata> {
 		Ok(Metadata {
-			date: date(json)?,
-			duration: duration(json)?,
-			platform: platform(json)?,
-			players: players(json)?,
-			console: console(json)?,
+			date: date(&json)?,
+			duration: duration(&json)?,
+			platform: platform(&json)?,
+			players: players(&json)?,
+			console: console(&json)?,
+			raw: json,
 		})
 	}
 }

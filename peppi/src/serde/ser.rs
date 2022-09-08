@@ -378,7 +378,7 @@ pub fn serialize<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 
 	w.write_all(
 		&[0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b])?;
-	ubjson::ser::from_map(w, &game.metadata_raw)?;
+	ubjson::ser::from_map(w, &game.metadata.raw)?;
 	w.write_all(&[0x7d])?; // closing brace for `metadata`
 	w.write_all(&[0x7d])?; // closing brace for top-level map
 
