@@ -219,7 +219,7 @@ impl error::Error for UnexpectedPortCountError { }
 
 impl Frames {
 	/// Tries to downcast our inner value to a `Vec<Frame<N>>`.
-	pub fn downcast<const N: usize>(&self) -> Result<&Vec<Frame<N>>, UnexpectedPortCountError> {
+	pub fn downcast_ref<const N: usize>(&self) -> Result<&Vec<Frame<N>>, UnexpectedPortCountError> {
 		match self {
 			Self::P1(frames) => (frames as &dyn Any)
 				.downcast_ref::<Vec<Frame<N>>>()
@@ -232,6 +232,24 @@ impl Frames {
 				.ok_or(UnexpectedPortCountError {expected: N, actual: 3}),
 			Self::P4(frames) => (frames as &dyn Any)
 				.downcast_ref::<Vec<Frame<N>>>()
+				.ok_or(UnexpectedPortCountError {expected: N, actual: 4}),
+		}
+	}
+
+	/// Tries to downcast our inner value to a `Vec<Frame<N>>`.
+	pub fn downcast_mut<const N: usize>(&mut self) -> Result<&mut Vec<Frame<N>>, UnexpectedPortCountError> {
+		match self {
+			Self::P1(frames) => (frames as &mut dyn Any)
+				.downcast_mut::<Vec<Frame<N>>>()
+				.ok_or(UnexpectedPortCountError {expected: N, actual: 1}),
+			Self::P2(frames) => (frames as &mut dyn Any)
+				.downcast_mut::<Vec<Frame<N>>>()
+				.ok_or(UnexpectedPortCountError {expected: N, actual: 2}),
+			Self::P3(frames) => (frames as &mut dyn Any)
+				.downcast_mut::<Vec<Frame<N>>>()
+				.ok_or(UnexpectedPortCountError {expected: N, actual: 3}),
+			Self::P4(frames) => (frames as &mut dyn Any)
+				.downcast_mut::<Vec<Frame<N>>>()
 				.ok_or(UnexpectedPortCountError {expected: N, actual: 4}),
 		}
 	}
