@@ -1,11 +1,12 @@
 use std::io::Result;
 use std::collections::VecDeque;
+use serde_json::{Map, Value};
 use crate::{
 	model::{
 		frame::{self, Frame, Pre, Post},
 		game::{self, GeckoCodes},
 		item::Item,
-		metadata::Metadata,
+		slippi::Version,
 	},
 	serde::de::{FrameEvent, FrameId, PortId,},
 };
@@ -60,7 +61,7 @@ pub trait HandlersAbs {
 	/// The end of the game.
 	fn game_end(&mut self, _: game::End) { }
 	/// Miscellaneous data not directly provided by Melee.
-	fn metadata(&mut self, _: Metadata) { }
+	fn metadata(&mut self, _: Map<String, Value>) { }
 	/// List of enabled Gecko codes. Currently unparsed.
 	fn gecko_codes(&mut self, _: GeckoCodes) { }
 	/// Called after all parse events have been handled.
@@ -268,11 +269,9 @@ impl<H> Handlers for Hook<H> where H: HandlersAbs {
 		Ok(())
 	}
 	fn metadata(&mut self, metadata: serde_json::Map<String, serde_json::Value>) -> Result<()> {
-		let metadata = Metadata::parse(&metadata)?;
 		self.hook.metadata(metadata);
 		Ok(())
 	}
-
 	fn frame_start(&mut self, evt: FrameEvent<FrameId, frame::Start>) -> Result<()> {
 		if evt.id.index <= self.highest_frame {
 			self.rollback(evt.id.index)?;
