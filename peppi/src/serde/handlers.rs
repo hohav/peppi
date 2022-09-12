@@ -112,6 +112,7 @@ pub struct Hook<H> where H: HandlersAbs {
 	highest_frame: i32,
 	ignore_frame: i32,
 	ports: Option<Vec<usize>>,
+	version: Version,
 }
 
 macro_rules! publish_frame {
@@ -158,6 +159,7 @@ impl<H> Hook<H> where H: HandlersAbs {
 			highest_frame: game::FIRST_FRAME_INDEX - 1,
 			ignore_frame: game::FIRST_FRAME_INDEX - 1,
 			ports: None,
+			version: Version(0, 1, 0),
 		}
 	}
 
@@ -224,6 +226,9 @@ impl<H> Hook<H> where H: HandlersAbs {
 
 	fn add_new_frame(&mut self, index: i32) {
 		let mut new_frame = FrameState::new(index);
+		if self.version >= Version(3, 0, 0) {
+			new_frame.items = Some(Vec::new());
+		}
 		if let Some(latest_frame) = self.frames.back() {
 			// TODO: rework to copy only when needed
 			new_frame.leader = latest_frame.leader.clone();
@@ -250,6 +255,7 @@ impl<H> Hook<H> where H: HandlersAbs {
 impl<H> Handlers for Hook<H> where H: HandlersAbs {
 	fn game_start(&mut self, start: game::Start) -> Result<()> {
 		self.ports = Some(start.players.iter().map(|p| p.port as usize).collect());
+		self.version = start.slippi.version;
 
 		self.hook.game_start(start);
 		Ok(())
