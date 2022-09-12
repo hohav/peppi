@@ -3,6 +3,7 @@ use std::{
 	collections::HashMap,
 	fs::{self, File},
 	io::{self, Read, Result, Write},
+	ops::{Index, IndexMut},
 	path::{Path, PathBuf},
 };
 
@@ -17,7 +18,7 @@ use crate::{
 	model::{
 		buttons,
 		enums::{
-			action_state::{self, Common, State},
+			action_state::{self, State},
 			attack::Attack,
 			character::{self, Internal},
 			costume, ground, item, stage,
@@ -34,19 +35,79 @@ use crate::{
 const ZELDA_TRANSFORM_FRAME: u32 = 43;
 const SHEIK_TRANSFORM_FRAME: u32 = 36;
 
-// We only track this for Sheik/Zelda transformations, which can't happen on
-// the first frame. So we can initialize with any arbitrary character value.
-const DEFAULT_CHAR_STATE: CharState = CharState {
-	character: Internal(255),
-	state: State::Common(Common::WAIT),
-	age: 0,
-};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+// Used to track Sheik/Zelda transformations
+#[derive(Debug, Default)]
 struct CharState {
-	character: Internal,
+	character: Option<Internal>,
 	state: State,
 	age: u32,
+}
+
+impl CharState {
+	/// we need to know the character to interpret the action state properly,
+	/// but for Sheik/Zelda we don't know whether they transformed this frame
+	/// until we get the corresponding `frame::Post` event. So we predict based
+	/// on whether we were on the last frame of `TRANSFORM_AIR` or
+	/// `TRANSFORM_GROUND` during the *previous* frame.
+	fn predict(&self) -> Option<Internal> {
+		match self.state {
+			State::Zelda(action_state::Zelda::TRANSFORM_GROUND)
+			| State::Zelda(action_state::Zelda::TRANSFORM_AIR)
+				if self.age >= ZELDA_TRANSFORM_FRAME =>
+			{
+				Some(Internal::SHEIK)
+			}
+			State::Sheik(action_state::Sheik::TRANSFORM_GROUND)
+			| State::Sheik(action_state::Sheik::TRANSFORM_AIR)
+				if self.age >= SHEIK_TRANSFORM_FRAME =>
+			{
+				Some(Internal::ZELDA)
+			}
+			_ => self.character.or(self.state.character()),
+		}
+	}
+
+	fn update(&mut self, character: Internal, state: State) {
+		const Z_AIR: State = State::Zelda(action_state::Zelda::TRANSFORM_AIR);
+		const Z_GROUND: State = State::Zelda(action_state::Zelda::TRANSFORM_GROUND);
+		const S_AIR: State = State::Sheik(action_state::Sheik::TRANSFORM_AIR);
+		const S_GROUND: State = State::Sheik(action_state::Sheik::TRANSFORM_GROUND);
+
+		self.age = match (self.state, state) {
+			(s0, s1) if s0 == s1 => self.age + 1,
+			// `TRANSFORM_AIR` can transition into `TRANSFORM_GROUND`
+			// without interruption, so conflate them for age purposes.
+			// Note: if you land on the frame where you would have transitioned from
+			// `TRANSFORM_AIR` to `TRANSFORM_AIR_ENDING`, you instead transition to
+			// `TRANSFORM_GROUND` for one frame before going to
+			// `TRANSFORM_GROUND_ENDING` on the next frame. This delays the character
+			// switch by one frame, so we cap `age` at its previous value so as not to
+			// confuse `predict_character`.
+			(Z_AIR, Z_GROUND) | (Z_GROUND, Z_AIR) => min(ZELDA_TRANSFORM_FRAME - 1, self.age + 1),
+			(S_AIR, S_GROUND) | (S_GROUND, S_AIR) => min(SHEIK_TRANSFORM_FRAME - 1, self.age + 1),
+			_ => 0,
+		};
+		self.character = Some(character);
+		self.state = state;
+	}
+}
+
+// Technically the game can load any character as a follower, so we track them
+// too. The second half of the array holds data for the followers.
+#[derive(Debug, Default)]
+struct LastCharStates([CharState; 2 * NUM_PORTS]);
+
+impl Index<PortId> for LastCharStates {
+	type Output = CharState;
+	fn index(&self, id: PortId) -> &Self::Output {
+		&self.0[id.port as usize + if id.is_follower { NUM_PORTS } else { 0 }]
+	}
+}
+
+impl IndexMut<PortId> for LastCharStates {
+	fn index_mut(&mut self, id: PortId) -> &mut Self::Output {
+		&mut self.0[id.port as usize + if id.is_follower { NUM_PORTS } else { 0 }]
+	}
 }
 
 pub(super) const PAYLOADS_EVENT_CODE: u8 = 0x35;
@@ -549,41 +610,17 @@ fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, Item>> {
 	})
 }
 
-/// We need to know the character to interpret the action state properly,
-/// but for Sheik/Zelda we don't know whether they transformed this frame
-/// until we get the corresponding `frame::Post` event. So we predict based
-/// on whether we were on the last frame of `TRANSFORM_AIR` or
-/// `TRANSFORM_GROUND` during the *previous* frame.
-fn predict_character(id: PortId, last_char_states: &[CharState; NUM_PORTS]) -> Internal {
-	let prev = last_char_states[id.port as usize];
-	match prev.state {
-		State::Zelda(action_state::Zelda::TRANSFORM_GROUND)
-		| State::Zelda(action_state::Zelda::TRANSFORM_AIR)
-			if prev.age >= ZELDA_TRANSFORM_FRAME =>
-		{
-			Internal::SHEIK
-		}
-		State::Sheik(action_state::Sheik::TRANSFORM_GROUND)
-		| State::Sheik(action_state::Sheik::TRANSFORM_AIR)
-			if prev.age >= SHEIK_TRANSFORM_FRAME =>
-		{
-			Internal::ZELDA
-		}
-		_ => prev.character,
-	}
-}
-
-fn frame_pre(
-	r: &mut &[u8],
-	last_char_states: &[CharState; NUM_PORTS],
-) -> Result<FrameEvent<PortId, Pre>> {
+fn frame_pre(r: &mut &[u8], last_char_states: &LastCharStates) -> Result<FrameEvent<PortId, Pre>> {
 	let id = PortId::try_new(r.read_i32::<BE>()?, r.read_u8()?, r.read_u8()? != 0)?;
 	trace!("Pre-Frame Update: {:?}", id);
 
-	let character = predict_character(id, last_char_states);
-
 	let random_seed = r.read_u32::<BE>()?;
-	let state = State::from(r.read_u16::<BE>()?, character);
+
+	let character = last_char_states[id].predict();
+	let state = match character {
+		None => r.read_u16::<BE>()?.into(),
+		Some(c) => State::from(r.read_u16::<BE>()?, c),
+	};
 
 	let position = Position {
 		x: r.read_f32::<BE>()?,
@@ -643,40 +680,9 @@ fn flags(buf: &[u8; 5]) -> frame::StateFlags {
 	)
 }
 
-fn update_last_char_state(
-	id: PortId,
-	character: Internal,
-	state: State,
-	last_char_states: &mut [CharState; NUM_PORTS],
-) {
-	const Z_AIR: State = State::Zelda(action_state::Zelda::TRANSFORM_AIR);
-	const Z_GROUND: State = State::Zelda(action_state::Zelda::TRANSFORM_GROUND);
-	const S_AIR: State = State::Sheik(action_state::Sheik::TRANSFORM_AIR);
-	const S_GROUND: State = State::Sheik(action_state::Sheik::TRANSFORM_GROUND);
-	let prev = last_char_states[id.port as usize];
-	last_char_states[id.port as usize] = CharState {
-		character: character,
-		state: state,
-		age: match (prev.state, state) {
-			(s0, s1) if s0 == s1 => prev.age + 1,
-			// `TRANSFORM_AIR` can transition into `TRANSFORM_GROUND`
-			// without interruption, so conflate them for age purposes.
-			// Note: if you land on the frame where you would have transitioned from
-			// `TRANSFORM_AIR` to `TRANSFORM_AIR_ENDING`, you instead transition to
-			// `TRANSFORM_GROUND` for one frame before going to
-			// `TRANSFORM_GROUND_ENDING` on the next frame. This delays the character
-			// switch by one frame, so we cap `age` at its previous value so as not to
-			// confuse `predict_character`.
-			(Z_AIR, Z_GROUND) | (Z_GROUND, Z_AIR) => min(ZELDA_TRANSFORM_FRAME - 1, prev.age + 1),
-			(S_AIR, S_GROUND) | (S_GROUND, S_AIR) => min(SHEIK_TRANSFORM_FRAME - 1, prev.age + 1),
-			_ => 0,
-		},
-	};
-}
-
 fn frame_post(
 	r: &mut &[u8],
-	last_char_states: &mut [CharState; NUM_PORTS],
+	last_char_states: &mut LastCharStates,
 ) -> Result<FrameEvent<PortId, Post>> {
 	let id = PortId::try_new(r.read_i32::<BE>()?, r.read_u8()?, r.read_u8()? != 0)?;
 	trace!("Post-Frame Update: {:?}", id);
@@ -760,7 +766,7 @@ fn frame_post(
 	// v3.11
 	let animation_index = if_more(r, |r| r.read_u32::<BE>())?;
 
-	update_last_char_state(id, character, state, last_char_states);
+	last_char_states[id].update(character, state);
 
 	Ok(FrameEvent {
 		id,
@@ -890,7 +896,7 @@ fn handle_splitter_event(buf: &[u8], accumulator: &mut Option<Vec<u8>>) -> Resul
 fn event<R: Read, H: Handlers, P: AsRef<Path>>(
 	mut r: R,
 	payload_sizes: &HashMap<u8, u16>,
-	last_char_states: &mut [CharState; NUM_PORTS],
+	last_char_states: &mut LastCharStates,
 	handlers: &mut H,
 	splitter_accumulator: &mut Option<Vec<u8>>,
 	event_counts: &mut HashMap<u8, usize>,
@@ -965,7 +971,7 @@ pub fn deserialize<R: Read, H: Handlers>(
 	let raw_len = r.read_u32::<BE>()? as usize;
 	info!("Raw length: {} bytes", raw_len);
 	let (mut bytes_read, payload_sizes) = payload_sizes(&mut r)?;
-	let mut last_char_states = [DEFAULT_CHAR_STATE; NUM_PORTS];
+	let mut last_char_states: LastCharStates = Default::default();
 	let mut last_event: Option<Event> = None;
 	let skip_frames = opts.map(|o| o.skip_frames).unwrap_or(false);
 
