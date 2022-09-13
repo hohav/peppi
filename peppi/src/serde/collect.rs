@@ -8,7 +8,7 @@ use crate::{
 		game::{self, Frames, Game, GeckoCodes},
 		metadata::Metadata,
 	},
-	serde::handlers::HandlersAbs,
+	serde::handlers::GameHandler,
 };
 
 #[derive(Debug, Default)]
@@ -44,7 +44,7 @@ impl Collector {
 	}
 }
 
-impl HandlersAbs for Collector {
+impl GameHandler for Collector {
 	fn gecko_codes(&mut self, codes: GeckoCodes) {
 					self.gecko_codes = Some(codes);
 	}

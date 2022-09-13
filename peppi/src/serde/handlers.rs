@@ -23,7 +23,7 @@ pub const NETPLAY_MAJOR_SCENE: u8 = 8;
 ///
 /// For frame events, there will be one event per frame per character
 /// (Ice Climbers are two characters).
-pub trait Handlers {
+pub trait EventHandler {
 	// Descriptions below partially copied from the Slippi spec:
 	// https://github.com/project-slippi/slippi-wiki/blob/master/SPEC.md
 
@@ -53,7 +53,7 @@ pub trait Handlers {
 	fn finalize(&mut self) -> Result<()> { Ok(()) }
 }
 
-pub trait HandlersAbs {
+pub trait GameHandler {
 	/// How the game is set up; also includes the version of the extraction code.
 	fn game_start(&mut self, _: game::Start) { }
 	/// Single frame of the game
@@ -106,7 +106,7 @@ impl FrameState {
 	}
 }
 
-pub struct Hook<H> where H: HandlersAbs {
+pub struct Hook<H> where H: GameHandler {
 	hook: H,
 	rollback: Rollback,
 	frames: VecDeque<FrameState>,
@@ -150,7 +150,7 @@ macro_rules! publish_frame {
 	}}
 }
 
-impl<H> Hook<H> where H: HandlersAbs {
+impl<H> Hook<H> where H: GameHandler {
 	pub fn new(hook: H, rollback: Rollback) -> Self {
 		let frames = VecDeque::new();
 		Self {
@@ -268,7 +268,7 @@ impl<H> Hook<H> where H: HandlersAbs {
 	}
 }
 
-impl<H> Handlers for Hook<H> where H: HandlersAbs {
+impl<H> EventHandler for Hook<H> where H: GameHandler {
 	fn game_start(&mut self, start: game::Start) -> Result<()> {
 		self.ports = Some(start.players.iter().map(|p| p.port as usize).collect());
 		self.version = start.slippi.version;

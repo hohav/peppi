@@ -32,7 +32,7 @@ use crate::{
 		slippi,
 		triggers,
 	},
-	serde::handlers::Handlers,
+	serde::handlers::EventHandler,
 	ubjson,
 };
 
@@ -782,7 +782,7 @@ fn handle_splitter_event(buf: &[u8], accumulator: &mut Option<Vec<u8>>) -> Resul
 /// the parsed event.
 ///
 /// Returns the number of bytes read by this function.
-fn event<R: Read, H: Handlers, P: AsRef<Path>>(
+fn event<R: Read, H: EventHandler, P: AsRef<Path>>(
 		mut r: R,
 		payload_sizes: &HashMap<u8, u16>,
 		last_char_states: &mut LastCharStates,
@@ -845,7 +845,7 @@ pub struct Opts {
 }
 
 /// Parses a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn deserialize<R: Read, H: Handlers>(mut r: &mut R, handlers: &mut H, opts: Option<&Opts>) -> Result<()> {
+pub fn deserialize<R: Read, H: EventHandler>(mut r: &mut R, handlers: &mut H, opts: Option<&Opts>) -> Result<()> {
 	// For speed, assume the `raw` element comes first and handle it manually.
 	// The official JS parser does this too, so it should be reliable.
 	expect_bytes(&mut r, &crate::SLIPPI_FILE_SIGNATURE)?;
