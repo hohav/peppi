@@ -318,15 +318,6 @@ impl<H> Handlers for Hook<H> where H: HandlersAbs {
 	fn frame_end(&mut self, evt: FrameEvent<FrameId, frame::End>) -> Result<()> {
 		if let Some(frame_state) = self.get_frame_state(evt.id.index)? {
 			frame_state.end = Some(evt.event);
-
-			// Uses latest finalized frame field (v3.7.0+) to publish
-			// TODO: potentially superfluous, disable if inefficient
-			if let Some(lff) = evt.event.latest_finalized_frame {
-				while matches!(self.frames.front(), Some(fs) if fs.index <= lff) {
-					let frame = self.frames.pop_front().unwrap();
-					self.publish_frame(frame)?;
-				}
-			}
 		}
 		Ok(())
 	}
