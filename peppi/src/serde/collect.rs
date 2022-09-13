@@ -22,8 +22,8 @@ pub struct Collector {
 
 impl Collector {
 	pub fn into_game(self) -> Result<Game> {
-		let start = self.start.ok_or(err!("missing start event"))?;
-		let end = self.end.ok_or(err!("missing end event"))?;
+		let start = self.start.ok_or_else(|| err!("missing start event"))?;
+		let end = self.end.ok_or_else(|| err!("missing end event"))?;
 		let frames = self.frames.unwrap_or((match start.players.len() {
 			1 => Ok(Frames::P1(Vec::new())),
 			2 => Ok(Frames::P2(Vec::new())),
@@ -31,7 +31,7 @@ impl Collector {
 			4 => Ok(Frames::P4(Vec::new())),
 			_ => Err(err!("invalid number of players")),
 		})?);
-		let metadata_raw = self.metadata.ok_or(err!("missing metadata event"))?;
+		let metadata_raw = self.metadata.ok_or_else(|| err!("missing metadata event"))?;
 		let metadata = Metadata::parse(&metadata_raw)?;
 		Ok(Game {
 			start,

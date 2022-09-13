@@ -68,7 +68,7 @@ impl LastCharStates {
 			State::Sheik(action_state::Sheik::TRANSFORM_GROUND) |
 			State::Sheik(action_state::Sheik::TRANSFORM_AIR)
 				if last_char_state.age >= SHEIK_TRANSFORM_FRAME => Some(Internal::ZELDA),
-			_ => last_char_state.character.or(last_char_state.state.character()),
+			_ => last_char_state.character.or_else(|| last_char_state.state.character()),
 		}
 	}
 

@@ -236,7 +236,7 @@ impl<H> Hook<H> where H: GameHandler {
 		// Saftey: index should always be <= self.highest_frame
 		let off = usize::try_from(self.highest_frame - index).unwrap();
 		let idx = self.frames.len() - off - 1;
-		let fs = self.frames.get_mut(idx).ok_or(err!("frame not in buffer"))?;
+		let fs = self.frames.get_mut(idx).ok_or_else(|| err!("frame not in buffer"))?;
 		Ok(Some(fs))
 	}
 
