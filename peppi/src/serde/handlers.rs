@@ -207,7 +207,8 @@ impl<H> Hook<H> where H: HandlersAbs {
 			self.add_new_frame(index);
 
 			// publish frames that can no longer be rolled back
-			while self.frames.len() > LARGEST_ROLLBACK as usize {
+			// we keep one extra frame to restore port data from
+			while self.frames.len() > (LARGEST_ROLLBACK + 1) as usize {
 				let frame = self.frames.pop_front().unwrap();
 				self.publish_frame(frame)?;
 			}
