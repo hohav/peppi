@@ -233,7 +233,8 @@ impl<H> Hook<H> where H: HandlersAbs {
 		}
 
 		// Saftey: index should always be <= self.highest_frame
-		let idx = usize::try_from(self.highest_frame - index).unwrap();
+		let off = usize::try_from(self.highest_frame - index).unwrap();
+		let idx = self.frames.len() - off - 1;
 		let fs = self.frames.get_mut(idx).ok_or(err!("frame not in buffer"))?;
 		Ok(Some(fs))
 	}
