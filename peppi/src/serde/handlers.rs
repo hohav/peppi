@@ -11,8 +11,7 @@ use crate::{
 	serde::de::{FrameEvent, FrameId, PortId,},
 };
 
-/// The largest possible rollback size in frames. Used to determine when a
-/// frame is finalized for replays before v3.7.0
+/// The largest possible rollback size in frames
 pub const LARGEST_ROLLBACK: u8 = 7;
 
 /// When the major scene number in the game start event is set to this value
@@ -53,6 +52,7 @@ pub trait EventHandler {
 	fn finalize(&mut self) -> Result<()> { Ok(()) }
 }
 
+/// Callbacks for the main parts of each game
 pub trait GameHandler {
 	/// How the game is set up; also includes the version of the extraction code.
 	fn game_start(&mut self, _: game::Start) { }
@@ -62,9 +62,9 @@ pub trait GameHandler {
 	fn game_end(&mut self, _: game::End) { }
 	/// Miscellaneous data not directly provided by Melee.
 	fn metadata(&mut self, _: Map<String, Value>) { }
-	/// List of enabled Gecko codes. Currently unparsed.
+	/// Enabled Gecko codes. Currently unparsed.
 	fn gecko_codes(&mut self, _: GeckoCodes) { }
-	/// Called after all parse events have been handled.
+	/// Called after all game events have been handled.
 	fn finalize(&mut self) { }
 }
 
@@ -106,6 +106,7 @@ impl FrameState {
 	}
 }
 
+/// Takes ownership of a GameHandler and adapts it for use as an EventHandler
 pub struct Hook<H> where H: GameHandler {
 	hook: H,
 	rollback: Rollback,
