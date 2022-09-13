@@ -176,22 +176,36 @@ impl<H> Hook<H> where H: HandlersAbs {
 			},
 			Rollback::Overwrite => {
 				if index < self.highest_frame - LARGEST_ROLLBACK as i32 {
-					return Err(err!("rollback size too large"));
+					return Err(err!("Rollback size too large"));
 				}
 				// All later frames are no longer valid
-				self.highest_frame = index;
 				while matches!(self.frames.back(), Some(fs) if fs.index >= index) {
 					self.frames.pop_back();
 				}
 				self.add_new_frame(index);
 			},
 			Rollback::Preserve => {
-				self.highest_frame = index;
-				// publish all frames in order on rollback
+				// Variables to store previous frames data before publishing
+				let mut leader: Option<FrameEvents> = None;
+				let mut follow: Option<FrameEvents> = None;
+
+				// Publish all frames in order on rollback
 				while let Some(frame) = self.frames.pop_front() {
+					if frame.index == index - 1 {
+						leader = Some(frame.leader.clone());
+						follow = Some(frame.follow.clone());
+					}
 					self.publish_frame(frame)?;
 				}
 				self.add_new_frame(index);
+				match leader.zip(follow) {
+					None => return Err(err!("Can't get prior frame on rollback")),
+					Some((leader, follow)) => {
+						let mut new_frame = self.frames.get_mut(0).unwrap();
+						new_frame.leader = leader;
+						new_frame.follow = follow;
+					}
+				}
 			}
 		}
 		Ok(())
@@ -235,6 +249,7 @@ impl<H> Hook<H> where H: HandlersAbs {
 			new_frame.follow = latest_frame.follow.clone();
 		}
 		self.frames.push_back(new_frame);
+		self.highest_frame = index;
 	}
 
 	fn publish_frame(&mut self, frame: FrameState) -> Result<()> {
