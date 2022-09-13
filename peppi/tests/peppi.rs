@@ -21,14 +21,14 @@ use peppi::{
 	},
 	serde::{
 		self,
-		collect::{self, Rollback},
+		handlers::Rollback,
 	},
 };
 
 fn read_game(path: &str) -> Result<Game, String> {
 	let mut buf = io::BufReader::new(
 		fs::File::open(path).unwrap());
-	peppi::game(&mut buf, None, None).map_err(|e| format!("couldn't deserialize game: {:?}", e))
+	peppi::game(&mut buf, None, Rollback::Preserve).map_err(|e| format!("couldn't deserialize game: {:?}", e))
 }
 
 fn game(name: &str) -> Result<Game, String> {
@@ -553,8 +553,7 @@ fn round_trip() -> Result<(), String> {
 fn rollback_frames(rollback: Rollback) -> Result<Vec<frame::Frame<2>>, String> {
 	let mut buf = io::BufReader::new(
 		fs::File::open("tests/data/ics2.slp").unwrap());
-	let opts = collect::Opts { rollback };
-	let game = peppi::game(&mut buf, None, Some(&opts)).map_err(|e| format!("couldn't deserialize game: {:?}", e))?;
+	let game = peppi::game(&mut buf, None, rollback).map_err(|e| format!("couldn't deserialize game: {:?}", e))?;
 	match game.frames {
 		Frames::P2(frames) => Ok(frames),
 		_ => Err("not a 2-player game".to_string()),
@@ -563,9 +562,9 @@ fn rollback_frames(rollback: Rollback) -> Result<Vec<frame::Frame<2>>, String> {
 
 #[test]
 fn rollback() -> Result<(), String> {
-	let frames_all = rollback_frames(Rollback::All)?;
-	let frames_first = rollback_frames(Rollback::First)?;
-	let frames_last = rollback_frames(Rollback::Last)?;
+	let frames_all = rollback_frames(Rollback::Preserve)?;
+	let frames_first = rollback_frames(Rollback::Ignore)?;
+	let frames_last = rollback_frames(Rollback::Overwrite)?;
 	assert_eq!(frames_all.len(), 9530);
 	assert_eq!(frames_first.len(), 9519);
 	assert_eq!(frames_last.len(), 9519);

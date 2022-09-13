@@ -116,11 +116,9 @@ pub fn parse<R: Read, H: serde::handlers::Handlers>(r: &mut R, handlers: &mut H,
 }
 
 /// Parse a Slippi replay from `r`, returning a `game::Game` object.
-pub fn game<R: Read>(r: &mut R, parse_opts: Option<&serde::de::Opts>, collect_opts: Option<&serde::collect::Opts>) -> Result<model::game::Game, ParseError> {
-	let mut game_parser = serde::collect::Collector {
-		opts: collect_opts.copied().unwrap_or_default(),
-		..Default::default()
-	};
-	parse(r, &mut game_parser, parse_opts)
-		.and_then(|_| game_parser.into_game().map_err(|e| ParseError { error: e, pos: None }))
+pub fn game<R: Read>(r: &mut R, parse_opts: Option<&serde::de::Opts>, rollback: serde::handlers::Rollback) -> Result<model::game::Game, ParseError> {
+	let collector = serde::collect::Collector::default();
+	let mut hook = serde::handlers::Hook::new(collector, rollback);
+	parse(r, &mut hook, parse_opts)
+		.and_then(|_| hook.into_inner().into_game().map_err(|e| ParseError { error: e, pos: None }))
 }
