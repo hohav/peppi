@@ -211,12 +211,10 @@ impl<H> Hook<H> where H: HandlersAbs {
 				let frame = self.frames.pop_front().unwrap();
 				self.publish_frame(frame)?;
 			}
+		} else if index <= self.ignore_frame {
+			return Ok(None);
 		} else if index < self.highest_frame {
-			if index == self.ignore_frame {
-				return Ok(None);
-			} else {
-				return Err(err!("Unexpected rollback without frame start"));
-			}
+			return Err(err!("Unexpected rollback without frame start"));
 		}
 
 		// Saftey: index should always be <= self.highest_frame
