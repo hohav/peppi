@@ -105,20 +105,31 @@ impl<R: Read> Read for TrackingReader<R> {
 	}
 }
 
-/// Parse a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn parse<R: Read, H: serde::handlers::EventHandler>(r: &mut R, handlers: &mut H, opts: Option<&serde::de::Opts>) -> std::result::Result<(), ParseError> {
+/// Parse a Slippi replay from `r`, passing game events to the callbacks in
+/// `handler` as they occur. For raw event parsing call `deserialize` directly.
+pub fn parse<R: Read, H: serde::handlers::GameHandler>(
+	r: &mut R,
+	handler: H,
+	opts: Option<&serde::de::Opts>,
+	rollback: serde::handlers::Rollback,
+) -> Result<H, ParseError> {
 	let mut r = TrackingReader {
 		pos: 0,
 		reader: r,
 	};
-	serde::de::deserialize(&mut r, handlers, opts)
+	let mut hook = serde::handlers::Hook::new(handler, rollback);
+	serde::de::deserialize(&mut r, &mut hook, opts)
+		.map(|_| hook.into_inner())
 		.map_err(|e| ParseError { error: e, pos: Some(r.pos) })
 }
 
 /// Parse a Slippi replay from `r`, returning a `game::Game` object.
-pub fn game<R: Read>(r: &mut R, parse_opts: Option<&serde::de::Opts>, rollback: serde::handlers::Rollback) -> Result<model::game::Game, ParseError> {
+pub fn game<R: Read>(
+	r: &mut R,
+	parse_opts: Option<&serde::de::Opts>,
+	rollback: serde::handlers::Rollback,
+) -> Result<model::game::Game, ParseError> {
 	let collector = serde::collect::Collector::default();
-	let mut hook = serde::handlers::Hook::new(collector, rollback);
-	parse(r, &mut hook, parse_opts)
-		.and_then(|_| hook.into_inner().into_game().map_err(|e| ParseError { error: e, pos: None }))
+	parse(r, collector, parse_opts, rollback)
+		.and_then(|c| c.into_game().map_err(|e| ParseError { error: e, pos: None }))
 }
