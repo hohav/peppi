@@ -549,6 +549,26 @@ fn zelda_sheik_transformation() {
 }
 
 #[test]
+fn pre_frame_character() {
+	let game = game("ics2");
+	match game.frames {
+		Frames::P2(frames) => {
+			for f in frames.iter().take(4000) {
+				if let Some(character) = f.ports[0].leader.pre.state.character() {
+					assert_eq!(character, Internal::POPO);
+				}
+				if let Some(follower) = f.ports[0].follower.as_ref() {
+					if let Some(character) = follower.pre.state.character() {
+						assert_eq!(character, Internal::NANA);
+					}
+				}
+			}
+		}
+		_ => panic!("wrong number of ports"),
+	};
+}
+
+#[test]
 fn items() {
 	let game = game("items");
 	match game.frames {
