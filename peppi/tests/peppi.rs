@@ -130,7 +130,7 @@ fn basic_game() -> Result<(), String> {
 					handicap: 9,
 					bitfield: 192,
 					cpu_level: None,
-					offense_ratio: 0.0,
+					offense_ratio: 1.0,
 					defense_ratio: 1.0,
 					model_scale: 1.0,
 					ucf: Some(Ucf {
@@ -150,7 +150,7 @@ fn basic_game() -> Result<(), String> {
 					handicap: 9,
 					bitfield: 64,
 					cpu_level: Some(1),
-					offense_ratio: 0.0,
+					offense_ratio: 1.0,
 					defense_ratio: 1.0,
 					model_scale: 1.0,
 					ucf: Some(Ucf {
@@ -464,7 +464,7 @@ fn v3_12() -> Result<(), String> {
 					handicap: 9,
 					bitfield: 192,
 					cpu_level: None,
-					offense_ratio: 0.0,
+					offense_ratio: 1.0,
 					defense_ratio: 1.0,
 					model_scale: 1.0,
 					ucf: Some(Ucf {
@@ -488,7 +488,7 @@ fn v3_12() -> Result<(), String> {
 					handicap: 9,
 					bitfield: 192,
 					cpu_level: None,
-					offense_ratio: 0.0,
+					offense_ratio: 1.0,
 					defense_ratio: 1.0,
 					model_scale: 1.0,
 					ucf: Some(Ucf {

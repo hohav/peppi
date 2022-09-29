@@ -218,11 +218,10 @@ fn player(
 			_ => None,
 		}
 	};
-	r.read_exact(&mut unmapped[7..11])?;
+	r.read_exact(&mut unmapped[7..15])?;
 	let offense_ratio = r.read_f32::<BE>()?;
 	let defense_ratio = r.read_f32::<BE>()?;
 	let model_scale = r.read_f32::<BE>()?;
-	r.read_exact(&mut unmapped[11..15])?;
 	// total bytes: 0x24
 
 	// v1.0
