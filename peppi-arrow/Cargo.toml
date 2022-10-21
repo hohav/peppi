@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 name = "peppi-arrow"
 repository = "https://github.com/hohav/peppi"
-version = "0.2.3"
+version = "0.3.0"
 
 [dependencies]
 arrow2 = "0.14.2"
