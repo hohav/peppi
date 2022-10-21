@@ -8,7 +8,7 @@ repository = "https://github.com/hohav/peppi"
 version = "0.2.3"
 
 [dependencies]
-darling = "0.13"
+darling = "0.14"
 peppi-arrow = { path = "../peppi-arrow" }
 proc-macro2 = "1.0"
 quote = "1.0"
