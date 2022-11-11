@@ -1,6 +1,4 @@
-use std::{
-	io::{Result, Write},
-};
+use std::io::{Result, Write};
 
 use byteorder::{LittleEndian, WriteBytesExt};
 
@@ -11,7 +9,7 @@ use crate::{
 		item,
 		slippi::{self, version as ver},
 	},
-	serde::de::{PAYLOADS_EVENT_CODE, Event, PortId},
+	serde::de::{Event, PortId, PAYLOADS_EVENT_CODE},
 	ubjson,
 };
 
@@ -24,17 +22,19 @@ fn payload_sizes(game: &Game) -> Vec<(u8, u16)> {
 
 	sizes.push((Event::GameStart as u8, start.raw_bytes.len() as u16));
 
-	sizes.push((Event::FramePre as u8,
+	sizes.push((
+		Event::FramePre as u8,
 		if v >= ver(1, 4) {
 			63
 		} else if v >= ver(1, 2) {
 			59
 		} else {
 			58
-		}
+		},
 	));
 
-	sizes.push((Event::FramePost as u8,
+	sizes.push((
+		Event::FramePost as u8,
 		if v >= ver(3, 11) {
 			80
 		} else if v >= ver(3, 8) {
@@ -49,41 +49,33 @@ fn payload_sizes(game: &Game) -> Vec<(u8, u16)> {
 			37
 		} else {
 			33
-		}
+		},
 	));
 
 	sizes.push((Event::GameEnd as u8, if v >= ver(2, 0) { 2 } else { 1 }));
 
 	if v >= ver(2, 2) {
-		sizes.push((Event::FrameStart as u8,
-			if v >= ver(3, 10) {
-				12
-			} else {
-				8
-			}
+		sizes.push((
+			Event::FrameStart as u8,
+			if v >= ver(3, 10) { 12 } else { 8 },
 		));
 	}
 
 	if v >= ver(3, 0) {
-		sizes.push((Event::Item as u8,
+		sizes.push((
+			Event::Item as u8,
 			if v >= ver(3, 6) {
 				42
 			} else if v >= ver(3, 2) {
 				41
 			} else {
 				37
-			}
+			},
 		));
 	}
 
 	if v >= ver(3, 0) {
-		sizes.push((Event::FrameEnd as u8,
-			if v >= ver(3, 7) {
-				8
-			} else {
-				4
-			}
-		));
+		sizes.push((Event::FrameEnd as u8, if v >= ver(3, 7) { 8 } else { 4 }));
 	}
 
 	if let Some(codes) = &game.gecko_codes {
@@ -102,7 +94,7 @@ fn gecko_codes<W: Write>(w: &mut W, codes: &GeckoCodes) -> Result<()> {
 	let actual_size = codes.actual_size as usize;
 	while pos < actual_size {
 		w.write_u8(0x10)?; // Message Splitter
-		w.write_all(&codes.bytes[pos .. pos + 512])?;
+		w.write_all(&codes.bytes[pos..pos + 512])?;
 		w.write_u16::<BE>(std::cmp::min(512, actual_size - pos) as u16)?;
 		w.write_u8(Event::GeckoCodes as u8)?;
 		pos += 512;
@@ -121,12 +113,22 @@ fn game_end<W: Write>(w: &mut W, e: &game::End, v: slippi::Version) -> Result<()
 	w.write_u8(Event::GameEnd as u8)?;
 	w.write_u8(e.method.0)?;
 	if v >= ver(2, 0) {
-		w.write_u8(e.lras_initiator.unwrap().map(|p| p.into()).unwrap_or(u8::MAX))?;
+		w.write_u8(
+			e.lras_initiator
+				.unwrap()
+				.map(|p| p.into())
+				.unwrap_or(u8::MAX),
+		)?;
 	}
 	Ok(())
 }
 
-fn frame_start<W: Write>(w: &mut W, s: &frame::Start, v: slippi::Version, frame_idx: i32) -> Result<()> {
+fn frame_start<W: Write>(
+	w: &mut W,
+	s: &frame::Start,
+	v: slippi::Version,
+	frame_idx: i32,
+) -> Result<()> {
 	w.write_u8(Event::FrameStart as u8)?;
 	w.write_i32::<BE>(frame_idx)?;
 	w.write_u32::<BE>(s.random_seed)?;
@@ -198,7 +200,11 @@ fn frame_post<W: Write>(w: &mut W, p: &frame::Post, v: slippi::Version, id: Port
 		w.write_u8(p.airborne.unwrap() as u8)?;
 		w.write_u16::<BE>(p.ground.unwrap().0)?;
 		w.write_u8(p.jumps.unwrap())?;
-		w.write_u8(match p.l_cancel.unwrap() { Some(true) => 1, Some(false) => 2, _ => 0 })?;
+		w.write_u8(match p.l_cancel.unwrap() {
+			Some(true) => 1,
+			Some(false) => 2,
+			_ => 0,
+		})?;
 	}
 
 	if v >= ver(2, 1) {
@@ -251,7 +257,12 @@ fn item<W: Write>(w: &mut W, i: &item::Item, v: slippi::Version, frame_idx: i32)
 	Ok(())
 }
 
-fn frame_end<W: Write>(w: &mut W, e: &frame::End, v: slippi::Version, frame_idx: i32) -> Result<()> {
+fn frame_end<W: Write>(
+	w: &mut W,
+	e: &frame::End,
+	v: slippi::Version,
+	frame_idx: i32,
+) -> Result<()> {
 	w.write_u8(Event::FrameEnd as u8)?;
 	w.write_i32::<BE>(frame_idx)?;
 	if v >= ver(3, 7) {
@@ -260,7 +271,11 @@ fn frame_end<W: Write>(w: &mut W, e: &frame::End, v: slippi::Version, frame_idx:
 	Ok(())
 }
 
-fn frames<W: Write, const N: usize>(w: &mut W, frames: &[frame::Frame<N>], v: slippi::Version) -> Result<()> {
+fn frames<W: Write, const N: usize>(
+	w: &mut W,
+	frames: &[frame::Frame<N>],
+	v: slippi::Version,
+) -> Result<()> {
 	for f in frames {
 		if v >= ver(2, 2) {
 			frame_start(w, f.start.as_ref().unwrap(), v, f.index)?;
@@ -307,13 +322,22 @@ struct FrameCounts {
 fn frame_counts<const N: usize>(frames: &Vec<frame::Frame<N>>) -> FrameCounts {
 	FrameCounts {
 		frames: frames.len().try_into().unwrap(),
-		frame_data: frames.iter().map(|f|
-			f.ports.iter().map(|p| match p.follower {
-				None => 1,
-				_ => 2,
-			}).sum::<u32>(),
-		).sum::<u32>(),
-		items: frames.iter().flat_map(|f| f.items.as_ref().map(|i| i.len() as u32)).sum(),
+		frame_data: frames
+			.iter()
+			.map(|f| {
+				f.ports
+					.iter()
+					.map(|p| match p.follower {
+						None => 1,
+						_ => 2,
+					})
+					.sum::<u32>()
+			})
+			.sum::<u32>(),
+		items: frames
+			.iter()
+			.flat_map(|f| f.items.as_ref().map(|i| i.len() as u32))
+			.sum(),
 	}
 }
 
@@ -333,7 +357,8 @@ fn raw_size(game: &Game, payload_sizes: &Vec<(u8, u16)>) -> u32 {
 		Frames::P4(f) => frame_counts(f),
 	};
 
-	let sizes: std::collections::HashMap<u8, u16> = payload_sizes.iter().map(|(k, v)| (*k, *v)).collect();
+	let sizes: std::collections::HashMap<u8, u16> =
+		payload_sizes.iter().map(|(k, v)| (*k, *v)).collect();
 	1 + 1 + (3 * payload_sizes.len() as u32) // Payload sizes
 		+ 1 + sizes[&(GameStart as u8)] as u32 // GameStart
 		+ 1 + sizes[&(GameEnd as u8)] as u32 // GameEnd
@@ -349,8 +374,9 @@ pub fn serialize<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 	let payload_sizes = payload_sizes(game);
 	let raw_size = raw_size(game, &payload_sizes);
 
-	w.write_all(
-		&[0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c])?;
+	w.write_all(&[
+		0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c,
+	])?;
 	w.write_u32::<BE>(raw_size)?;
 
 	w.write_u8(PAYLOADS_EVENT_CODE)?;
@@ -376,8 +402,9 @@ pub fn serialize<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 
 	game_end(w, &game.end, v)?;
 
-	w.write_all(
-		&[0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b])?;
+	w.write_all(&[
+		0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b,
+	])?;
 	ubjson::ser::from_map(w, &game.metadata_raw)?;
 	w.write_all(&[0x7d])?; // closing brace for `metadata`
 	w.write_all(&[0x7d])?; // closing brace for top-level map

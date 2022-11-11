@@ -1,5 +1,5 @@
-use std::fmt;
 use super::character::Internal;
+use std::fmt;
 
 const MAX_COMMON_STATE: u16 = 340;
 

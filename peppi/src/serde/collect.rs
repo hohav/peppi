@@ -15,7 +15,9 @@ use crate::{
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Rollback {
-	All, First, Last
+	All,
+	First,
+	Last,
 }
 
 impl Default for Rollback {
@@ -167,7 +169,16 @@ impl Collector {
 	}
 }
 
-fn append_frame_event<Id, Event>(v: &mut Vec<Option<Event>>, evt: FrameEvent<Id, Event>, frame_count: usize, opts: Opts) -> Result<usize> where Id: Indexed, Event: Copy {
+fn append_frame_event<Id, Event>(
+	v: &mut Vec<Option<Event>>,
+	evt: FrameEvent<Id, Event>,
+	frame_count: usize,
+	opts: Opts,
+) -> Result<usize>
+where
+	Id: Indexed,
+	Event: Copy,
+{
 	let idx = match opts.rollback {
 		Rollback::All => frame_count - 1,
 		_ => evt.id.array_index(),
@@ -196,7 +207,7 @@ macro_rules! append_missing_frame_data {
 				f.push(None);
 			}
 		}
-	}
+	};
 }
 
 impl de::Handlers for Collector {
@@ -220,7 +231,12 @@ impl de::Handlers for Collector {
 
 	fn frame_start(&mut self, evt: FrameEvent<FrameId, frame::Start>) -> Result<()> {
 		self.frames_index.push(evt.id.index);
-		let idx = append_frame_event(&mut self.frames_start, evt, self.frames_index.len(), self.opts)?;
+		let idx = append_frame_event(
+			&mut self.frames_start,
+			evt,
+			self.frames_index.len(),
+			self.opts,
+		)?;
 		// reset items list in case of rollback
 		while self.items.len() <= idx {
 			self.items.push(Vec::new());
@@ -235,26 +251,54 @@ impl de::Handlers for Collector {
 		if self.first_port.is_none() {
 			self.first_port = Some(evt.id.port);
 		}
-		if self.frames_start.is_empty() && Some(evt.id.port) == self.first_port && !evt.id.is_follower {
+		if self.frames_start.is_empty()
+			&& Some(evt.id.port) == self.first_port
+			&& !evt.id.is_follower
+		{
 			self.frames_index.push(evt.id.index);
 		}
 		match evt.id.is_follower {
-			true => append_frame_event(&mut self.frames_followers.pre[evt.id.port as usize], evt, self.frames_index.len(), self.opts)?,
-			_ => append_frame_event(&mut self.frames_leaders.pre[evt.id.port as usize], evt, self.frames_index.len(), self.opts)?,
+			true => append_frame_event(
+				&mut self.frames_followers.pre[evt.id.port as usize],
+				evt,
+				self.frames_index.len(),
+				self.opts,
+			)?,
+			_ => append_frame_event(
+				&mut self.frames_leaders.pre[evt.id.port as usize],
+				evt,
+				self.frames_index.len(),
+				self.opts,
+			)?,
 		};
 		Ok(())
 	}
 
 	fn frame_post(&mut self, evt: FrameEvent<PortId, frame::Post>) -> Result<()> {
 		match evt.id.is_follower {
-			true => append_frame_event(&mut self.frames_followers.post[evt.id.port as usize], evt, self.frames_index.len(), self.opts)?,
-			_ => append_frame_event(&mut self.frames_leaders.post[evt.id.port as usize], evt, self.frames_index.len(), self.opts)?,
+			true => append_frame_event(
+				&mut self.frames_followers.post[evt.id.port as usize],
+				evt,
+				self.frames_index.len(),
+				self.opts,
+			)?,
+			_ => append_frame_event(
+				&mut self.frames_leaders.post[evt.id.port as usize],
+				evt,
+				self.frames_index.len(),
+				self.opts,
+			)?,
 		};
 		Ok(())
 	}
 
 	fn frame_end(&mut self, evt: FrameEvent<FrameId, frame::End>) -> Result<()> {
-		append_frame_event(&mut self.frames_end, evt, self.frames_index.len(), self.opts)?;
+		append_frame_event(
+			&mut self.frames_end,
+			evt,
+			self.frames_index.len(),
+			self.opts,
+		)?;
 		Ok(())
 	}
 
@@ -274,7 +318,13 @@ impl de::Handlers for Collector {
 	}
 
 	fn finalize(&mut self) -> Result<()> {
-		let frame_count = self.frames_leaders.pre.iter().map(Vec::len).max().unwrap_or(0);
+		let frame_count = self
+			.frames_leaders
+			.pre
+			.iter()
+			.map(Vec::len)
+			.max()
+			.unwrap_or(0);
 
 		append_missing_frame_data!(self.frames_leaders.pre, frame_count);
 		append_missing_frame_data!(self.frames_leaders.post, frame_count);

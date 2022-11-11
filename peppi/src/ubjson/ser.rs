@@ -1,4 +1,4 @@
-use std::io::{Write, Result};
+use std::io::{Result, Write};
 
 use byteorder::{BigEndian, WriteBytesExt};
 use serde_json::{Map, Value};
@@ -18,11 +18,11 @@ pub fn from_map<W: Write>(w: &mut W, map: &Map<String, Value>) -> Result<()> {
 			Value::String(s) => {
 				write!(w, "S")?;
 				write_utf8(w, s)?;
-			},
+			}
 			Value::Number(n) => {
 				write!(w, "l")?;
 				w.write_i32::<BigEndian>(n.as_i64().unwrap().try_into().unwrap())?;
-			},
+			}
 			Value::Object(o) => {
 				write!(w, "{{")?;
 				from_map(w, o)?;

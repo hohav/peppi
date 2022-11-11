@@ -4,7 +4,7 @@ use quote::{quote, ToTokens};
 type Result<T> = std::result::Result<T, darling::Error>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct Version (u8, u8);
+struct Version(u8, u8);
 
 impl FromMeta for Version {
 	fn from_string(value: &str) -> Result<Self> {
@@ -36,7 +36,7 @@ fn if_ver(version: Option<Version>, inner: proc_macro2::TokenStream) -> proc_mac
 				true => Some(#inner),
 				_ => None,
 			},)
-		},
+		}
 		_ => quote!(Some(#inner),),
 	}
 }
@@ -47,19 +47,20 @@ fn wrapped_type(ty: &syn::Type) -> Option<&syn::Type> {
 		syn::Type::Path(tpath) => {
 			let segment = &tpath.path.segments[0];
 			match segment.ident.to_string().as_str() {
-				"Option" => // FIXME: will miss `std::option::Option`, etc
+				"Option" =>
+				// FIXME: will miss `std::option::Option`, etc
+				{
 					match &segment.arguments {
-						syn::PathArguments::AngleBracketed(args) =>
-							match &args.args[0] {
-								syn::GenericArgument::Type(ty) =>
-									Some(ty),
-								_ => None,
-							},
+						syn::PathArguments::AngleBracketed(args) => match &args.args[0] {
+							syn::GenericArgument::Type(ty) => Some(ty),
+							_ => None,
+						},
 						_ => None,
 					}
+				}
 				_ => None,
 			}
-		},
+		}
 		_ => None,
 	}
 }
@@ -89,57 +90,53 @@ impl ToTokens for MyInputReceiver {
 
 		for (i, f) in fields.into_iter().enumerate() {
 			let ident = &f.ident;
-			let name = ident.as_ref()
+			let name = ident
+				.as_ref()
 				.map(|n| n.to_string().trim_start_matches("r#").to_string())
 				.unwrap_or(format!("{}", i));
 			let ty = &f.ty;
-			arrow_defaults.extend(
-				quote!(
-					#ident: <#ty as ::peppi_arrow::Arrow>::arrow_default(),
-				)
-			);
-			arrow_fields.extend(if_ver(f.version,
+			arrow_defaults.extend(quote!(
+				#ident: <#ty as ::peppi_arrow::Arrow>::arrow_default(),
+			));
+			arrow_fields.extend(if_ver(
+				f.version,
 				quote!(::arrow2::datatypes::Field::new(
 					#name,
 					<#ty>::data_type(context),
 					<#ty>::is_nullable(),
-				))
+				)),
 			));
-			arrow_arrays.extend(if_ver(f.version,
+			arrow_arrays.extend(if_ver(
+				f.version,
 				quote!(Box::new(<#ty>::arrow_array(context))
-					as Box<dyn ::arrow2::array::MutableArray>)
+					as Box<dyn ::arrow2::array::MutableArray>),
 			));
-			arrow_pushers.extend(
-				quote!(
-					if num_fields > #i {
-						self.#ident.arrow_push(array.mut_values()[#i].deref_mut());
-					}
-				)
-			);
-			arrow_null_pushers.extend(
-				quote!(
-					if num_fields > #i {
-						<#ty>::arrow_push_null(array.mut_values()[#i].deref_mut());
-					}
-				)
-			);
-			arrow_readers.extend(
-				if f.version.is_some() {
-					let wrapped = wrapped_type(ty).expect(stringify!(Failed to unwrap type for: #ident));
-					quote!(
-						let values = struct_array.values();
-						if values.len() > #i {
-							let mut value = <#wrapped as ::peppi_arrow::Arrow>::arrow_default();
-							value.arrow_read(values[#i].as_ref(), idx);
-							self.#ident = Some(value);
-						}
-					)
-				} else {
-					quote!(
-						self.#ident.arrow_read(struct_array.values()[#i].as_ref(), idx);
-					)
+			arrow_pushers.extend(quote!(
+				if num_fields > #i {
+					self.#ident.arrow_push(array.mut_values()[#i].deref_mut());
 				}
-			);
+			));
+			arrow_null_pushers.extend(quote!(
+				if num_fields > #i {
+					<#ty>::arrow_push_null(array.mut_values()[#i].deref_mut());
+				}
+			));
+			arrow_readers.extend(if f.version.is_some() {
+				let wrapped =
+					wrapped_type(ty).expect(stringify!(Failed to unwrap type for: #ident));
+				quote!(
+					let values = struct_array.values();
+					if values.len() > #i {
+						let mut value = <#wrapped as ::peppi_arrow::Arrow>::arrow_default();
+						value.arrow_read(values[#i].as_ref(), idx);
+						self.#ident = Some(value);
+					}
+				)
+			} else {
+				quote!(
+					self.#ident.arrow_read(struct_array.values()[#i].as_ref(), idx);
+				)
+			});
 		}
 
 		tokens.extend(quote! {

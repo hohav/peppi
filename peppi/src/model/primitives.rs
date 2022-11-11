@@ -1,10 +1,12 @@
-use std::fmt::{self, Debug, Display, Formatter};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::Serialize;
+use std::fmt::{self, Debug, Display, Formatter};
 
 use peppi_derive::Arrow;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, IntoPrimitive, TryFromPrimitive)]
+#[derive(
+	Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, IntoPrimitive, TryFromPrimitive,
+)]
 #[repr(u8)]
 pub enum Port {
 	P1 = 0,
@@ -33,7 +35,10 @@ impl Default for Port {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
-pub enum Direction { Left, Right }
+pub enum Direction {
+	Left,
+	Right,
+}
 
 impl Default for Direction {
 	fn default() -> Self {

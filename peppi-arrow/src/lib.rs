@@ -1,21 +1,13 @@
 use arrow2::{
 	array::{
-		Array,
-		BooleanArray,
-		ListArray,
-		FixedSizeListArray,
-		MutableArray,
-		MutableBooleanArray,
-		MutableFixedSizeListArray,
-		MutableListArray,
-		MutablePrimitiveArray,
-		PrimitiveArray,
+		Array, BooleanArray, FixedSizeListArray, ListArray, MutableArray, MutableBooleanArray,
+		MutableFixedSizeListArray, MutableListArray, MutablePrimitiveArray, PrimitiveArray,
 	},
 	datatypes::{DataType, Field},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SlippiVersion (pub u8, pub u8, pub u8);
+pub struct SlippiVersion(pub u8, pub u8, pub u8);
 
 pub trait Context: Copy {
 	fn slippi_version(&self) -> SlippiVersion;
@@ -25,7 +17,9 @@ pub trait Arrow {
 	type ArrowArray: MutableArray + 'static;
 
 	fn data_type<C: Context>(context: C) -> DataType;
-	fn is_nullable() -> bool { false }
+	fn is_nullable() -> bool {
+		false
+	}
 	fn arrow_array<C: Context>(context: C) -> Self::ArrowArray;
 
 	fn arrow_push(&self, array: &mut dyn MutableArray);
@@ -92,7 +86,11 @@ impl Arrow for bool {
 	}
 
 	fn arrow_push(&self, array: &mut dyn MutableArray) {
-		array.as_mut_any().downcast_mut::<Self::ArrowArray>().unwrap().push(Some(*self));
+		array
+			.as_mut_any()
+			.downcast_mut::<Self::ArrowArray>()
+			.unwrap()
+			.push(Some(*self));
 	}
 
 	fn arrow_push_null(array: &mut dyn MutableArray) {
@@ -100,7 +98,11 @@ impl Arrow for bool {
 	}
 
 	fn arrow_read(&mut self, array: &dyn Array, idx: usize) {
-		*self = array.as_any().downcast_ref::<BooleanArray>().unwrap().value(idx);
+		*self = array
+			.as_any()
+			.downcast_ref::<BooleanArray>()
+			.unwrap()
+			.value(idx);
 	}
 
 	fn arrow_default() -> Self {
@@ -108,7 +110,10 @@ impl Arrow for bool {
 	}
 }
 
-impl<T> Arrow for Option<T> where T: Arrow {
+impl<T> Arrow for Option<T>
+where
+	T: Arrow,
+{
 	type ArrowArray = T::ArrowArray;
 
 	fn data_type<C: Context>(context: C) -> DataType {
@@ -148,7 +153,10 @@ impl<T> Arrow for Option<T> where T: Arrow {
 	}
 }
 
-impl<T> Arrow for Box<T> where T: Arrow {
+impl<T> Arrow for Box<T>
+where
+	T: Arrow,
+{
 	type ArrowArray = T::ArrowArray;
 
 	fn data_type<C: Context>(context: C) -> DataType {
@@ -176,7 +184,10 @@ impl<T> Arrow for Box<T> where T: Arrow {
 	}
 }
 
-impl<T> Arrow for Vec<T> where T: Arrow {
+impl<T> Arrow for Vec<T>
+where
+	T: Arrow,
+{
 	type ArrowArray = MutableListArray<i32, T::ArrowArray>;
 
 	fn data_type<C: Context>(context: C) -> DataType {
@@ -188,7 +199,10 @@ impl<T> Arrow for Vec<T> where T: Arrow {
 	}
 
 	fn arrow_push(&self, array: &mut dyn MutableArray) {
-		let array = array.as_mut_any().downcast_mut::<Self::ArrowArray>().unwrap();
+		let array = array
+			.as_mut_any()
+			.downcast_mut::<Self::ArrowArray>()
+			.unwrap();
 		for x in self {
 			x.arrow_push(array.mut_values());
 		}
@@ -200,8 +214,12 @@ impl<T> Arrow for Vec<T> where T: Arrow {
 	}
 
 	fn arrow_read(&mut self, array: &dyn Array, idx: usize) {
-		let slice = array.as_any().downcast_ref::<ListArray<i32>>().unwrap().value(idx);
-		for i in 0 .. slice.len() {
+		let slice = array
+			.as_any()
+			.downcast_ref::<ListArray<i32>>()
+			.unwrap()
+			.value(idx);
+		for i in 0..slice.len() {
 			let mut value = T::arrow_default();
 			value.arrow_read(&*slice, i);
 			self.push(value);
@@ -213,7 +231,10 @@ impl<T> Arrow for Vec<T> where T: Arrow {
 	}
 }
 
-impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
+impl<T, const N: usize> Arrow for [T; N]
+where
+	T: Arrow,
+{
 	type ArrowArray = MutableFixedSizeListArray<T::ArrowArray>;
 
 	fn data_type<C: Context>(context: C) -> DataType {
@@ -226,7 +247,10 @@ impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
 	}
 
 	fn arrow_push(&self, array: &mut dyn MutableArray) {
-		let array = array.as_mut_any().downcast_mut::<Self::ArrowArray>().unwrap();
+		let array = array
+			.as_mut_any()
+			.downcast_mut::<Self::ArrowArray>()
+			.unwrap();
 		for x in self {
 			x.arrow_push(array.mut_values());
 		}
@@ -238,16 +262,18 @@ impl<T, const N: usize> Arrow for [T; N] where T: Arrow {
 	}
 
 	fn arrow_read(&mut self, array: &dyn Array, idx: usize) {
-		let slice = array.as_any().downcast_ref::<FixedSizeListArray>().unwrap().value(idx);
+		let slice = array
+			.as_any()
+			.downcast_ref::<FixedSizeListArray>()
+			.unwrap()
+			.value(idx);
 		#[allow(clippy::needless_range_loop)]
-		for i in 0 .. slice.len() {
+		for i in 0..slice.len() {
 			self[i].arrow_read(slice.as_ref(), i);
 		}
 	}
 
 	fn arrow_default() -> Self {
-		[(); N].map(|_| {
-			T::arrow_default()
-		})
+		[(); N].map(|_| T::arrow_default())
 	}
 }

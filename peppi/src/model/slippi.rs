@@ -20,7 +20,10 @@ impl From<std::num::ParseIntError> for ParseVersionError {
 impl TryFrom<&str> for Version {
 	type Error = ParseVersionError;
 	fn try_from(s: &str) -> Result<Version, Self::Error> {
-		let v: Vec<u8> = s.split('.').map(|s| s.parse::<u8>()).collect::<Result<Vec<u8>, std::num::ParseIntError>>()?;
+		let v: Vec<u8> = s
+			.split('.')
+			.map(|s| s.parse::<u8>())
+			.collect::<Result<Vec<u8>, std::num::ParseIntError>>()?;
 		match v.len() {
 			0 => unreachable!(),
 			1 => Ok(Version(v[0], 0, 0)),

@@ -1,7 +1,7 @@
 use std::{
 	any::Any,
 	error,
-	fmt::{self, Display, Debug, Formatter},
+	fmt::{self, Debug, Display, Formatter},
 	io,
 };
 
@@ -79,7 +79,9 @@ pub struct Ucf {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Netplay {
 	pub name: String,
+
 	pub code: String,
+
 	/// Slippi UID (added: v3.11)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub suid: Option<String>,
@@ -91,28 +93,40 @@ pub struct Player {
 	pub port: Port,
 
 	pub character: character::External,
+
 	pub r#type: PlayerType,
+
 	/// starting stock count
 	pub stocks: u8,
+
 	pub costume: costume::Costume,
+
 	pub team: Option<Team>,
+
 	/// handicap level; affects `offense_ratio` & `defense_ratio`
 	pub handicap: u8,
+
 	/// miscellaneous flags (metal, stamina mode, etc)
 	pub bitfield: u8,
+
 	pub cpu_level: Option<u8>,
+
 	/// knockback multiplier when this player hits another
 	pub offense_ratio: f32,
+
 	/// knockback multiplier when this player is hit
 	pub defense_ratio: f32,
+
 	pub model_scale: f32,
 
 	/// UCF info (added: v1.0)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub ucf: Option<Ucf>,
+
 	/// in-game name-tag (added: v1.3)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub name_tag: Option<String>,
+
 	/// netplay info (added: v3.9)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub netplay: Option<Netplay>,
@@ -128,31 +142,46 @@ pub struct Scene {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Start {
 	pub slippi: slippi::Slippi,
+
 	pub bitfield: [u8; 4],
+
 	pub is_raining_bombs: bool,
+
 	pub is_teams: bool,
+
 	pub item_spawn_frequency: i8,
+
 	pub self_destruct_score: i8,
+
 	pub stage: stage::Stage,
+
 	pub timer: u32,
+
 	pub item_spawn_bitfield: [u8; 5],
+
 	pub damage_ratio: f32,
+
 	pub players: Vec<Player>,
+
 	pub random_seed: u32,
 
 	/// mostly-redundant copy of the raw start block, for round-tripping
-	#[serde(skip)] #[doc(hidden)]
+	#[serde(skip)]
+	#[doc(hidden)]
 	pub raw_bytes: Vec<u8>,
 
 	/// (added: v1.5)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_pal: Option<bool>,
+
 	/// (added: v2.0)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_frozen_ps: Option<bool>,
+
 	/// (added: v3.7)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub scene: Option<Scene>,
+
 	/// (added: v3.12)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub language: Option<Language>,
@@ -179,7 +208,8 @@ pub struct End {
 	pub method: EndMethod,
 
 	/// mostly-redundant copy of the raw start block, for round-tripping
-	#[serde(skip)] #[doc(hidden)]
+	#[serde(skip)]
+	#[doc(hidden)]
 	pub raw_bytes: Vec<u8>,
 
 	/// player who LRAS'd, if any (added: v2.0)
@@ -215,24 +245,36 @@ impl Display for UnexpectedPortCountError {
 	}
 }
 
-impl error::Error for UnexpectedPortCountError { }
+impl error::Error for UnexpectedPortCountError {}
 
 impl Frames {
 	/// Tries to downcast our inner value to a `Vec<Frame<N>>`.
 	pub fn downcast<const N: usize>(&self) -> Result<&Vec<Frame<N>>, UnexpectedPortCountError> {
 		match self {
-			Self::P1(frames) => (frames as &dyn Any)
-				.downcast_ref::<Vec<Frame<N>>>()
-				.ok_or(UnexpectedPortCountError {expected: N, actual: 1}),
-			Self::P2(frames) => (frames as &dyn Any)
-				.downcast_ref::<Vec<Frame<N>>>()
-				.ok_or(UnexpectedPortCountError {expected: N, actual: 2}),
-			Self::P3(frames) => (frames as &dyn Any)
-				.downcast_ref::<Vec<Frame<N>>>()
-				.ok_or(UnexpectedPortCountError {expected: N, actual: 3}),
-			Self::P4(frames) => (frames as &dyn Any)
-				.downcast_ref::<Vec<Frame<N>>>()
-				.ok_or(UnexpectedPortCountError {expected: N, actual: 4}),
+			Self::P1(frames) => (frames as &dyn Any).downcast_ref::<Vec<Frame<N>>>().ok_or(
+				UnexpectedPortCountError {
+					expected: N,
+					actual: 1,
+				},
+			),
+			Self::P2(frames) => (frames as &dyn Any).downcast_ref::<Vec<Frame<N>>>().ok_or(
+				UnexpectedPortCountError {
+					expected: N,
+					actual: 2,
+				},
+			),
+			Self::P3(frames) => (frames as &dyn Any).downcast_ref::<Vec<Frame<N>>>().ok_or(
+				UnexpectedPortCountError {
+					expected: N,
+					actual: 3,
+				},
+			),
+			Self::P4(frames) => (frames as &dyn Any).downcast_ref::<Vec<Frame<N>>>().ok_or(
+				UnexpectedPortCountError {
+					expected: N,
+					actual: 4,
+				},
+			),
 		}
 	}
 
@@ -281,13 +323,19 @@ pub struct GeckoCodes {
 #[derive(PartialEq, Serialize)]
 pub struct Game {
 	pub start: Start,
+
 	pub end: End,
+
 	pub frames: Frames,
+
 	#[serde(skip)]
 	pub metadata: metadata::Metadata,
+
 	#[serde(rename = "metadata")]
 	pub metadata_raw: serde_json::Map<String, serde_json::Value>,
-	#[serde(skip)] #[doc(hidden)]
+
+	#[serde(skip)]
+	#[doc(hidden)]
 	pub gecko_codes: Option<GeckoCodes>,
 }
 

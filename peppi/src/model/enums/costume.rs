@@ -1,5 +1,5 @@
-use std::fmt;
 use super::character::External;
+use std::fmt;
 
 macro_rules! costume {
 	($name: ident {

@@ -3,13 +3,10 @@ use arrow2::{
 	datatypes::DataType,
 };
 
-use crate::{
-	model::{
-		enums::action_state,
-		frame,
-		game,
-		primitives::{Direction, Port},
-	},
+use crate::model::{
+	enums::action_state,
+	frame, game,
+	primitives::{Direction, Port},
 };
 
 use peppi_arrow::{Arrow, Context, SlippiVersion};
@@ -59,11 +56,7 @@ macro_rules! arrow {
 	}
 }
 
-arrow!(
-	Port: u8,
-	Direction: u8,
-	action_state::State: u16,
-);
+arrow!(Port: u8, Direction: u8, action_state::State: u16,);
 
 #[derive(Clone, Copy, Debug)]
 struct PeppiContext {
@@ -83,7 +76,10 @@ fn context(game: &game::Game, _opts: Option<Opts>) -> PeppiContext {
 	}
 }
 
-fn _frames_to_arrow<const N: usize>(frames: &[frame::Frame<N>], context: PeppiContext) -> StructArray {
+fn _frames_to_arrow<const N: usize>(
+	frames: &[frame::Frame<N>],
+	context: PeppiContext,
+) -> StructArray {
 	let mut array = frame::Frame::<N>::arrow_array(context);
 	for frame in frames {
 		frame.arrow_push(&mut array);
@@ -105,7 +101,7 @@ pub fn frames_to_arrow(game: &game::Game, opts: Option<Opts>) -> StructArray {
 
 fn _frames_from_arrow<const N: usize>(array: &dyn Array) -> Vec<frame::Frame<N>> {
 	let mut frames = Vec::with_capacity(array.len());
-	for i in 0 .. array.len() {
+	for i in 0..array.len() {
 		frames.push(frame::Frame::<N>::arrow_default());
 		frames[i].arrow_read(array, i);
 	}
@@ -113,7 +109,10 @@ fn _frames_from_arrow<const N: usize>(array: &dyn Array) -> Vec<frame::Frame<N>>
 }
 
 pub fn frames_from_arrow(frames: &dyn Array) -> game::Frames {
-	let frames = frames.as_any().downcast_ref::<StructArray>().expect("expected a `StructArray`");
+	let frames = frames
+		.as_any()
+		.downcast_ref::<StructArray>()
+		.expect("expected a `StructArray`");
 	let mut ports_data_type = Option::<DataType>::None;
 	for f in frames.fields() {
 		if f.name == "ports" {
