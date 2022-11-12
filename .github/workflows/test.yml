@@ -12,7 +12,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Format
+      run: cargo fmt --all -- --check
     - name: Build
       run: cargo build --verbose
-    - name: Run tests
+    - name: Test
       run: cargo test --verbose
