@@ -166,7 +166,7 @@ pub struct Start {
 
 	pub random_seed: u32,
 
-	/// mostly-redundant copy of the raw start block, for round-tripping
+	/// mostly-redundant copy of the raw start event, for round-tripping
 	#[serde(skip)]
 	#[doc(hidden)]
 	pub raw_bytes: Vec<u8>,
@@ -215,7 +215,7 @@ pub struct End {
 	/// how the game ended
 	pub method: EndMethod,
 
-	/// mostly-redundant copy of the raw start block, for round-tripping
+	/// mostly-redundant copy of the raw end event, for round-tripping
 	#[serde(skip)]
 	#[doc(hidden)]
 	pub raw_bytes: Vec<u8>,
