@@ -20,7 +20,7 @@ use peppi::{
 			ShieldDrop, Start, Ucf,
 		},
 		item::Item,
-		metadata::{self, Metadata},
+		metadata::{self, Metadata, Platform},
 		primitives::{Direction, Port, Position, Velocity},
 		slippi::{Slippi, Version},
 	},
@@ -108,7 +108,7 @@ fn basic_game() -> Result<(), Error> {
 		Metadata {
 			date: "2018-06-22T07:52:59Z".parse::<DateTime<Utc>>().ok(),
 			duration: Some(5209),
-			platform: Some("dolphin".to_string()),
+			platform: Some(Platform::Dolphin),
 			players: Some(vec![
 				metadata::Player {
 					port: Port::P1,
@@ -432,7 +432,7 @@ fn joystick_udlr() -> Result<(), Error> {
 #[test]
 fn nintendont() -> Result<(), Error> {
 	let game = game("nintendont")?;
-	assert_eq!(game.metadata.platform, Some("nintendont".to_string()));
+	assert_eq!(game.metadata.platform, Some(Platform::Nintendont));
 	Ok(())
 }
 

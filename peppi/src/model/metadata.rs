@@ -6,11 +6,30 @@ use serde_json::{Map, Value};
 
 use crate::model::{enums::character, game::FIRST_FRAME_INDEX, primitives::Port};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Platform {
+	Dolphin,
+	Network,
+	Nintendont,
+	Unknown(String),
+}
+
+impl From<Platform> for String {
+	fn from(platform: Platform) -> String {
+		match platform {
+			Platform::Dolphin => String::from("dolphin"),
+			Platform::Network => String::from("network"),
+			Platform::Nintendont => String::from("nintendont"),
+			Platform::Unknown(s) => s,
+		}
+	}
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Metadata {
 	pub date: Option<DateTime<Utc>>,
 	pub duration: Option<usize>,
-	pub platform: Option<String>,
+	pub platform: Option<Platform>,
 	pub console: Option<String>,
 	pub players: Option<Vec<Player>>,
 }
@@ -75,10 +94,18 @@ fn duration(json: &Map<String, Value>) -> Result<Option<usize>> {
 	}
 }
 
-fn platform(json: &Map<String, Value>) -> Result<Option<String>> {
+fn platform(json: &Map<String, Value>) -> Result<Option<Platform>> {
 	match json.get("playedOn") {
 		None => Ok(None),
-		Some(Value::String(played_on)) => Ok(Some(played_on.clone())),
+		Some(Value::String(platform)) => match platform.as_str() {
+			"dolphin" => Ok(Some(Platform::Dolphin)),
+			"network" => Ok(Some(Platform::Network)),
+			"nintendont" => Ok(Some(Platform::Nintendont)),
+			s => {
+				warn!("Unrecognized metadata.playedOn {:?}", s);
+				Ok(Some(Platform::Unknown(platform.clone())))
+			}
+		},
 		played_on => Err(err!(
 			"metadata.playedOn: expected str, but got: {:?}",
 			played_on
