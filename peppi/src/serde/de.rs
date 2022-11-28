@@ -604,7 +604,7 @@ fn frame_pre(
 		},
 	};
 
-	let raw_analog_x = if_more(r, |r| r.read_u8())?;
+	let raw_analog_x = if_more(r, |r| r.read_i8())?;
 	let damage = if_more(r, |r| r.read_f32::<BE>())?;
 
 	Ok(FrameEvent {

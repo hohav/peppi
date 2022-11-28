@@ -160,7 +160,7 @@ fn frame_pre<W: Write>(w: &mut W, p: &frame::Pre, v: slippi::Version, id: PortId
 	w.write_f32::<BE>(p.triggers.physical.r)?;
 
 	if v >= ver(1, 2) {
-		w.write_u8(p.raw_analog_x.unwrap())?;
+		w.write_i8(p.raw_analog_x.unwrap())?;
 	}
 
 	if v >= ver(1, 4) {

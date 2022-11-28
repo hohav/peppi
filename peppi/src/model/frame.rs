@@ -111,7 +111,7 @@ pub struct Pre {
 
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "1.2")]
-	pub raw_analog_x: Option<u8>,
+	pub raw_analog_x: Option<i8>,
 
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "1.4")]
