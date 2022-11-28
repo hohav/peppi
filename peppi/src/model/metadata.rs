@@ -2,64 +2,29 @@ use std::{collections::HashMap, io::Result};
 
 use chrono::{DateTime, Utc};
 use log::warn;
-use serde::{ser::SerializeMap, Serialize};
 use serde_json::{Map, Value};
 
 use crate::model::{enums::character, game::FIRST_FRAME_INDEX, primitives::Port};
 
-#[derive(Debug, PartialEq, Eq, Serialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Metadata {
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub date: Option<DateTime<Utc>>,
-
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub duration: Option<usize>,
-
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub platform: Option<String>,
-
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub console: Option<String>,
-
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub players: Option<Vec<Player>>,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Netplay {
 	pub code: String,
 	pub name: String,
 }
 
-// needed for JMESPath
-pub fn serialize_characters<S>(
-	characters: &Option<HashMap<character::Internal, usize>>,
-	serializer: S,
-) -> std::result::Result<S::Ok, S::Error>
-where
-	S: serde::Serializer,
-{
-	match characters {
-		Some(characters) => {
-			let mut map = serializer.serialize_map(Some(characters.len()))?;
-			for (k, v) in characters {
-				map.serialize_entry(&format!("{:?}", k), v)?;
-			}
-			map.end()
-		}
-		_ => serializer.serialize_none(),
-	}
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Player {
 	pub port: Port,
-
-	#[serde(skip_serializing_if = "Option::is_none")]
-	#[serde(serialize_with = "serialize_characters")]
 	pub characters: Option<HashMap<character::Internal, usize>>,
-
-	#[serde(skip_serializing_if = "Option::is_none")]
 	pub netplay: Option<Netplay>,
 }
 
