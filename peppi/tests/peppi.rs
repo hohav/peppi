@@ -28,16 +28,43 @@ use peppi::{
 	},
 };
 
-fn read_game(path: &str) -> Result<Game, String> {
-	let mut buf = io::BufReader::new(fs::File::open(path).unwrap());
-	peppi::game(&mut buf, None, None).map_err(|e| format!("couldn't deserialize game: {:?}", e))
+#[derive(Debug)]
+struct Error(pub String);
+
+impl From<String> for Error {
+	fn from(s: String) -> Self {
+		Error(s)
+	}
 }
 
-fn game(name: &str) -> Result<Game, String> {
+impl From<&str> for Error {
+	fn from(s: &str) -> Self {
+		Error(s.to_string())
+	}
+}
+
+impl From<serde_json::Error> for Error {
+	fn from(e: serde_json::Error) -> Self {
+		Error(format!("serde_json error: {:?}", e))
+	}
+}
+
+impl From<peppi::ParseError> for Error {
+	fn from(e: peppi::ParseError) -> Self {
+		Error(format!("peppi error: {:?}", e))
+	}
+}
+
+fn read_game(path: &str) -> Result<Game, Error> {
+	let mut buf = io::BufReader::new(fs::File::open(path).unwrap());
+	Ok(peppi::game(&mut buf, None, None)?)
+}
+
+fn game(name: &str) -> Result<Game, Error> {
 	read_game(&format!("tests/data/{}.slp", name))
 }
 
-fn button_seq(game: &Game) -> Result<Vec<Buttons>, String> {
+fn button_seq(game: &Game) -> Result<Vec<Buttons>, Error> {
 	match &game.frames {
 		Frames::P2(frames) => {
 			let mut last_buttons: Option<Buttons> = None;
@@ -51,12 +78,12 @@ fn button_seq(game: &Game) -> Result<Vec<Buttons>, String> {
 			}
 			Ok(button_seq)
 		}
-		_ => Err("wrong number of ports".to_string()),
+		_ => Err("wrong number of ports".into()),
 	}
 }
 
 #[test]
-fn slippi_old_version() -> Result<(), String> {
+fn slippi_old_version() -> Result<(), Error> {
 	let game = game("v0.1")?;
 	let players = game.start.players;
 
@@ -71,7 +98,7 @@ fn slippi_old_version() -> Result<(), String> {
 }
 
 #[test]
-fn basic_game() -> Result<(), String> {
+fn basic_game() -> Result<(), Error> {
 	let game = game("game")?;
 
 	assert_eq!(
@@ -204,7 +231,7 @@ fn basic_game() -> Result<(), String> {
 }
 
 #[test]
-fn ics() -> Result<(), String> {
+fn ics() -> Result<(), Error> {
 	let game = game("ics")?;
 	assert_eq!(
 		game.metadata.players,
@@ -239,7 +266,7 @@ fn ics() -> Result<(), String> {
 }
 
 #[test]
-fn ucf() -> Result<(), String> {
+fn ucf() -> Result<(), Error> {
 	assert_eq!(
 		game("shield_drop")?.start.players[0].ucf,
 		Some(Ucf {
@@ -258,7 +285,7 @@ fn ucf() -> Result<(), String> {
 }
 
 #[test]
-fn buttons_lzrs() -> Result<(), String> {
+fn buttons_lzrs() -> Result<(), Error> {
 	let game = game("buttons_lrzs")?;
 	assert_eq!(
 		button_seq(&game)?,
@@ -293,7 +320,7 @@ fn buttons_lzrs() -> Result<(), String> {
 }
 
 #[test]
-fn buttons_abxy() -> Result<(), String> {
+fn buttons_abxy() -> Result<(), Error> {
 	let game = game("buttons_abxy")?;
 	assert_eq!(
 		button_seq(&game)?,
@@ -320,7 +347,7 @@ fn buttons_abxy() -> Result<(), String> {
 }
 
 #[test]
-fn dpad_udlr() -> Result<(), String> {
+fn dpad_udlr() -> Result<(), Error> {
 	let game = game("dpad_udlr")?;
 	assert_eq!(
 		button_seq(&game)?,
@@ -347,7 +374,7 @@ fn dpad_udlr() -> Result<(), String> {
 }
 
 #[test]
-fn cstick_udlr() -> Result<(), String> {
+fn cstick_udlr() -> Result<(), Error> {
 	let game = game("cstick_udlr")?;
 	assert_eq!(
 		button_seq(&game)?,
@@ -374,7 +401,7 @@ fn cstick_udlr() -> Result<(), String> {
 }
 
 #[test]
-fn joystick_udlr() -> Result<(), String> {
+fn joystick_udlr() -> Result<(), Error> {
 	let game = game("joystick_udlr")?;
 	assert_eq!(
 		button_seq(&game)?,
@@ -401,14 +428,14 @@ fn joystick_udlr() -> Result<(), String> {
 }
 
 #[test]
-fn nintendont() -> Result<(), String> {
+fn nintendont() -> Result<(), Error> {
 	let game = game("nintendont")?;
 	assert_eq!(game.metadata.platform, Some("nintendont".to_string()));
 	Ok(())
 }
 
 #[test]
-fn netplay() -> Result<(), String> {
+fn netplay() -> Result<(), Error> {
 	let game = game("netplay")?;
 	let players = game.metadata.players.ok_or("missing metadata.players")?;
 	let names: Vec<_> = players
@@ -421,21 +448,21 @@ fn netplay() -> Result<(), String> {
 }
 
 #[test]
-fn console_name() -> Result<(), String> {
+fn console_name() -> Result<(), Error> {
 	let game = game("console_name")?;
 	assert_eq!(game.metadata.console, Some("Station 1".to_string()));
 	Ok(())
 }
 
 #[test]
-fn v2() -> Result<(), String> {
+fn v2() -> Result<(), Error> {
 	let game = game("v2.0")?;
 	assert_eq!(game.start.slippi.version, Version(2, 0, 1));
 	Ok(())
 }
 
 #[test]
-fn v3_12() -> Result<(), String> {
+fn v3_12() -> Result<(), Error> {
 	let game = game("v3.12")?;
 
 	assert_eq!(
@@ -546,14 +573,14 @@ fn v3_12() -> Result<(), String> {
 }
 
 #[test]
-fn unknown_event() -> Result<(), String> {
+fn unknown_event() -> Result<(), Error> {
 	game("unknown_event")?;
 	// TODO: check for warning
 	Ok(())
 }
 
 #[test]
-fn zelda_sheik_transformation() -> Result<(), String> {
+fn zelda_sheik_transformation() -> Result<(), Error> {
 	let game = game("transform")?;
 	match game.frames {
 		Frames::P2(frames) => assert_eq!(
@@ -566,7 +593,7 @@ fn zelda_sheik_transformation() -> Result<(), String> {
 }
 
 #[test]
-fn items() -> Result<(), String> {
+fn items() -> Result<(), Error> {
 	let game = game("items")?;
 	match game.frames {
 		Frames::P2(frames) => {
@@ -637,7 +664,7 @@ fn items() -> Result<(), String> {
 }
 
 #[test]
-fn round_trip() -> Result<(), String> {
+fn round_trip() -> Result<(), Error> {
 	let game1 = game("ics2")?;
 	let path = "/tmp/peppi_test_round_trip.slp";
 	let mut buf = fs::File::create(path).unwrap();
@@ -657,25 +684,25 @@ fn round_trip() -> Result<(), String> {
 				assert_eq!(f1[idx], f2[idx], "frame: {}", idx);
 			}
 		}
-		_ => return Err("wrong number of ports".to_string()),
+		_ => return Err("wrong number of ports".into()),
 	}
 
 	Ok(())
 }
 
-fn rollback_frames(rollback: Rollback) -> Result<Vec<frame::Frame<2>>, String> {
+fn rollback_frames(rollback: Rollback) -> Result<Vec<frame::Frame<2>>, Error> {
 	let mut buf = io::BufReader::new(fs::File::open("tests/data/ics2.slp").unwrap());
 	let opts = collect::Opts { rollback };
 	let game = peppi::game(&mut buf, None, Some(&opts))
 		.map_err(|e| format!("couldn't deserialize game: {:?}", e))?;
 	match game.frames {
 		Frames::P2(frames) => Ok(frames),
-		_ => Err("not a 2-player game".to_string()),
+		_ => Err("not a 2-player game".into()),
 	}
 }
 
 #[test]
-fn rollback() -> Result<(), String> {
+fn rollback() -> Result<(), Error> {
 	let frames_all = rollback_frames(Rollback::All)?;
 	let frames_first = rollback_frames(Rollback::First)?;
 	let frames_last = rollback_frames(Rollback::Last)?;
