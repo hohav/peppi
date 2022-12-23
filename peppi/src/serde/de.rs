@@ -979,7 +979,13 @@ pub fn deserialize<R: Read, H: Handlers>(
 	while (raw_len == 0 || bytes_read < raw_len) && last_event != Some(Event::GameEnd) {
 		if skip_frames && last_event == Some(Event::GameStart) {
 			// Skip to GameEnd, which we assume is the last event in the stream!
-			let skip = raw_len - bytes_read - payload_sizes[&(Event::GameEnd as u8)] as usize - 1;
+			let end_offset: usize = payload_sizes[&(Event::GameEnd as u8)] as usize + 1;
+			if raw_len == 0 || raw_len - bytes_read < end_offset {
+				return Err(err!(
+					"Cannot skip to game end. Replay in-progress or corrupted."
+				));
+			}
+			let skip = raw_len - bytes_read - end_offset;
 			info!("Jumping to GameEnd (skipping {} bytes)", skip);
 			// In theory we should seek() if `r` is Seekable, but it's not much
 			// faster and is very awkward to implement without specialization.
