@@ -36,7 +36,7 @@ use peppi::{
 };
 
 mod common;
-use common::{game, read_game};
+use common::{game, get_path, read_game};
 
 fn button_seq(game: &Game) -> Vec<Buttons> {
 	match &game.frames {
@@ -537,6 +537,11 @@ fn unknown_event() {
 }
 
 #[test]
+fn corrupt_replay() {
+	assert!(matches!(read_game(get_path("corrupt")), Err(_)));
+}
+
+#[test]
 fn zelda_sheik_transformation() {
 	let game = game("transform");
 	match game.frames {
@@ -626,11 +631,11 @@ fn hash(path: impl AsRef<Path>) -> u64 {
 }
 
 fn _round_trip(in_path: impl AsRef<Path> + Clone) {
-	let game1 = read_game(in_path.clone());
+	let game1 = read_game(in_path.clone()).unwrap();
 	let out_path = "/tmp/peppi_test_round_trip.slp";
 	let mut buf = File::create(out_path).unwrap();
 	serde::ser::serialize(&mut buf, &game1).unwrap();
-	let game2 = read_game(out_path);
+	let game2 = read_game(out_path).unwrap();
 
 	assert_eq!(game1.start, game2.start);
 	assert_eq!(game1.end, game2.end);
@@ -658,8 +663,11 @@ fn round_trip() {
 		.unwrap()
 		.into_iter()
 		.map(|e| e.unwrap())
-		.filter(|e| e.file_name() != "unknown_event.slp")
-	{
+		.filter(|e| match e.file_name().to_str().unwrap() {
+			"unknown_event.slp" => false,
+			"corrupt.slp" => false,
+			_ => true,
+		}) {
 		println!("{:?}", entry.file_name());
 		_round_trip(entry.path());
 	}
