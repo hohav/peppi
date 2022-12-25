@@ -121,9 +121,9 @@ macro_rules! into_game {
 					PortData {
 						leader: frame::Data {
 							pre: $gp.frames_leaders.pre[ports[$idx]][n]
-								.ok_or_else(|| err!("missing pre event: {}", n))?,
+								.ok_or_else(|| err!("missing pre event (frame: {}, port: {})", $idx, n))?,
 							post: $gp.frames_leaders.post[ports[$idx]][n]
-								.ok_or_else(|| err!("missing post event: {}", n))?,
+								.ok_or_else(|| err!("missing post event (frame: {}, port: {})", $idx, n))?,
 						},
 						follower: {
 							let pre = $gp.frames_followers.pre[ports[$idx]].get(n).copied().unwrap_or(None);
