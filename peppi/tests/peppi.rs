@@ -57,16 +57,16 @@ impl From<peppi::ParseError> for Error {
 	}
 }
 
-fn read_game(path: impl AsRef<Path>) -> Result<Game, Error> {
+fn read_game(path: impl AsRef<Path>) -> Game {
 	let mut buf = io::BufReader::new(fs::File::open(path).unwrap());
-	Ok(peppi::game(&mut buf, None, None)?)
+	peppi::game(&mut buf, None, None).unwrap()
 }
 
-fn game(name: &str) -> Result<Game, Error> {
+fn game(name: &str) -> Game {
 	read_game(&format!("tests/data/{}.slp", name))
 }
 
-fn button_seq(game: &Game) -> Result<Vec<Buttons>, Error> {
+fn button_seq(game: &Game) -> Vec<Buttons> {
 	match &game.frames {
 		Frames::P2(frames) => {
 			let mut last_buttons: Option<Buttons> = None;
@@ -78,15 +78,15 @@ fn button_seq(game: &Game) -> Result<Vec<Buttons>, Error> {
 					last_buttons = Some(b);
 				}
 			}
-			Ok(button_seq)
+			button_seq
 		}
-		_ => Err("wrong number of ports".into()),
+		_ => panic!("wrong number of ports"),
 	}
 }
 
 #[test]
-fn slippi_old_version() -> Result<(), Error> {
-	let game = game("v0.1")?;
+fn slippi_old_version() {
+	let game = game("v0.1");
 	let players = game.start.players;
 
 	assert_eq!(game.start.slippi.version, Version(0, 1, 0));
@@ -95,13 +95,11 @@ fn slippi_old_version() -> Result<(), Error> {
 	assert_eq!(players.len(), 2);
 	assert_eq!(players[0].character, External::FOX);
 	assert_eq!(players[1].character, External::GANONDORF);
-
-	Ok(())
 }
 
 #[test]
-fn basic_game() -> Result<(), Error> {
-	let game = game("game")?;
+fn basic_game() {
+	let game = game("game");
 
 	assert_eq!(
 		game.metadata,
@@ -226,15 +224,13 @@ fn basic_game() -> Result<(), Error> {
 
 	match game.frames {
 		Frames::P2(frames) => assert_eq!(frames.len(), 5209),
-		_ => Err("wrong number of ports")?,
+		_ => panic!("wrong number of ports"),
 	};
-
-	Ok(())
 }
 
 #[test]
-fn ics() -> Result<(), Error> {
-	let game = game("ics")?;
+fn ics() {
+	let game = game("ics");
 	assert_eq!(
 		game.metadata.players,
 		Some(vec![
@@ -262,35 +258,33 @@ fn ics() -> Result<(), Error> {
 	assert_eq!(game.start.players[0].character, External::ICE_CLIMBERS);
 	match game.frames {
 		Frames::P2(frames) => assert!(frames[0].ports[0].follower.is_some()),
-		_ => Err("wrong number of ports")?,
+		_ => panic!("wrong number of ports"),
 	};
-	Ok(())
 }
 
 #[test]
-fn ucf() -> Result<(), Error> {
+fn ucf() {
 	assert_eq!(
-		game("shield_drop")?.start.players[0].ucf,
+		game("shield_drop").start.players[0].ucf,
 		Some(Ucf {
 			dash_back: None,
 			shield_drop: Some(ShieldDrop::UCF)
 		})
 	);
 	assert_eq!(
-		game("dash_back")?.start.players[0].ucf,
+		game("dash_back").start.players[0].ucf,
 		Some(Ucf {
 			dash_back: Some(DashBack::UCF),
 			shield_drop: None
 		})
 	);
-	Ok(())
 }
 
 #[test]
-fn buttons_lzrs() -> Result<(), Error> {
-	let game = game("buttons_lrzs")?;
+fn buttons_lzrs() {
+	let game = game("buttons_lrzs");
 	assert_eq!(
-		button_seq(&game)?,
+		button_seq(&game),
 		vec![
 			Buttons {
 				logical: Logical::TRIGGER_ANALOG,
@@ -318,14 +312,13 @@ fn buttons_lzrs() -> Result<(), Error> {
 			},
 		]
 	);
-	Ok(())
 }
 
 #[test]
-fn buttons_abxy() -> Result<(), Error> {
-	let game = game("buttons_abxy")?;
+fn buttons_abxy() {
+	let game = game("buttons_abxy");
 	assert_eq!(
-		button_seq(&game)?,
+		button_seq(&game),
 		vec![
 			Buttons {
 				logical: Logical::A,
@@ -345,14 +338,13 @@ fn buttons_abxy() -> Result<(), Error> {
 			},
 		]
 	);
-	Ok(())
 }
 
 #[test]
-fn dpad_udlr() -> Result<(), Error> {
-	let game = game("dpad_udlr")?;
+fn dpad_udlr() {
+	let game = game("dpad_udlr");
 	assert_eq!(
-		button_seq(&game)?,
+		button_seq(&game),
 		vec![
 			Buttons {
 				logical: Logical::DPAD_UP,
@@ -372,14 +364,13 @@ fn dpad_udlr() -> Result<(), Error> {
 			},
 		]
 	);
-	Ok(())
 }
 
 #[test]
-fn cstick_udlr() -> Result<(), Error> {
-	let game = game("cstick_udlr")?;
+fn cstick_udlr() {
+	let game = game("cstick_udlr");
 	assert_eq!(
-		button_seq(&game)?,
+		button_seq(&game),
 		vec![
 			Buttons {
 				logical: Logical::CSTICK_UP,
@@ -399,14 +390,13 @@ fn cstick_udlr() -> Result<(), Error> {
 			},
 		]
 	);
-	Ok(())
 }
 
 #[test]
-fn joystick_udlr() -> Result<(), Error> {
-	let game = game("joystick_udlr")?;
+fn joystick_udlr() {
+	let game = game("joystick_udlr");
 	assert_eq!(
-		button_seq(&game)?,
+		button_seq(&game),
 		vec![
 			Buttons {
 				logical: Logical::JOYSTICK_UP,
@@ -426,46 +416,41 @@ fn joystick_udlr() -> Result<(), Error> {
 			},
 		]
 	);
-	Ok(())
 }
 
 #[test]
-fn nintendont() -> Result<(), Error> {
-	let game = game("nintendont")?;
+fn nintendont() {
+	let game = game("nintendont");
 	assert_eq!(game.metadata.platform, Some("nintendont".to_string()));
-	Ok(())
 }
 
 #[test]
-fn netplay() -> Result<(), Error> {
-	let game = game("netplay")?;
-	let players = game.metadata.players.ok_or("missing metadata.players")?;
+fn netplay() {
+	let game = game("netplay");
+	let players = game.metadata.players.unwrap();
 	let names: Vec<_> = players
 		.into_iter()
 		.flat_map(|p| p.netplay)
 		.map(|n| n.name)
 		.collect();
 	assert_eq!(names, vec!["abcdefghijk", "nobody"]);
-	Ok(())
 }
 
 #[test]
-fn console_name() -> Result<(), Error> {
-	let game = game("console_name")?;
+fn console_name() {
+	let game = game("console_name");
 	assert_eq!(game.metadata.console, Some("Station 1".to_string()));
-	Ok(())
 }
 
 #[test]
-fn v2() -> Result<(), Error> {
-	let game = game("v2.0")?;
+fn v2() {
+	let game = game("v2.0");
 	assert_eq!(game.start.slippi.version, Version(2, 0, 1));
-	Ok(())
 }
 
 #[test]
-fn v3_12() -> Result<(), Error> {
-	let game = game("v3.12")?;
+fn v3_12() {
+	let game = game("v3.12");
 
 	assert_eq!(
 		game.start,
@@ -570,33 +555,30 @@ fn v3_12() -> Result<(), Error> {
 			language: Some(Language::ENGLISH)
 		}
 	);
-
-	Ok(())
 }
 
 #[test]
-fn unknown_event() -> Result<(), Error> {
-	game("unknown_event")?;
+fn unknown_event() {
+	// shouldn't panic
 	// TODO: check for warning
-	Ok(())
+	game("unknown_event");
 }
 
 #[test]
-fn zelda_sheik_transformation() -> Result<(), Error> {
-	let game = game("transform")?;
+fn zelda_sheik_transformation() {
+	let game = game("transform");
 	match game.frames {
 		Frames::P2(frames) => assert_eq!(
 			frames[400].ports[1].leader.pre.state,
 			State::Zelda(Zelda::TRANSFORM_GROUND)
 		),
-		_ => Err("wrong number of ports")?,
+		_ => panic!("wrong number of ports"),
 	};
-	Ok(())
 }
 
 #[test]
-fn items() -> Result<(), Error> {
-	let game = game("items")?;
+fn items() {
+	let game = game("items");
 	match game.frames {
 		Frames::P2(frames) => {
 			let mut items: HashMap<u32, Item> = HashMap::new();
@@ -660,18 +642,16 @@ fn items() -> Result<(), Error> {
 				}
 			);
 		}
-		_ => Err("wrong number of ports")?,
+		_ => panic!("wrong number of ports"),
 	};
-	Ok(())
 }
 
-fn _round_trip(in_path: impl AsRef<Path>) -> Result<(), Error> {
-	let game1 = read_game(in_path)?;
+fn _round_trip(in_path: impl AsRef<Path>) {
+	let game1 = read_game(in_path);
 	let out_path = "/tmp/peppi_test_round_trip.slp";
 	let mut buf = fs::File::create(out_path).unwrap();
-	serde::ser::serialize(&mut buf, &game1)
-		.map_err(|e| format!("couldn't serialize game: {:?}", e))?;
-	let game2 = read_game(out_path)?;
+	serde::ser::serialize(&mut buf, &game1).unwrap();
+	let game2 = read_game(out_path);
 
 	assert_eq!(game1.start, game2.start);
 	assert_eq!(game1.end, game2.end);
@@ -685,43 +665,39 @@ fn _round_trip(in_path: impl AsRef<Path>) -> Result<(), Error> {
 				assert_eq!(f1[idx], f2[idx], "frame: {}", idx);
 			}
 		}
-		_ => return Err("wrong number of ports".into()),
+		_ => panic!("wrong number of ports"),
 	}
 
 	fs::remove_file(out_path).unwrap();
-
-	Ok(())
 }
 
 #[test]
-fn round_trip() -> Result<(), Error> {
+fn round_trip() {
 	for entry in fs::read_dir("tests/data")
 		.unwrap()
 		.into_iter()
 		.map(|e| e.unwrap())
 	{
 		println!("{:?}", entry.file_name());
-		_round_trip(entry.path())?;
+		_round_trip(entry.path());
 	}
-	Ok(())
 }
 
-fn rollback_frames(rollback: Rollback) -> Result<Vec<frame::Frame<2>>, Error> {
+fn rollback_frames(rollback: Rollback) -> Vec<frame::Frame<2>> {
 	let mut buf = io::BufReader::new(fs::File::open("tests/data/ics2.slp").unwrap());
 	let opts = collect::Opts { rollback };
-	let game = peppi::game(&mut buf, None, Some(&opts))
-		.map_err(|e| format!("couldn't deserialize game: {:?}", e))?;
+	let game = peppi::game(&mut buf, None, Some(&opts)).unwrap();
 	match game.frames {
-		Frames::P2(frames) => Ok(frames),
-		_ => Err("not a 2-player game".into()),
+		Frames::P2(frames) => frames,
+		_ => panic!("wrong number of ports"),
 	}
 }
 
 #[test]
-fn rollback() -> Result<(), Error> {
-	let frames_all = rollback_frames(Rollback::All)?;
-	let frames_first = rollback_frames(Rollback::First)?;
-	let frames_last = rollback_frames(Rollback::Last)?;
+fn rollback() {
+	let frames_all = rollback_frames(Rollback::All);
+	let frames_first = rollback_frames(Rollback::First);
+	let frames_last = rollback_frames(Rollback::Last);
 	assert_eq!(frames_all.len(), 9530);
 	assert_eq!(frames_first.len(), 9519);
 	assert_eq!(frames_last.len(), 9519);
@@ -729,12 +705,11 @@ fn rollback() -> Result<(), Error> {
 	assert_eq!(frames_all[475], frames_last[474]);
 	assert_eq!(frames_all[476], frames_first[475]);
 	assert_eq!(frames_all[476], frames_last[475]);
-	Ok(())
 }
 
 #[test]
-fn json_metadata() -> Result<(), Error> {
-	let game = game("v3.12")?;
+fn json_metadata() {
+	let game = game("v3.12");
 	let expected: serde_json::Value = serde_json::from_str(
 		r#"{
 			"startAt":"2022-06-04T21:58:00Z",
@@ -761,16 +736,16 @@ fn json_metadata() -> Result<(), Error> {
 			},
 			"playedOn":"dolphin"
 		}"#,
-	)?;
+	)
+	.unwrap();
 	let actual: serde_json::Value =
-		serde_json::from_str(&serde_json::to_string(&game.metadata_raw)?)?;
+		serde_json::from_str(&serde_json::to_string(&game.metadata_raw).unwrap()).unwrap();
 	assert_eq!(expected, actual);
-	Ok(())
 }
 
 #[test]
-fn json_start() -> Result<(), Error> {
-	let game = game("v3.12")?;
+fn json_start() {
+	let game = game("v3.12");
 	let expected: serde_json::Value = serde_json::from_str(
 		r#"{
 			"slippi":{
@@ -844,29 +819,31 @@ fn json_start() -> Result<(), Error> {
 			},
 			"language":1
 		}"#,
-	)?;
-	let actual: serde_json::Value = serde_json::from_str(&serde_json::to_string(&game.start)?)?;
+	)
+	.unwrap();
+	let actual: serde_json::Value =
+		serde_json::from_str(&serde_json::to_string(&game.start).unwrap()).unwrap();
 	assert_eq!(expected, actual);
-	Ok(())
 }
 
 #[test]
-fn json_end() -> Result<(), Error> {
-	let game = game("v3.12")?;
+fn json_end() {
+	let game = game("v3.12");
 	let expected: serde_json::Value = serde_json::from_str(
 		r#"{
 			"method":7,
 			"lras_initiator":"P2"
 		}"#,
-	)?;
-	let actual: serde_json::Value = serde_json::from_str(&serde_json::to_string(&game.end)?)?;
+	)
+	.unwrap();
+	let actual: serde_json::Value =
+		serde_json::from_str(&serde_json::to_string(&game.end).unwrap()).unwrap();
 	assert_eq!(expected, actual);
-	Ok(())
 }
 
 #[test]
-fn frames_to_arrow() -> Result<(), Error> {
-	let game = game("v3.12")?;
+fn frames_to_arrow() {
+	let game = game("v3.12");
 	let frames = arrow::frames_to_arrow(&game, None);
 
 	assert_eq!(
@@ -883,6 +860,4 @@ fn frames_to_arrow() -> Result<(), Error> {
 		"StructArray[{index: 0, ports: [{leader: {pre: {position: {x: -35.766, y: 0.0001}, direction: 0, joystick: {x: -0.95, y: 0}, cstick: {x: 0, y: 0}, triggers: {logical: 0, physical: {l: 0, r: 0}}, random_seed: 8100584, buttons: {logical: 262144, physical: 0}, state: 20, raw_analog_x: -127, damage: 0}, post: {character: 18, state: 20, position: {x: -37.322998, y: 0.0001}, direction: 0, damage: 0, shield: 60, last_attack_landed: None, combo_count: 0, last_hit_by: None, stocks: 4, state_age: 2, flags: 0, misc_as: 0, airborne: false, ground: 34, jumps: 2, l_cancel: None, hurtbox_state: 0, velocities: {autogenous: {x: -1.557, y: -0}, knockback: {x: 0, y: 0}, autogenous_x: {air: -1.5569999, ground: -1.557}}, hitlag: 0, animation_index: 12}}, follower: None}, {leader: {pre: {position: {x: 40, y: 25.0001}, direction: 0, joystick: {x: 0, y: 0}, cstick: {x: 0, y: 0}, triggers: {logical: 1, physical: {l: 0.71428573, r: 0}}, random_seed: 8100584, buttons: {logical: 2147488096, physical: 4448}, state: 341, raw_analog_x: 0, damage: 0}, post: {character: 18, state: 341, position: {x: 40, y: 25.0001}, direction: 0, damage: 0, shield: 60, last_attack_landed: None, combo_count: 0, last_hit_by: None, stocks: 4, state_age: 10, flags: 0, misc_as: 0, airborne: false, ground: 36, jumps: 2, l_cancel: None, hurtbox_state: 0, velocities: {autogenous: {x: 0, y: 0}, knockback: {x: 0, y: 0}, autogenous_x: {air: 0, ground: 0}}, hitlag: 0, animation_index: 295}}, follower: None}], start: {random_seed: 8100584, scene_frame_counter: 123}, end: {latest_finalized_frame: 0}, items: []}]",
 		format!("{:?}", frames.slice(123, 1))
 	);
-
-	Ok(())
 }
