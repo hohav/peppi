@@ -11,7 +11,7 @@ use crate::{
 		game::{self, Frames, Game, GeckoCodes},
 		item,
 		primitives::Port,
-		slippi::{self, version as ver},
+		slippi::Version,
 	},
 	serde::de::{Event, PortId, PAYLOADS_EVENT_CODE},
 	ubjson,
@@ -21,16 +21,16 @@ type BE = byteorder::BigEndian;
 
 fn payload_sizes(game: &Game) -> Vec<(u8, u16)> {
 	let start = &game.start;
-	let v = start.slippi.version;
+	let ver = start.slippi.version;
 	let mut sizes = Vec::new();
 
 	sizes.push((Event::GameStart as u8, start.raw_bytes.len() as u16));
 
 	sizes.push((
 		Event::FramePre as u8,
-		if v >= ver(1, 4) {
+		if ver.gte(1, 4) {
 			63
-		} else if v >= ver(1, 2) {
+		} else if ver.gte(1, 2) {
 			59
 		} else {
 			58
@@ -39,38 +39,35 @@ fn payload_sizes(game: &Game) -> Vec<(u8, u16)> {
 
 	sizes.push((
 		Event::FramePost as u8,
-		if v >= ver(3, 11) {
+		if ver.gte(3, 11) {
 			80
-		} else if v >= ver(3, 8) {
+		} else if ver.gte(3, 8) {
 			76
-		} else if v >= ver(3, 5) {
+		} else if ver.gte(3, 5) {
 			72
-		} else if v >= ver(2, 1) {
+		} else if ver.gte(2, 1) {
 			52
-		} else if v >= ver(2, 0) {
+		} else if ver.gte(2, 0) {
 			51
-		} else if v >= ver(0, 2) {
+		} else if ver.gte(0, 2) {
 			37
 		} else {
 			33
 		},
 	));
 
-	sizes.push((Event::GameEnd as u8, if v >= ver(2, 0) { 2 } else { 1 }));
+	sizes.push((Event::GameEnd as u8, if ver.gte(2, 0) { 2 } else { 1 }));
 
-	if v >= ver(2, 2) {
-		sizes.push((
-			Event::FrameStart as u8,
-			if v >= ver(3, 10) { 12 } else { 8 },
-		));
+	if ver.gte(2, 2) {
+		sizes.push((Event::FrameStart as u8, if ver.gte(3, 10) { 12 } else { 8 }));
 	}
 
-	if v >= ver(3, 0) {
+	if ver.gte(3, 0) {
 		sizes.push((
 			Event::Item as u8,
-			if v >= ver(3, 6) {
+			if ver.gte(3, 6) {
 				42
-			} else if v >= ver(3, 2) {
+			} else if ver.gte(3, 2) {
 				41
 			} else {
 				37
@@ -78,15 +75,15 @@ fn payload_sizes(game: &Game) -> Vec<(u8, u16)> {
 		));
 	}
 
-	if v >= ver(3, 0) {
-		sizes.push((Event::FrameEnd as u8, if v >= ver(3, 7) { 8 } else { 4 }));
+	if ver.gte(3, 0) {
+		sizes.push((Event::FrameEnd as u8, if ver.gte(3, 7) { 8 } else { 4 }));
 	}
 
 	if let Some(codes) = &game.gecko_codes {
 		sizes.push((Event::GeckoCodes as u8, codes.actual_size));
 	}
 
-	if v >= ver(3, 3) {
+	if ver.gte(3, 3) {
 		sizes.push((0x10, 516)); // Message Splitter
 	}
 
@@ -107,16 +104,16 @@ fn gecko_codes<W: Write>(w: &mut W, codes: &GeckoCodes) -> Result<()> {
 	Ok(())
 }
 
-fn game_start<W: Write>(w: &mut W, s: &game::Start, v: slippi::Version) -> Result<()> {
-	assert_eq!(v, s.slippi.version);
+fn game_start<W: Write>(w: &mut W, s: &game::Start, ver: Version) -> Result<()> {
+	assert_eq!(ver, s.slippi.version);
 	w.write_u8(Event::GameStart as u8)?;
 	w.write_all(&s.raw_bytes)
 }
 
-fn game_end<W: Write>(w: &mut W, e: &game::End, v: slippi::Version) -> Result<()> {
+fn game_end<W: Write>(w: &mut W, e: &game::End, ver: Version) -> Result<()> {
 	w.write_u8(Event::GameEnd as u8)?;
 	w.write_u8(e.method.0)?;
-	if v >= ver(2, 0) {
+	if ver.gte(2, 0) {
 		w.write_u8(
 			e.lras_initiator
 				.unwrap()
@@ -127,22 +124,17 @@ fn game_end<W: Write>(w: &mut W, e: &game::End, v: slippi::Version) -> Result<()
 	Ok(())
 }
 
-fn frame_start<W: Write>(
-	w: &mut W,
-	s: &frame::Start,
-	v: slippi::Version,
-	frame_idx: i32,
-) -> Result<()> {
+fn frame_start<W: Write>(w: &mut W, s: &frame::Start, ver: Version, frame_idx: i32) -> Result<()> {
 	w.write_u8(Event::FrameStart as u8)?;
 	w.write_i32::<BE>(frame_idx)?;
 	w.write_u32::<BE>(s.random_seed)?;
-	if v >= ver(3, 10) {
+	if ver.gte(3, 10) {
 		w.write_u32::<BE>(s.scene_frame_counter.unwrap())?;
 	}
 	Ok(())
 }
 
-fn frame_pre<W: Write>(w: &mut W, p: &frame::Pre, v: slippi::Version, id: PortId) -> Result<()> {
+fn frame_pre<W: Write>(w: &mut W, p: &frame::Pre, ver: Version, id: PortId) -> Result<()> {
 	w.write_u8(Event::FramePre as u8)?;
 	w.write_i32::<BE>(id.index)?;
 	w.write_u8(id.port as u8)?;
@@ -163,18 +155,18 @@ fn frame_pre<W: Write>(w: &mut W, p: &frame::Pre, v: slippi::Version, id: PortId
 	w.write_f32::<BE>(p.triggers.physical.l)?;
 	w.write_f32::<BE>(p.triggers.physical.r)?;
 
-	if v >= ver(1, 2) {
+	if ver.gte(1, 2) {
 		w.write_i8(p.raw_analog_x.unwrap())?;
 	}
 
-	if v >= ver(1, 4) {
+	if ver.gte(1, 4) {
 		w.write_f32::<BE>(p.damage.unwrap())?;
 	}
 
 	Ok(())
 }
 
-fn frame_post<W: Write>(w: &mut W, p: &frame::Post, v: slippi::Version, id: PortId) -> Result<()> {
+fn frame_post<W: Write>(w: &mut W, p: &frame::Post, ver: Version, id: PortId) -> Result<()> {
 	w.write_u8(Event::FramePost as u8)?;
 	w.write_i32::<BE>(id.index)?;
 	w.write_u8(id.port as u8)?;
@@ -192,11 +184,11 @@ fn frame_post<W: Write>(w: &mut W, p: &frame::Post, v: slippi::Version, id: Port
 	w.write_u8(p.last_hit_by.map(|p| p as u8).unwrap_or(6))?;
 	w.write_u8(p.stocks)?;
 
-	if v >= ver(0, 2) {
+	if ver.gte(0, 2) {
 		w.write_f32::<BE>(p.state_age.unwrap())?;
 	}
 
-	if v >= ver(2, 0) {
+	if ver.gte(2, 0) {
 		let mut buf = [0u8; 8];
 		buf.as_mut().write_u64::<LittleEndian>(p.flags.unwrap().0)?;
 		w.write_all(&buf[0..5])?;
@@ -211,11 +203,11 @@ fn frame_post<W: Write>(w: &mut W, p: &frame::Post, v: slippi::Version, id: Port
 		})?;
 	}
 
-	if v >= ver(2, 1) {
+	if ver.gte(2, 1) {
 		w.write_u8(p.hurtbox_state.unwrap().0)?;
 	}
 
-	if v >= ver(3, 5) {
+	if ver.gte(3, 5) {
 		let vel = p.velocities.unwrap();
 		w.write_f32::<BE>(vel.autogenous_x.air)?;
 		w.write_f32::<BE>(vel.autogenous.y)?;
@@ -224,18 +216,18 @@ fn frame_post<W: Write>(w: &mut W, p: &frame::Post, v: slippi::Version, id: Port
 		w.write_f32::<BE>(vel.autogenous_x.ground)?;
 	}
 
-	if v >= ver(3, 8) {
+	if ver.gte(3, 8) {
 		w.write_f32::<BE>(p.hitlag.unwrap())?;
 	}
 
-	if v >= ver(3, 11) {
+	if ver.gte(3, 11) {
 		w.write_u32::<BE>(p.animation_index.unwrap())?;
 	}
 
 	Ok(())
 }
 
-fn item<W: Write>(w: &mut W, i: &item::Item, v: slippi::Version, frame_idx: i32) -> Result<()> {
+fn item<W: Write>(w: &mut W, i: &item::Item, ver: Version, frame_idx: i32) -> Result<()> {
 	w.write_u8(Event::Item as u8)?;
 	w.write_i32::<BE>(frame_idx)?;
 
@@ -250,26 +242,21 @@ fn item<W: Write>(w: &mut W, i: &item::Item, v: slippi::Version, frame_idx: i32)
 	w.write_f32::<BE>(i.timer)?;
 	w.write_u32::<BE>(i.id)?;
 
-	if v >= ver(3, 2) {
+	if ver.gte(3, 2) {
 		w.write_all(&i.misc.unwrap())?;
 	}
 
-	if v >= ver(3, 6) {
+	if ver.gte(3, 6) {
 		w.write_u8(i.owner.unwrap().map(|p| p as u8).unwrap_or(u8::MAX))?;
 	}
 
 	Ok(())
 }
 
-fn frame_end<W: Write>(
-	w: &mut W,
-	e: &frame::End,
-	v: slippi::Version,
-	frame_idx: i32,
-) -> Result<()> {
+fn frame_end<W: Write>(w: &mut W, e: &frame::End, ver: Version, frame_idx: i32) -> Result<()> {
 	w.write_u8(Event::FrameEnd as u8)?;
 	w.write_i32::<BE>(frame_idx)?;
-	if v >= ver(3, 7) {
+	if ver.gte(3, 7) {
 		w.write_i32::<BE>(e.latest_finalized_frame.unwrap())?;
 	}
 	Ok(())
@@ -277,37 +264,42 @@ fn frame_end<W: Write>(
 
 fn frames<W: Write, const N: usize>(
 	w: &mut W,
-	v: slippi::Version,
+	ver: Version,
 	ports: &[Port],
 	frames: &[frame::Frame<N>],
 ) -> Result<()> {
 	for f in frames {
-		if v >= ver(2, 2) {
-			frame_start(w, f.start.as_ref().unwrap(), v, f.index)?;
+		if ver.gte(2, 2) {
+			frame_start(w, f.start.as_ref().unwrap(), ver, f.index)?;
 		}
 
 		for (port, data) in zip(ports, &f.ports) {
-			frame_pre(w, &data.leader.pre, v, PortId::new(f.index, *port, false))?;
+			frame_pre(w, &data.leader.pre, ver, PortId::new(f.index, *port, false))?;
 			if let Some(follower) = &data.follower {
-				frame_pre(w, &follower.pre, v, PortId::new(f.index, *port, true))?;
+				frame_pre(w, &follower.pre, ver, PortId::new(f.index, *port, true))?;
 			}
 		}
 
-		if v >= ver(3, 0) {
+		if ver.gte(3, 0) {
 			for i in f.items.as_ref().unwrap() {
-				item(w, i, v, f.index)?;
+				item(w, i, ver, f.index)?;
 			}
 		}
 
 		for (port, data) in zip(ports, &f.ports) {
-			frame_post(w, &data.leader.post, v, PortId::new(f.index, *port, false))?;
+			frame_post(
+				w,
+				&data.leader.post,
+				ver,
+				PortId::new(f.index, *port, false),
+			)?;
 			if let Some(follower) = &data.follower {
-				frame_post(w, &follower.post, v, PortId::new(f.index, *port, true))?;
+				frame_post(w, &follower.post, ver, PortId::new(f.index, *port, true))?;
 			}
 		}
 
-		if v >= ver(3, 0) {
-			frame_end(w, f.end.as_ref().unwrap(), v, f.index)?;
+		if ver.gte(3, 0) {
+			frame_end(w, f.end.as_ref().unwrap(), ver, f.index)?;
 		}
 	}
 	Ok(())
@@ -387,8 +379,8 @@ pub fn serialize<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 		w.write_u16::<BE>(size)?;
 	}
 
-	let v = game.start.slippi.version;
-	game_start(w, &game.start, v)?;
+	let ver = game.start.slippi.version;
+	game_start(w, &game.start, ver)?;
 
 	if let Some(codes) = &game.gecko_codes {
 		gecko_codes(w, codes)?;
@@ -397,13 +389,13 @@ pub fn serialize<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 	let ports: Vec<_> = game.start.players.iter().map(|p| p.port).collect();
 
 	match &game.frames {
-		Frames::P1(f) => frames(w, v, &ports, f)?,
-		Frames::P2(f) => frames(w, v, &ports, f)?,
-		Frames::P3(f) => frames(w, v, &ports, f)?,
-		Frames::P4(f) => frames(w, v, &ports, f)?,
+		Frames::P1(f) => frames(w, ver, &ports, f)?,
+		Frames::P2(f) => frames(w, ver, &ports, f)?,
+		Frames::P3(f) => frames(w, ver, &ports, f)?,
+		Frames::P4(f) => frames(w, ver, &ports, f)?,
 	};
 
-	game_end(w, &game.end, v)?;
+	game_end(w, &game.end, ver)?;
 
 	w.write_all(&[
 		0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b,

@@ -5,8 +5,10 @@ use serde::Serialize;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Version(pub u8, pub u8, pub u8);
 
-pub const fn version(major: u8, minor: u8) -> Version {
-	Version(major, minor, 0)
+impl Version {
+	pub fn gte(&self, major: u8, minor: u8) -> bool {
+		self.0 > major || (self.0 == major && self.1 >= minor)
+	}
 }
 
 pub struct ParseVersionError(pub String);
