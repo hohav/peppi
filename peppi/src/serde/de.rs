@@ -76,8 +76,8 @@ pub struct FrameId {
 }
 
 impl FrameId {
-	fn new(index: i32) -> FrameId {
-		FrameId { index }
+	fn new(index: i32) -> Self {
+		Self { index }
 	}
 }
 
@@ -100,16 +100,16 @@ pub struct PortId {
 }
 
 impl PortId {
-	pub fn new(index: i32, port: Port, is_follower: bool) -> PortId {
-		PortId {
+	pub fn new(index: i32, port: Port, is_follower: bool) -> Self {
+		Self {
 			index,
 			port,
 			is_follower,
 		}
 	}
 
-	pub fn try_new(index: i32, port: u8, is_follower: bool) -> Result<PortId> {
-		Ok(PortId::new(
+	pub fn try_new(index: i32, port: u8, is_follower: bool) -> Result<Self> {
+		Ok(Self::new(
 			index,
 			Port::try_from(port).map_err(|e| err!("invalid port: {:?}", e))?,
 			is_follower,

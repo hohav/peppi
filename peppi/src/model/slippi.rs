@@ -14,14 +14,14 @@ impl Version {
 pub struct ParseVersionError(pub String);
 
 impl From<std::num::ParseIntError> for ParseVersionError {
-	fn from(err: std::num::ParseIntError) -> ParseVersionError {
+	fn from(err: std::num::ParseIntError) -> Self {
 		ParseVersionError(format!("{}", err))
 	}
 }
 
 impl TryFrom<&str> for Version {
 	type Error = ParseVersionError;
-	fn try_from(s: &str) -> Result<Version, Self::Error> {
+	fn try_from(s: &str) -> Result<Self, Self::Error> {
 		let v: Vec<u8> = s
 			.split('.')
 			.map(|s| s.parse::<u8>())
