@@ -944,7 +944,7 @@ fn event<R: Read, H: Handlers, P: AsRef<Path>>(
 }
 
 /// Options for parsing replays.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Opts {
 	/// Skip all frame data when parsing a replay for speed
 	/// (when you only need start/end/metadata).
