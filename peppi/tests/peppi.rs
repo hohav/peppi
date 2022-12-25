@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, io};
+use std::{collections::HashMap, fs, io, path::Path};
 
 use chrono::{DateTime, Utc};
 use pretty_assertions::assert_eq;
@@ -57,7 +57,7 @@ impl From<peppi::ParseError> for Error {
 	}
 }
 
-fn read_game(path: &str) -> Result<Game, Error> {
+fn read_game(path: impl AsRef<Path>) -> Result<Game, Error> {
 	let mut buf = io::BufReader::new(fs::File::open(path).unwrap());
 	Ok(peppi::game(&mut buf, None, None)?)
 }
@@ -665,14 +665,13 @@ fn items() -> Result<(), Error> {
 	Ok(())
 }
 
-#[test]
-fn round_trip() -> Result<(), Error> {
-	let game1 = game("ics2")?;
-	let path = "/tmp/peppi_test_round_trip.slp";
-	let mut buf = fs::File::create(path).unwrap();
+fn _round_trip(in_path: impl AsRef<Path>) -> Result<(), Error> {
+	let game1 = read_game(in_path)?;
+	let out_path = "/tmp/peppi_test_round_trip.slp";
+	let mut buf = fs::File::create(out_path).unwrap();
 	serde::ser::serialize(&mut buf, &game1)
 		.map_err(|e| format!("couldn't serialize game: {:?}", e))?;
-	let game2 = read_game(path)?;
+	let game2 = read_game(out_path)?;
 
 	assert_eq!(game1.start, game2.start);
 	assert_eq!(game1.end, game2.end);
@@ -689,6 +688,21 @@ fn round_trip() -> Result<(), Error> {
 		_ => return Err("wrong number of ports".into()),
 	}
 
+	fs::remove_file(out_path).unwrap();
+
+	Ok(())
+}
+
+#[test]
+fn round_trip() -> Result<(), Error> {
+	for entry in fs::read_dir("tests/data")
+		.unwrap()
+		.into_iter()
+		.map(|e| e.unwrap())
+	{
+		println!("{:?}", entry.file_name());
+		_round_trip(entry.path())?;
+	}
 	Ok(())
 }
 
