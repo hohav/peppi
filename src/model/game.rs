@@ -1,5 +1,4 @@
 use std::{
-	any::Any,
 	error,
 	fmt::{self, Debug, Display, Formatter},
 	io,
@@ -10,8 +9,7 @@ use serde::Serialize;
 use crate::{
 	model::{
 		enums::{character, costume, stage},
-		frame::{Frame, PortData},
-		metadata,
+		frame,
 		primitives::Port,
 		shift_jis::MeleeString,
 		slippi,
@@ -224,16 +222,6 @@ impl End {
 	}
 }
 
-/// Type-erasing wrapper for frame data. This allows `Game` not to be generic.
-#[derive(Debug, PartialEq, Serialize)]
-#[serde(untagged)]
-pub enum Frames {
-	P1(Vec<Frame<1>>),
-	P2(Vec<Frame<2>>),
-	P3(Vec<Frame<3>>),
-	P4(Vec<Frame<4>>),
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct UnexpectedPortCountError {
 	pub expected: usize,
@@ -248,67 +236,6 @@ impl Display for UnexpectedPortCountError {
 
 impl error::Error for UnexpectedPortCountError {}
 
-impl Frames {
-	/// Tries to downcast our inner value to a `Vec<Frame<N>>`.
-	pub fn downcast<const N: usize>(&self) -> Result<&Vec<Frame<N>>, UnexpectedPortCountError> {
-		match self {
-			Self::P1(frames) => (frames as &dyn Any).downcast_ref::<Vec<Frame<N>>>().ok_or(
-				UnexpectedPortCountError {
-					expected: N,
-					actual: 1,
-				},
-			),
-			Self::P2(frames) => (frames as &dyn Any).downcast_ref::<Vec<Frame<N>>>().ok_or(
-				UnexpectedPortCountError {
-					expected: N,
-					actual: 2,
-				},
-			),
-			Self::P3(frames) => (frames as &dyn Any).downcast_ref::<Vec<Frame<N>>>().ok_or(
-				UnexpectedPortCountError {
-					expected: N,
-					actual: 3,
-				},
-			),
-			Self::P4(frames) => (frames as &dyn Any).downcast_ref::<Vec<Frame<N>>>().ok_or(
-				UnexpectedPortCountError {
-					expected: N,
-					actual: 4,
-				},
-			),
-		}
-	}
-
-	pub fn frame_count(&self) -> usize {
-		match self {
-			Self::P1(frames) => frames.len(),
-			Self::P2(frames) => frames.len(),
-			Self::P3(frames) => frames.len(),
-			Self::P4(frames) => frames.len(),
-		}
-	}
-
-	pub fn port_count(&self) -> usize {
-		match self {
-			Self::P1(_) => 1,
-			Self::P2(_) => 2,
-			Self::P3(_) => 3,
-			Self::P4(_) => 4,
-		}
-	}
-
-	/// Returns the port data for this frame & port index.
-	/// Frames are indexed from zero here, not -123.
-	pub fn port_data(&self, frame_idx: usize, port_idx: usize) -> Option<&PortData> {
-		match self {
-			Self::P1(frames) => frames.get(frame_idx).and_then(|f| f.ports.get(port_idx)),
-			Self::P2(frames) => frames.get(frame_idx).and_then(|f| f.ports.get(port_idx)),
-			Self::P3(frames) => frames.get(frame_idx).and_then(|f| f.ports.get(port_idx)),
-			Self::P4(frames) => frames.get(frame_idx).and_then(|f| f.ports.get(port_idx)),
-		}
-	}
-}
-
 /// Binary blob of Gecko codes in use.
 ///
 /// Currently unparsed, but still needed for round-tripping.
@@ -318,35 +245,10 @@ pub struct GeckoCodes {
 	pub actual_size: u32,
 }
 
-/// Replay data for a single game of Melee.
-///
-/// See https://github.com/project-slippi/slippi-wiki/blob/master/SPEC.md.
-#[derive(PartialEq, Serialize)]
 pub struct Game {
 	pub start: Start,
-
-	pub end: End,
-
-	pub frames: Frames,
-
-	#[serde(skip)]
-	pub metadata: metadata::Metadata,
-
-	#[serde(rename = "metadata")]
-	pub metadata_raw: serde_json::Map<String, serde_json::Value>,
-
-	#[serde(skip)]
-	#[doc(hidden)]
+	pub end: Option<End>,
+	pub frames: frame::Frame,
+	pub metadata: Option<serde_json::Map<String, serde_json::Value>>,
 	pub gecko_codes: Option<GeckoCodes>,
-}
-
-impl Debug for Game {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.debug_struct("Game")
-			.field("metadata", &self.metadata)
-			.field("start", &self.start)
-			.field("end", &self.end)
-			.field("frames", &self.frames)
-			.finish()
-	}
 }

@@ -23,6 +23,12 @@ macro_rules! pseudo_enum {
 			$( pub const $variant:$name = $name($value); )*
 		}
 
+		impl std::convert::Into<$type> for $name {
+			fn into(self) -> $type {
+				self.0
+			}
+		}
+
 		impl std::convert::TryFrom<$name> for String {
 			type Error = crate::model::pseudo_enum::ConversionError;
 			/// Returns the stringified name for this enum value, if any.
@@ -69,34 +75,6 @@ macro_rules! pseudo_enum {
 					true => format!("{:?}", self).serialize(serializer),
 					_ => self.0.serialize(serializer),
 				}
-			}
-		}
-
-		impl peppi_arrow::Arrow for $name {
-			type ArrowArray = <$type as peppi_arrow::Arrow>::ArrowArray;
-
-			fn arrow_default() -> Self {
-				<Self as Default>::default()
-			}
-
-			fn data_type<C: ::peppi_arrow::Context>(context: C) -> ::arrow2::datatypes::DataType {
-				<$type>::data_type(context)
-			}
-
-			fn arrow_array<C: peppi_arrow::Context>(context: C) -> Self::ArrowArray {
-				<$type>::arrow_array(context)
-			}
-
-			fn arrow_push(&self, array: &mut dyn ::arrow2::array::MutableArray) {
-				self.0.arrow_push(array)
-			}
-
-			fn arrow_push_null(array: &mut dyn ::arrow2::array::MutableArray) {
-				<$type>::arrow_push_null(array)
-			}
-
-			fn arrow_read(&mut self, array: &dyn ::arrow2::array::Array, idx: usize) {
-				self.0.arrow_read(array, idx);
 			}
 		}
 	}

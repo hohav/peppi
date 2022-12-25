@@ -38,15 +38,12 @@ pub mod model {
 	#[doc(hidden)]
 	pub(crate) mod pseudo_enum;
 
-	pub mod buttons;
 	pub mod frame;
 	pub mod game;
-	pub mod item;
 	pub mod metadata;
 	pub mod primitives;
 	pub mod shift_jis;
 	pub mod slippi;
-	pub mod triggers;
 	pub mod enums {
 		pub mod action_state;
 		pub mod attack;
@@ -59,8 +56,6 @@ pub mod model {
 }
 
 pub mod serde {
-	pub mod arrow;
-	pub mod collect;
 	pub mod de;
 	pub mod ser;
 }
@@ -109,33 +104,14 @@ impl<R: Read> Read for TrackingReader<R> {
 	}
 }
 
-/// Parse a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
-pub fn parse<R: Read, H: serde::de::Handlers>(
-	r: &mut R,
-	handlers: &mut H,
-	opts: Option<&serde::de::Opts>,
-) -> std::result::Result<(), ParseError> {
-	let mut r = TrackingReader { pos: 0, reader: r };
-	serde::de::deserialize(&mut r, handlers, opts).map_err(|e| ParseError {
-		error: e,
-		pos: Some(r.pos),
-	})
-}
-
 /// Parse a Slippi replay from `r`, returning a `game::Game` object.
 pub fn game<R: Read>(
 	r: &mut R,
-	parse_opts: Option<&serde::de::Opts>,
-	collect_opts: Option<&serde::collect::Opts>,
-) -> Result<model::game::Game, ParseError> {
-	let mut game_parser = serde::collect::Collector {
-		opts: collect_opts.copied().unwrap_or_default(),
-		..Default::default()
-	};
-	parse(r, &mut game_parser, parse_opts).and_then(|_| {
-		game_parser.into_game().map_err(|e| ParseError {
-			error: e,
-			pos: None,
-		})
+	opts: Option<&serde::de::Opts>,
+) -> std::result::Result<model::game::Game, ParseError> {
+	let mut r = TrackingReader { pos: 0, reader: r };
+	serde::de::deserialize(&mut r, opts).map_err(|e| ParseError {
+		error: e,
+		pos: Some(r.pos),
 	})
 }

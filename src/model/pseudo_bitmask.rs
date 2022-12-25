@@ -7,6 +7,12 @@ macro_rules! pseudo_bitmask {
 			$( pub const $variant:$name = $name($value); )*
 		}
 
+		impl std::convert::Into<$type> for $name {
+			fn into(self) -> $type {
+				self.0
+			}
+		}
+
 		#[allow(clippy::bad_bit_mask)]
 		impl std::fmt::Debug for $name {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -36,34 +42,6 @@ macro_rules! pseudo_bitmask {
 
 			fn bitand(self, rhs: Self) -> Self {
 				$name(self.0 & rhs.0)
-			}
-		}
-
-		impl peppi_arrow::Arrow for $name {
-			type ArrowArray = <$type as peppi_arrow::Arrow>::ArrowArray;
-
-			fn arrow_default() -> Self {
-				<Self as Default>::default()
-			}
-
-			fn data_type<C: peppi_arrow::Context>(context: C) -> ::arrow2::datatypes::DataType {
-				<$type>::data_type(context)
-			}
-
-			fn arrow_array<C: peppi_arrow::Context>(context: C) -> Self::ArrowArray {
-				<$type>::arrow_array(context)
-			}
-
-			fn arrow_push(&self, array: &mut dyn ::arrow2::array::MutableArray) {
-				self.0.arrow_push(array)
-			}
-
-			fn arrow_push_null(array: &mut dyn ::arrow2::array::MutableArray) {
-				<$type>::arrow_push_null(array)
-			}
-
-			fn arrow_read(&mut self, array: &dyn ::arrow2::array::Array, idx: usize) {
-				self.0.arrow_read(array, idx);
 			}
 		}
 	}

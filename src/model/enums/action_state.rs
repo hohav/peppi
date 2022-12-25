@@ -47,6 +47,27 @@ macro_rules! state {
 			}
 		}
 
+		/// The u16 representation is ambiguous since character-specific enum values overlap.
+		/// So we prepend a character byte to make a u32 (with a byte in between for padding).
+		impl TryFrom<u32> for State {
+			type Error = String;
+			fn try_from(n: u32) -> Result<Self, Self::Error> {
+				let [chr, pad, state0, state1] = n.to_le_bytes();
+				match pad {
+					0 => Ok(State::from(u16::from_le_bytes([state0, state1]), Internal(chr))),
+					n => Err(err!("invalid padding byte: {}", n).to_string()),
+				}
+			}
+		}
+
+		impl From<State> for u32 {
+			fn from(state: State) -> u32 {
+				let state_bytes = u16::from(state).to_le_bytes();
+				let character = state.character().map(|c| c.0).unwrap_or(0);
+				u32::from_le_bytes([character, 0, state_bytes[0], state_bytes[1]])
+			 }
+		}
+
 		impl fmt::Debug for $name {
 			fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 				 match *self {
