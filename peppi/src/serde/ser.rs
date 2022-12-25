@@ -1,4 +1,7 @@
-use std::io::{Result, Write};
+use std::{
+	io::{Result, Write},
+	iter::zip,
+};
 
 use byteorder::{LittleEndian, WriteBytesExt};
 
@@ -7,6 +10,7 @@ use crate::{
 		frame,
 		game::{self, Frames, Game, GeckoCodes},
 		item,
+		primitives::Port,
 		slippi::{self, version as ver},
 	},
 	serde::de::{Event, PortId, PAYLOADS_EVENT_CODE},
@@ -273,21 +277,20 @@ fn frame_end<W: Write>(
 
 fn frames<W: Write, const N: usize>(
 	w: &mut W,
-	frames: &[frame::Frame<N>],
 	v: slippi::Version,
+	ports: &[Port],
+	frames: &[frame::Frame<N>],
 ) -> Result<()> {
 	for f in frames {
 		if v >= ver(2, 2) {
 			frame_start(w, f.start.as_ref().unwrap(), v, f.index)?;
 		}
 
-		let mut port_idx = 0u8;
-		for p in &f.ports {
-			frame_pre(w, &p.leader.pre, v, PortId::new(f.index, port_idx, false)?)?;
-			if let Some(follower) = &p.follower {
-				frame_pre(w, &follower.pre, v, PortId::new(f.index, port_idx, true)?)?;
+		for (port, data) in zip(ports, &f.ports) {
+			frame_pre(w, &data.leader.pre, v, PortId::new(f.index, *port, false))?;
+			if let Some(follower) = &data.follower {
+				frame_pre(w, &follower.pre, v, PortId::new(f.index, *port, true))?;
 			}
-			port_idx += 1;
 		}
 
 		if v >= ver(3, 0) {
@@ -296,13 +299,11 @@ fn frames<W: Write, const N: usize>(
 			}
 		}
 
-		port_idx = 0u8;
-		for p in &f.ports {
-			frame_post(w, &p.leader.post, v, PortId::new(f.index, port_idx, false)?)?;
-			if let Some(follower) = &p.follower {
-				frame_post(w, &follower.post, v, PortId::new(f.index, port_idx, true)?)?;
+		for (port, data) in zip(ports, &f.ports) {
+			frame_post(w, &data.leader.post, v, PortId::new(f.index, *port, false))?;
+			if let Some(follower) = &data.follower {
+				frame_post(w, &follower.post, v, PortId::new(f.index, *port, true))?;
 			}
-			port_idx += 1;
 		}
 
 		if v >= ver(3, 0) {
@@ -393,11 +394,13 @@ pub fn serialize<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 		gecko_codes(w, codes)?;
 	}
 
+	let ports: Vec<_> = game.start.players.iter().map(|p| p.port).collect();
+
 	match &game.frames {
-		Frames::P1(f) => frames(w, f, v)?,
-		Frames::P2(f) => frames(w, f, v)?,
-		Frames::P3(f) => frames(w, f, v)?,
-		Frames::P4(f) => frames(w, f, v)?,
+		Frames::P1(f) => frames(w, v, &ports, f)?,
+		Frames::P2(f) => frames(w, v, &ports, f)?,
+		Frames::P3(f) => frames(w, v, &ports, f)?,
+		Frames::P4(f) => frames(w, v, &ports, f)?,
 	};
 
 	game_end(w, &game.end, v)?;
