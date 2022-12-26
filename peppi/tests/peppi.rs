@@ -7,7 +7,6 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use pretty_assertions::assert_eq;
-use serde_json;
 use xxhash_rust::xxh3::xxh3_64;
 
 use peppi::{
@@ -31,46 +30,13 @@ use peppi::{
 		slippi::{Slippi, Version},
 	},
 	serde::{
-		self, arrow,
+		self,
 		collect::{self, Rollback},
 	},
 };
 
-#[derive(Debug)]
-struct Error(pub String);
-
-impl From<String> for Error {
-	fn from(s: String) -> Self {
-		Error(s)
-	}
-}
-
-impl From<&str> for Error {
-	fn from(s: &str) -> Self {
-		Error(s.to_string())
-	}
-}
-
-impl From<serde_json::Error> for Error {
-	fn from(e: serde_json::Error) -> Self {
-		Error(format!("serde_json error: {:?}", e))
-	}
-}
-
-impl From<peppi::ParseError> for Error {
-	fn from(e: peppi::ParseError) -> Self {
-		Error(format!("peppi error: {:?}", e))
-	}
-}
-
-fn read_game(path: impl AsRef<Path>) -> Game {
-	let mut buf = BufReader::new(File::open(path).unwrap());
-	peppi::game(&mut buf, None, None).unwrap()
-}
-
-fn game(name: &str) -> Game {
-	read_game(&format!("tests/data/{}.slp", name))
-}
+mod common;
+use common::{game, read_game};
 
 fn button_seq(game: &Game) -> Vec<Buttons> {
 	match &game.frames {
@@ -721,159 +687,4 @@ fn rollback() {
 	assert_eq!(frames_all[475], frames_last[474]);
 	assert_eq!(frames_all[476], frames_first[475]);
 	assert_eq!(frames_all[476], frames_last[475]);
-}
-
-#[test]
-fn json_metadata() {
-	let game = game("v3.12");
-	let expected: serde_json::Value = serde_json::from_str(
-		r#"{
-			"startAt":"2022-06-04T21:58:00Z",
-			"lastFrame":0,
-			"players":{
-				"1":{
-					"names":{
-						"netplay":"yyyyyyyyy",
-						"code":"YYYY#222"
-					},
-					"characters":{
-						"18":124
-					}
-				},
-				"0":{
-					"names":{
-						"netplay":"xxxxxx",
-						"code":"XX#111"
-					},
-					"characters":{
-						"18":124
-					}
-				}
-			},
-			"playedOn":"dolphin"
-		}"#,
-	)
-	.unwrap();
-	let actual: serde_json::Value =
-		serde_json::from_str(&serde_json::to_string(&game.metadata_raw).unwrap()).unwrap();
-	assert_eq!(expected, actual);
-}
-
-#[test]
-fn json_start() {
-	let game = game("v3.12");
-	let expected: serde_json::Value = serde_json::from_str(
-		r#"{
-			"slippi":{
-				"version":[3,12,0]
-			},
-			"bitfield":[50,1,142,76],
-			"is_raining_bombs":false,
-			"is_teams":false,
-			"item_spawn_frequency":-1,
-			"self_destruct_score":-1,
-			"stage":3,
-			"timer":480,
-			"item_spawn_bitfield":[255,255,255,255,255],
-			"damage_ratio":1.0,
-			"players":[
-				{
-					"port":"P1",
-					"character":9,
-					"type":0,
-					"stocks":4,
-					"costume":3,
-					"team":null,
-					"handicap":9,
-					"bitfield":192,
-					"cpu_level":null,
-					"offense_ratio":1.0,
-					"defense_ratio":1.0,
-					"model_scale":1.0,
-					"ucf":{
-						"dash_back":1,
-						"shield_drop":1
-					},
-					"name_tag":"",
-					"netplay":{
-						"name":"xxxxxx",
-						"code":"XX＃111",
-						"suid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-					}
-				},
-				{
-					"port":"P2",
-					"character":9,
-					"type":0,
-					"stocks":4,
-					"costume":0,
-					"team":null,
-					"handicap":9,
-					"bitfield":192,
-					"cpu_level":null,
-					"offense_ratio":1.0,
-					"defense_ratio":1.0,
-					"model_scale":1.0,
-					"ucf":{
-						"dash_back":1,
-						"shield_drop":1
-					},
-					"name_tag":"",
-					"netplay":{
-						"name":"yyyyyyyyyy",
-						"code":"YYYY＃222",
-						"suid":"bbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-					}
-				}
-			],
-			"random_seed":39656,
-			"is_pal":false,
-			"is_frozen_ps":false,
-			"scene":{
-				"minor":2,
-				"major":8
-			},
-			"language":1
-		}"#,
-	)
-	.unwrap();
-	let actual: serde_json::Value =
-		serde_json::from_str(&serde_json::to_string(&game.start).unwrap()).unwrap();
-	assert_eq!(expected, actual);
-}
-
-#[test]
-fn json_end() {
-	let game = game("v3.12");
-	let expected: serde_json::Value = serde_json::from_str(
-		r#"{
-			"method":7,
-			"lras_initiator":"P2"
-		}"#,
-	)
-	.unwrap();
-	let actual: serde_json::Value =
-		serde_json::from_str(&serde_json::to_string(&game.end).unwrap()).unwrap();
-	assert_eq!(expected, actual);
-}
-
-#[test]
-fn frames_to_arrow() {
-	let game = game("v3.12");
-	let frames = arrow::frames_to_arrow(&game, None);
-
-	assert_eq!(
-		vec![124, 124, 124, 124, 124],
-		frames.values().iter().map(|v| v.len()).collect::<Vec<_>>()
-	);
-
-	assert_eq!(
-		"StructArray[{index: -123, ports: [{leader: {pre: {position: {x: -40, y: 32}, direction: 1, joystick: {x: 0, y: 0}, cstick: {x: 0, y: 0}, triggers: {logical: 0, physical: {l: 0, r: 0}}, random_seed: 39656, buttons: {logical: 0, physical: 0}, state: 322, raw_analog_x: 0, damage: 0}, post: {character: 18, state: 322, position: {x: -40, y: 32}, direction: 1, damage: 0, shield: 60, last_attack_landed: None, combo_count: 0, last_hit_by: None, stocks: 4, state_age: -1, flags: 274877906944, misc_as: 0.000000000000000000000000000000000000000000006, airborne: true, ground: 65535, jumps: 1, l_cancel: None, hurtbox_state: 0, velocities: {autogenous: {x: 0, y: 0}, knockback: {x: 0, y: 0}, autogenous_x: {air: 0, ground: 0}}, hitlag: 0, animation_index: 4294967295}}, follower: None}, {leader: {pre: {position: {x: 40, y: 32}, direction: 0, joystick: {x: 0, y: 0}, cstick: {x: 0, y: 0}, triggers: {logical: 0, physical: {l: 0, r: 0}}, random_seed: 39656, buttons: {logical: 0, physical: 0}, state: 322, raw_analog_x: 0, damage: 0}, post: {character: 18, state: 322, position: {x: 40, y: 32}, direction: 0, damage: 0, shield: 60, last_attack_landed: None, combo_count: 0, last_hit_by: None, stocks: 4, state_age: -1, flags: 274877906944, misc_as: 0.000000000000000000000000000000000000000000013, airborne: true, ground: 65535, jumps: 1, l_cancel: None, hurtbox_state: 0, velocities: {autogenous: {x: 0, y: 0}, knockback: {x: 0, y: 0}, autogenous_x: {air: 0, ground: 0}}, hitlag: 0, animation_index: 4294967295}}, follower: None}], start: {random_seed: 39656, scene_frame_counter: 0}, end: {latest_finalized_frame: -123}, items: []}]",
-		format!("{:?}", frames.slice(0, 1))
-	);
-
-	assert_eq!(
-		"StructArray[{index: 0, ports: [{leader: {pre: {position: {x: -35.766, y: 0.0001}, direction: 0, joystick: {x: -0.95, y: 0}, cstick: {x: 0, y: 0}, triggers: {logical: 0, physical: {l: 0, r: 0}}, random_seed: 8100584, buttons: {logical: 262144, physical: 0}, state: 20, raw_analog_x: -127, damage: 0}, post: {character: 18, state: 20, position: {x: -37.322998, y: 0.0001}, direction: 0, damage: 0, shield: 60, last_attack_landed: None, combo_count: 0, last_hit_by: None, stocks: 4, state_age: 2, flags: 0, misc_as: 0, airborne: false, ground: 34, jumps: 2, l_cancel: None, hurtbox_state: 0, velocities: {autogenous: {x: -1.557, y: -0}, knockback: {x: 0, y: 0}, autogenous_x: {air: -1.5569999, ground: -1.557}}, hitlag: 0, animation_index: 12}}, follower: None}, {leader: {pre: {position: {x: 40, y: 25.0001}, direction: 0, joystick: {x: 0, y: 0}, cstick: {x: 0, y: 0}, triggers: {logical: 1, physical: {l: 0.71428573, r: 0}}, random_seed: 8100584, buttons: {logical: 2147488096, physical: 4448}, state: 341, raw_analog_x: 0, damage: 0}, post: {character: 18, state: 341, position: {x: 40, y: 25.0001}, direction: 0, damage: 0, shield: 60, last_attack_landed: None, combo_count: 0, last_hit_by: None, stocks: 4, state_age: 10, flags: 0, misc_as: 0, airborne: false, ground: 36, jumps: 2, l_cancel: None, hurtbox_state: 0, velocities: {autogenous: {x: 0, y: 0}, knockback: {x: 0, y: 0}, autogenous_x: {air: 0, ground: 0}}, hitlag: 0, animation_index: 295}}, follower: None}], start: {random_seed: 8100584, scene_frame_counter: 123}, end: {latest_finalized_frame: 0}, items: []}]",
-		format!("{:?}", frames.slice(123, 1))
-	);
 }
