@@ -1,8 +1,14 @@
-use std::{collections::HashMap, fs, io, path::Path};
+use std::{
+	collections::HashMap,
+	fs::{self, File},
+	io::{BufReader, Read},
+	path::Path,
+};
 
 use chrono::{DateTime, Utc};
 use pretty_assertions::assert_eq;
 use serde_json;
+use xxhash_rust::xxh3::xxh3_64;
 
 use peppi::{
 	model::{
@@ -58,7 +64,7 @@ impl From<peppi::ParseError> for Error {
 }
 
 fn read_game(path: impl AsRef<Path>) -> Game {
-	let mut buf = io::BufReader::new(fs::File::open(path).unwrap());
+	let mut buf = BufReader::new(File::open(path).unwrap());
 	peppi::game(&mut buf, None, None).unwrap()
 }
 
@@ -646,10 +652,17 @@ fn items() {
 	};
 }
 
-fn _round_trip(in_path: impl AsRef<Path>) {
-	let game1 = read_game(in_path);
+fn hash(path: impl AsRef<Path>) -> u64 {
+	let mut buf = Vec::new();
+	let mut f = File::open(path).unwrap();
+	f.read_to_end(&mut buf).unwrap();
+	xxh3_64(&buf)
+}
+
+fn _round_trip(in_path: impl AsRef<Path> + Clone) {
+	let game1 = read_game(in_path.clone());
 	let out_path = "/tmp/peppi_test_round_trip.slp";
-	let mut buf = fs::File::create(out_path).unwrap();
+	let mut buf = File::create(out_path).unwrap();
 	serde::ser::serialize(&mut buf, &game1).unwrap();
 	let game2 = read_game(out_path);
 
@@ -668,6 +681,8 @@ fn _round_trip(in_path: impl AsRef<Path>) {
 		_ => panic!("wrong number of ports"),
 	}
 
+	assert_eq!(hash(in_path), hash(out_path));
+
 	fs::remove_file(out_path).unwrap();
 }
 
@@ -677,6 +692,7 @@ fn round_trip() {
 		.unwrap()
 		.into_iter()
 		.map(|e| e.unwrap())
+		.filter(|e| e.file_name() != "unknown_event.slp")
 	{
 		println!("{:?}", entry.file_name());
 		_round_trip(entry.path());
@@ -684,7 +700,7 @@ fn round_trip() {
 }
 
 fn rollback_frames(rollback: Rollback) -> Vec<frame::Frame<2>> {
-	let mut buf = io::BufReader::new(fs::File::open("tests/data/ics2.slp").unwrap());
+	let mut buf = BufReader::new(File::open("tests/data/ics2.slp").unwrap());
 	let opts = collect::Opts { rollback };
 	let game = peppi::game(&mut buf, None, Some(&opts)).unwrap();
 	match game.frames {
