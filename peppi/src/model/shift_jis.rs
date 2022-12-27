@@ -35,10 +35,10 @@ impl TryFrom<&[u8]> for ShiftJis {
 fn fix_char(c: char) -> char {
 	let c = u32::from(c);
 	let c = match c {
-		0xff01..=0xff5e => c + 0x0020 - 0xff00,
-		0x3000 => 0x20,
-		0x2019 => 0x27,
-		0x201d => 0x22,
+		0xff01..=0xff5e => c + 0x0020 - 0xff00, // full-width => half-width
+		0x3000 => 0x20,                         // ideographic space => ascii space
+		0x2019 => 0x27,                         // ’ => '
+		0x201d => 0x22,                         // ” => "
 		_ => c,
 	};
 	char::try_from(c).unwrap()
