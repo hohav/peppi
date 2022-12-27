@@ -34,19 +34,14 @@ impl TryFrom<&[u8]> for ShiftJis {
 /// 4. Change Right Single/Double Quotation Mark (U+2019/U+201D) to their
 /// ascii equivalents
 fn fix_char(c: char) -> char {
-	let mut c: u32 = u32::from(c);
-
-	if c > 0xff00 && c < 0xff5f {
-		c = c + 0x0020 - 0xff00;
-	} else if c == 0x3000 {
-		c = 0x20;
-	} else if c == 0x301c {
-		c = 0x7e;
-	} else if c == 0x2019 {
-		c = 0x27;
-	} else if c == 0x201d {
-		c = 0x22;
-	}
-
+	let c = u32::from(c);
+	let c = match c {
+		0xff01..=0xff5e => c + 0x0020 - 0xff00,
+		0x3000 => 0x20,
+		0x301c => 0x7e,
+		0x2019 => 0x27,
+		0x201d => 0x22,
+		_ => c,
+	};
 	char::try_from(c).unwrap()
 }
