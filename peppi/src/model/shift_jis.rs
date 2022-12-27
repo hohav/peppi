@@ -30,15 +30,13 @@ impl TryFrom<&[u8]> for ShiftJis {
 /// 1. Map full-width code points to their half-width equivalents
 /// https://en.wikipedia.org/wiki/Halfwidth_and_Fullwidth_Forms_(Unicode_block)
 /// 2. Change ideographic space (U+3000) to ascii space
-/// 3. Change tilde (called WAVE DASH) (U+301C) to ascii tilde ~
-/// 4. Change Right Single/Double Quotation Mark (U+2019/U+201D) to their
+/// 3. Change Right Single/Double Quotation Mark (U+2019/U+201D) to their
 /// ascii equivalents
 fn fix_char(c: char) -> char {
 	let c = u32::from(c);
 	let c = match c {
 		0xff01..=0xff5e => c + 0x0020 - 0xff00,
 		0x3000 => 0x20,
-		0x301c => 0x7e,
 		0x2019 => 0x27,
 		0x201d => 0x22,
 		_ => c,
