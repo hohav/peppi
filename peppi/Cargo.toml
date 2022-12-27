@@ -22,7 +22,12 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 
 [dev-dependencies]
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
+criterion = "0.3"
 
 [lib]
 name = "peppi"
 path = "src/lib.rs"
+
+[[bench]]
+name = "peppi"
+harness = false
