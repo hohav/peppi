@@ -211,7 +211,7 @@ macro_rules! append_missing_frame_data {
 }
 
 impl de::Handlers for Collector {
-	fn gecko_codes(&mut self, codes: &[u8], actual_size: u16) -> Result<()> {
+	fn gecko_codes(&mut self, codes: &[u8], actual_size: u32) -> Result<()> {
 		self.gecko_codes = Some(GeckoCodes {
 			bytes: codes.to_vec(),
 			actual_size: actual_size,

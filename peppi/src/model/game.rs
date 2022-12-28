@@ -314,7 +314,7 @@ impl Frames {
 #[derive(Debug, PartialEq, Eq)]
 pub struct GeckoCodes {
 	pub bytes: Vec<u8>,
-	pub actual_size: u16,
+	pub actual_size: u32,
 }
 
 /// Replay data for a single game of Melee.

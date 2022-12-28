@@ -80,7 +80,8 @@ fn payload_sizes(game: &Game) -> Vec<(u8, u16)> {
 	}
 
 	if let Some(codes) = &game.gecko_codes {
-		sizes.push((Event::GeckoCodes as u8, codes.actual_size));
+		// Higher-order bits of actual_size are lost matching slippi-behavior
+		sizes.push((Event::GeckoCodes as u8, codes.actual_size as u16));
 	}
 
 	if ver.gte(3, 3) {
