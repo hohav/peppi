@@ -21,13 +21,18 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 
 [dev-dependencies]
-xxhash-rust = { version = "0.8", features = ["xxh3"] }
 criterion = "0.3"
+iai = "0.1"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
 
 [lib]
 name = "peppi"
 path = "src/lib.rs"
 
 [[bench]]
-name = "peppi"
+name = "criterion_benchmarks"
+harness = false
+
+[[bench]]
+name = "iai_benchmarks"
 harness = false
