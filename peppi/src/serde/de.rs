@@ -92,21 +92,31 @@ impl CharState {
 	}
 }
 
-// Technically the game can load any character as a follower, so we track them
-// too. The second half of the array holds data for the followers.
+// Technically melee can load any character as a follower, so we track them too
 #[derive(Debug, Default)]
-struct LastCharStates([CharState; 2 * NUM_PORTS]);
+struct LastCharStates {
+	leaders: [CharState; NUM_PORTS],
+	followers: [CharState; NUM_PORTS],
+}
 
 impl Index<PortId> for LastCharStates {
 	type Output = CharState;
 	fn index(&self, id: PortId) -> &Self::Output {
-		&self.0[id.port as usize + if id.is_follower { NUM_PORTS } else { 0 }]
+		if id.is_follower {
+			&self.followers[id.port as usize]
+		} else {
+			&self.leaders[id.port as usize]
+		}
 	}
 }
 
 impl IndexMut<PortId> for LastCharStates {
 	fn index_mut(&mut self, id: PortId) -> &mut Self::Output {
-		&mut self.0[id.port as usize + if id.is_follower { NUM_PORTS } else { 0 }]
+		if id.is_follower {
+			&mut self.followers[id.port as usize]
+		} else {
+			&mut self.leaders[id.port as usize]
+		}
 	}
 }
 
