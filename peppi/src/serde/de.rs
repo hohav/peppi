@@ -73,6 +73,11 @@ impl CharState {
 		const S_AIR: State = State::Sheik(action_state::Sheik::TRANSFORM_AIR);
 		const S_GROUND: State = State::Sheik(action_state::Sheik::TRANSFORM_GROUND);
 
+		self.character = Some(character);
+		if character != Internal::SHEIK && character != Internal::ZELDA {
+			// Skip state tracking for characters who can't transform
+			return;
+		}
 		self.age = match (self.state, state) {
 			(s0, s1) if s0 == s1 => self.age + 1,
 			// `TRANSFORM_AIR` can transition into `TRANSFORM_GROUND`
@@ -87,7 +92,6 @@ impl CharState {
 			(S_AIR, S_GROUND) | (S_GROUND, S_AIR) => min(SHEIK_TRANSFORM_FRAME - 1, self.age + 1),
 			_ => 0,
 		};
-		self.character = Some(character);
 		self.state = state;
 	}
 }
