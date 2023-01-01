@@ -21,8 +21,8 @@ use peppi::{
 		},
 		frame::{self, Buttons, Frame},
 		game::{
-			DashBack, End, EndMethod, Frames, Game, Language, Netplay, Player, PlayerType, Scene,
-			ShieldDrop, Start, Ucf,
+			self, DashBack, End, EndMethod, Frames, Game, Language, Netplay, Player, PlayerType,
+			Scene, ShieldDrop, Start, Ucf,
 		},
 		item::Item,
 		metadata::{self, Metadata},
@@ -640,6 +640,10 @@ fn frames<const N: usize>(f1: Vec<Frame<N>>, f2: Vec<Frame<N>>) {
 
 fn _round_trip(in_path: impl AsRef<Path> + Clone) {
 	let game1 = read_game(in_path.clone()).unwrap();
+	if game1.start.slippi.version > game::MAX_SUPPORTED_VERSION {
+		// Don't test serialization for replay versions we don't yet support
+		return;
+	}
 	let out_path = "/tmp/peppi_test_round_trip.slp";
 	let mut buf = File::create(out_path).unwrap();
 	serde::ser::serialize(&mut buf, &game1).unwrap();
