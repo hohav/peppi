@@ -35,7 +35,7 @@ impl TryFrom<&[u8]> for ShiftJis {
 	fn try_from(s: &[u8]) -> Result<ShiftJis> {
 		let first_null = s.iter().position(|&x| x == 0).unwrap_or(s.len());
 		match SHIFT_JIS.decode_without_bom_handling(&s[0..first_null]) {
-			(_, true) => Err(err!("malformed shift_jis sequence")),
+			(_, true) => Err(err!("invalid Shift JIS sequence")),
 			(cow, _) => Ok(ShiftJis(cow.to_string())),
 		}
 	}
