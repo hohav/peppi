@@ -3,13 +3,28 @@ use serde::Serialize;
 
 use std::io::Result;
 
+/// Melee encodes strings using the Shift JIS character encoding for Japanese.
+/// This type represents a Shift JIS string that has been decoded to utf-8.
+/// While this decoded string is valid utf-8, many characters are represented
+/// unusually. For that reason, most users should use
+/// [to_normalized](crate::model::shift_jis::ShiftJis::to_normalized) when
+/// working with this type.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct ShiftJis(pub String);
 
 impl ShiftJis {
+	/// Returns the decoded string as-is in utf-8.
 	pub fn as_str(&self) -> &str {
 		self.0.as_str()
 	}
+
+	/// Normalizes the decoded string and returns it.
+	/// Performs the following fixes:
+	/// 1. Map full-width code points to their half-width equivalents
+	/// <https://en.wikipedia.org/wiki/Halfwidth_and_Fullwidth_Forms_(Unicode_block)>
+	/// 2. Change ideographic space (U+3000) to ascii space
+	/// 3. Change Right Single/Double Quotation Mark (U+2019/U+201D) to their
+	/// ascii equivalents
 	pub fn to_normalized(&self) -> String {
 		self.0.clone().chars().map(fix_char).collect::<String>()
 	}
@@ -26,12 +41,6 @@ impl TryFrom<&[u8]> for ShiftJis {
 	}
 }
 
-/// Performs the following fixes:
-/// 1. Map full-width code points to their half-width equivalents
-/// https://en.wikipedia.org/wiki/Halfwidth_and_Fullwidth_Forms_(Unicode_block)
-/// 2. Change ideographic space (U+3000) to ascii space
-/// 3. Change Right Single/Double Quotation Mark (U+2019/U+201D) to their
-/// ascii equivalents
 fn fix_char(c: char) -> char {
 	let c = u32::from(c);
 	let c = match c {
