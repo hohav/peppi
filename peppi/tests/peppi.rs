@@ -564,7 +564,7 @@ fn items() {
 				Item {
 					id: 0,
 					damage: 0,
-					direction: Some(Direction::Right),
+					direction: Direction::Right,
 					position: Position {
 						x: -62.709_606,
 						y: -1.493_274_9
@@ -582,7 +582,7 @@ fn items() {
 				Item {
 					id: 1,
 					damage: 0,
-					direction: Some(Direction::Left),
+					direction: Direction::Left,
 					position: Position {
 						x: 20.395_56,
 						y: -1.493_274_9
@@ -600,7 +600,7 @@ fn items() {
 				Item {
 					id: 2,
 					damage: 0,
-					direction: Some(Direction::Right),
+					direction: Direction::Right,
 					position: Position {
 						x: -3.982_539_2,
 						y: -1.493_274_9

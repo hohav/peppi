@@ -233,7 +233,7 @@ fn item<W: Write>(w: &mut W, i: &item::Item, ver: Version, frame_idx: i32) -> Re
 
 	w.write_u16::<BE>(i.r#type.0)?;
 	w.write_u8(i.state.0)?;
-	w.write_f32::<BE>(i.direction.map(|d| d.into()).unwrap_or(0.0))?;
+	w.write_f32::<BE>(i.direction.into())?;
 	w.write_f32::<BE>(i.velocity.x)?;
 	w.write_f32::<BE>(i.velocity.y)?;
 	w.write_f32::<BE>(i.position.x)?;

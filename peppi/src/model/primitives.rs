@@ -38,6 +38,7 @@ impl Default for Port {
 pub enum Direction {
 	Left,
 	Right,
+	Neither,
 }
 
 impl Default for Direction {
@@ -47,16 +48,14 @@ impl Default for Direction {
 }
 
 /// Melee represents direction as f32 for some reason
-impl TryFrom<f32> for Direction {
-	type Error = std::io::ErrorKind;
-
-	fn try_from(x: f32) -> Result<Self, Self::Error> {
+impl From<f32> for Direction {
+	fn from(x: f32) -> Self {
 		if x < 0.0 {
-			Ok(Direction::Left)
+			Direction::Left
 		} else if x > 0.0 {
-			Ok(Direction::Right)
+			Direction::Right
 		} else {
-			Err(Self::Error::InvalidData)
+			Direction::Neither
 		}
 	}
 }
@@ -66,6 +65,7 @@ impl From<Direction> for f32 {
 		match d {
 			Direction::Left => -1.0,
 			Direction::Right => 1.0,
+			Direction::Neither => 0.0,
 		}
 	}
 }

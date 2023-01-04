@@ -14,7 +14,7 @@ pub struct Item {
 
 	pub state: State,
 
-	pub direction: Option<Direction>,
+	pub direction: Direction,
 
 	pub position: Position,
 
