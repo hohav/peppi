@@ -27,7 +27,7 @@ use peppi::{
 		item::Item,
 		metadata::{self, Metadata},
 		primitives::{Direction, Port, Position, Velocity},
-		shift_jis::ShiftJis,
+		shift_jis::MeleeString,
 		slippi::{Slippi, Version},
 	},
 	serde::{
@@ -458,10 +458,10 @@ fn v3_12() {
 						dash_back: Some(DashBack::UCF),
 						shield_drop: Some(ShieldDrop::UCF)
 					}),
-					name_tag: Some(ShiftJis("".to_string())),
+					name_tag: Some(MeleeString("".to_string())),
 					netplay: Some(Netplay {
-						name: ShiftJis("xxxxxx".to_string()),
-						code: ShiftJis("XX＃111".to_string()),
+						name: MeleeString("xxxxxx".to_string()),
+						code: MeleeString("XX＃111".to_string()),
 						suid: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string())
 					})
 				},
@@ -482,10 +482,10 @@ fn v3_12() {
 						dash_back: Some(DashBack::UCF),
 						shield_drop: Some(ShieldDrop::UCF)
 					}),
-					name_tag: Some(ShiftJis("".to_string())),
+					name_tag: Some(MeleeString("".to_string())),
 					netplay: Some(Netplay {
-						name: ShiftJis("yyyyyyyyyy".to_string()),
-						code: ShiftJis("YYYY＃222".to_string()),
+						name: MeleeString("yyyyyyyyyy".to_string()),
+						code: MeleeString("YYYY＃222".to_string()),
 						suid: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string())
 					})
 				}

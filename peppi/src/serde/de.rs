@@ -25,7 +25,7 @@ use crate::{
 		game::{self, Netplay, Player, PlayerType, MAX_PLAYERS, NUM_PORTS},
 		item::Item,
 		primitives::{Port, Position, Velocity},
-		shift_jis::ShiftJis,
+		shift_jis::MeleeString,
 		slippi, triggers,
 	},
 	ubjson,
@@ -251,7 +251,7 @@ fn player(
 
 	// v1_3
 	let name_tag = v1_3
-		.map(|v1_3| ShiftJis::try_from(v1_3.as_slice()))
+		.map(|v1_3| MeleeString::try_from(v1_3.as_slice()))
 		.transpose()?;
 
 	// v3.9
@@ -267,8 +267,8 @@ fn player(
 				})
 				.transpose()?;
 			Result::Ok(Netplay {
-				name: ShiftJis::try_from(name.as_slice())?,
-				code: ShiftJis::try_from(code.as_slice())?,
+				name: MeleeString::try_from(name.as_slice())?,
+				code: MeleeString::try_from(code.as_slice())?,
 				suid,
 			})
 		})
