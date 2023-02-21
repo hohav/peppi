@@ -232,5 +232,26 @@ pseudo_enum!(Type: u16 {
 	236 => BIRDO_EGG,
 });
 
+pseudo_enum!(TurnipType: u8 {
+	0 => SMILEY,
+	1 => BORED,
+	2 => SLEEPY,
+	3 => SHOCKED,
+	4 => LAUGHING,
+	5 => WINK,
+	6 => DOT_EYES,
+	7 => STITCH_FACE,
+});
+
+pseudo_enum!(MissileType: u8 {
+	0 => HOMING,
+	1 => SUPER,
+});
+
+pseudo_enum!(ChargeLaunched: u8 {
+	0 => CHARGING,
+	1 => LAUNCHED,
+});
+
 pseudo_enum!(State: u8 {
 });

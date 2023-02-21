@@ -24,7 +24,7 @@ use peppi::{
 			DashBack, End, EndMethod, Frames, Game, Language, Netplay, Player, PlayerType, Scene,
 			ShieldDrop, Start, Ucf,
 		},
-		item::Item,
+		item::{Item, MiscInfo},
 		metadata::{self, Metadata},
 		primitives::{Direction, Port, Position, Velocity},
 		slippi::{Slippi, Version},
@@ -573,7 +573,12 @@ fn items() {
 					timer: 140.0,
 					r#type: item::Type::PEACH_TURNIP,
 					velocity: Velocity { x: 0.0, y: 0.0 },
-					misc: Some([5, 5, 5, 5]),
+					misc_info: Some(MiscInfo {
+						missile_type: item::MissileType(5),
+						turnip_type: item::TurnipType::WINK,
+						charge_launched: item::ChargeLaunched(5),
+						charge_power: 5,
+					}),
 					owner: Some(Some(Port::P1)),
 				}
 			);
@@ -591,7 +596,12 @@ fn items() {
 					timer: 140.0,
 					r#type: item::Type::PEACH_TURNIP,
 					velocity: Velocity { x: 0.0, y: 0.0 },
-					misc: Some([5, 0, 5, 5]),
+					misc_info: Some(MiscInfo {
+						missile_type: item::MissileType(5),
+						turnip_type: item::TurnipType::SMILEY,
+						charge_launched: item::ChargeLaunched(5),
+						charge_power: 5,
+					}),
 					owner: Some(Some(Port::P1)),
 				}
 			);
@@ -609,7 +619,12 @@ fn items() {
 					timer: 140.0,
 					r#type: item::Type::PEACH_TURNIP,
 					velocity: Velocity { x: 0.0, y: 0.0 },
-					misc: Some([5, 0, 5, 5]),
+					misc_info: Some(MiscInfo {
+						missile_type: item::MissileType(5),
+						turnip_type: item::TurnipType::SMILEY,
+						charge_launched: item::ChargeLaunched(5),
+						charge_power: 5,
+					}),
 					owner: Some(Some(Port::P1)),
 				}
 			);

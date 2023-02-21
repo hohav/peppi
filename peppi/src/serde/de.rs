@@ -24,7 +24,7 @@ use crate::{
 		},
 		frame::{self, Post, Pre},
 		game::{self, Netplay, Player, PlayerType, MAX_PLAYERS, NUM_PORTS},
-		item::Item,
+		item::{Item, MiscInfo},
 		primitives::{Port, Position, Velocity},
 		slippi, triggers,
 	},
@@ -512,39 +512,56 @@ fn frame_end(r: &mut &[u8]) -> Result<FrameEvent<FrameId, frame::End>> {
 }
 
 fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, Item>> {
-	let id = FrameId::new(r.read_i32::<BE>()?);
-	trace!("Item Update: {:?}", id);
+	let frame_id = FrameId::new(r.read_i32::<BE>()?);
+	trace!("Item Update: {:?}", frame_id);
 	let r#type = item::Type(r.read_u16::<BE>()?);
+	let state = item::State(r.read_u8()?);
+	let direction = {
+		let x = r.read_f32::<BE>()?;
+		if x == 0.0 {
+			None
+		} else {
+			Some(x.try_into()?)
+		}
+	};
+	let velocity = Velocity {
+		x: r.read_f32::<BE>()?,
+		y: r.read_f32::<BE>()?,
+	};
+	let position = Position {
+		x: r.read_f32::<BE>()?,
+		y: r.read_f32::<BE>()?,
+	};
+	let damage = r.read_u16::<BE>()?;
+	let timer = r.read_f32::<BE>()?;
+	let id = r.read_u32::<BE>()?;
+	// v3.2
+	let misc_info = if_more(r, |r| {
+		Ok(MiscInfo {
+			missile_type: item::MissileType(r.read_u8()?),
+			turnip_type: item::TurnipType(r.read_u8()?),
+			charge_launched: item::ChargeLaunched(r.read_u8()?),
+			charge_power: r.read_u8()?,
+		})
+	})?;
+	// v3.6
+	let owner = if_more(r, |r| Ok(Port::try_from(r.read_u8()?).ok()))?;
+
 	Ok(FrameEvent {
-		id: id,
+		id: frame_id,
 		event: Item {
-			r#type: r#type,
-			state: item::State(r.read_u8()?),
-			direction: {
-				let x = r.read_f32::<BE>()?;
-				if x == 0.0 {
-					None
-				} else {
-					Some(x.try_into()?)
-				}
-			},
-			velocity: Velocity {
-				x: r.read_f32::<BE>()?,
-				y: r.read_f32::<BE>()?,
-			},
-			position: Position {
-				x: r.read_f32::<BE>()?,
-				y: r.read_f32::<BE>()?,
-			},
-			damage: r.read_u16::<BE>()?,
-			timer: r.read_f32::<BE>()?,
-			id: r.read_u32::<BE>()?,
+			r#type,
+			state,
+			direction,
+			velocity,
+			position,
+			damage,
+			timer,
+			id,
 			// v3.2
-			misc: if_more(r, |r| {
-				Ok([r.read_u8()?, r.read_u8()?, r.read_u8()?, r.read_u8()?])
-			})?,
+			misc_info,
 			// v3.6
-			owner: if_more(r, |r| Ok(Port::try_from(r.read_u8()?).ok()))?,
+			owner,
 		},
 	})
 }
