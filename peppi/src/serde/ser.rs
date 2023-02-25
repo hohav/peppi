@@ -100,7 +100,7 @@ fn gecko_codes<W: Write>(w: &mut W, codes: &GeckoCodes) -> Result<()> {
 		w.write_u16::<BE>(std::cmp::min(512, actual_size - pos) as u16)?;
 		w.write_u8(Event::GeckoCodes as u8)?;
 		pos += 512;
-		w.write_u8(if pos < actual_size { 0 } else { 1 })?;
+		w.write_u8(u8::from(pos >= actual_size))?;
 	}
 	Ok(())
 }

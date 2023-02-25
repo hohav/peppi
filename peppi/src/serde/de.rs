@@ -896,7 +896,7 @@ fn event<R: Read, H: Handlers, P: AsRef<Path>>(
 		.get(&code)
 		.ok_or_else(|| err!("unknown event: {}", code))? as usize;
 	let mut buf = vec![0; size];
-	r.read_exact(&mut *buf)?;
+	r.read_exact(&mut buf)?;
 
 	if code == 0x10 {
 		// message splitter
@@ -933,7 +933,7 @@ fn event<R: Read, H: Handlers, P: AsRef<Path>>(
 		};
 	}
 
-	Ok((1 + size as usize, event)) // +1 byte for the event code
+	Ok((size + 1, event)) // +1 byte for the event code
 }
 
 /// Options for parsing replays.
