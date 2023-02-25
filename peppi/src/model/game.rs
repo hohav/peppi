@@ -13,6 +13,7 @@ use crate::{
 		frame::{Frame, PortData},
 		metadata,
 		primitives::Port,
+		shift_jis::MeleeString,
 		slippi,
 	},
 	serde::de,
@@ -78,9 +79,9 @@ pub struct Ucf {
 /// Netplay name, connect code, and Slippi UID.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Netplay {
-	pub name: String,
+	pub name: MeleeString,
 
-	pub code: String,
+	pub code: MeleeString,
 
 	/// Slippi UID (added: v3.11)
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -125,7 +126,7 @@ pub struct Player {
 
 	/// in-game name-tag (added: v1.3)
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub name_tag: Option<String>,
+	pub name_tag: Option<MeleeString>,
 
 	/// netplay info (added: v3.9)
 	#[serde(skip_serializing_if = "Option::is_none")]

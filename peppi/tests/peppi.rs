@@ -19,7 +19,7 @@ use peppi::{
 			item,
 			stage::Stage,
 		},
-		frame::{self, Buttons},
+		frame::{self, Buttons, Frame},
 		game::{
 			DashBack, End, EndMethod, Frames, Game, Language, Netplay, Player, PlayerType, Scene,
 			ShieldDrop, Start, Ucf,
@@ -27,6 +27,7 @@ use peppi::{
 		item::Item,
 		metadata::{self, Metadata},
 		primitives::{Direction, Port, Position, Velocity},
+		shift_jis::MeleeString,
 		slippi::{Slippi, Version},
 	},
 	serde::{
@@ -457,10 +458,10 @@ fn v3_12() {
 						dash_back: Some(DashBack::UCF),
 						shield_drop: Some(ShieldDrop::UCF)
 					}),
-					name_tag: Some("".to_string()),
+					name_tag: Some(MeleeString("".to_string())),
 					netplay: Some(Netplay {
-						name: "xxxxxx".to_string(),
-						code: "XX＃111".to_string(),
+						name: MeleeString("xxxxxx".to_string()),
+						code: MeleeString("XX＃111".to_string()),
 						suid: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string())
 					})
 				},
@@ -481,10 +482,10 @@ fn v3_12() {
 						dash_back: Some(DashBack::UCF),
 						shield_drop: Some(ShieldDrop::UCF)
 					}),
-					name_tag: Some("".to_string()),
+					name_tag: Some(MeleeString("".to_string())),
 					netplay: Some(Netplay {
-						name: "yyyyyyyyyy".to_string(),
-						code: "YYYY＃222".to_string(),
+						name: MeleeString("yyyyyyyyyy".to_string()),
+						code: MeleeString("YYYY＃222".to_string()),
 						suid: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string())
 					})
 				}
@@ -625,6 +626,13 @@ fn hash(path: impl AsRef<Path>) -> u64 {
 	xxh3_64(&buf)
 }
 
+fn frames<const N: usize>(f1: Vec<Frame<N>>, f2: Vec<Frame<N>>) {
+	assert_eq!(f1.len(), f2.len());
+	for idx in 0..f1.len() {
+		assert_eq!(f1[idx], f2[idx], "frame: {}", idx);
+	}
+}
+
 fn _round_trip(in_path: impl AsRef<Path> + Clone) {
 	let game1 = read_game(in_path.clone());
 	let out_path = "/tmp/peppi_test_round_trip.slp";
@@ -638,12 +646,10 @@ fn _round_trip(in_path: impl AsRef<Path> + Clone) {
 	assert_eq!(game1.metadata_raw, game2.metadata_raw);
 
 	match (game1.frames, game2.frames) {
-		(Frames::P2(f1), Frames::P2(f2)) => {
-			assert_eq!(f1.len(), f2.len());
-			for idx in 0..f1.len() {
-				assert_eq!(f1[idx], f2[idx], "frame: {}", idx);
-			}
-		}
+		(Frames::P1(f1), Frames::P1(f2)) => frames(f1, f2),
+		(Frames::P2(f1), Frames::P2(f2)) => frames(f1, f2),
+		(Frames::P3(f1), Frames::P3(f2)) => frames(f1, f2),
+		(Frames::P4(f1), Frames::P4(f2)) => frames(f1, f2),
 		_ => panic!("wrong number of ports"),
 	}
 

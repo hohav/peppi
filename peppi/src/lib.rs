@@ -44,6 +44,7 @@ pub mod model {
 	pub mod item;
 	pub mod metadata;
 	pub mod primitives;
+	pub mod shift_jis;
 	pub mod slippi;
 	pub mod triggers;
 	pub mod enums {

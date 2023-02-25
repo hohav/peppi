@@ -7,7 +7,6 @@ use std::{
 };
 
 use byteorder::ReadBytesExt;
-use encoding_rs::SHIFT_JIS;
 use log::{debug, info, trace};
 use serde_json;
 
@@ -26,6 +25,7 @@ use crate::{
 		game::{self, Netplay, Player, PlayerType, MAX_PLAYERS, NUM_PORTS},
 		item::Item,
 		primitives::{Port, Position, Velocity},
+		shift_jis::MeleeString,
 		slippi, triggers,
 	},
 	ubjson,
@@ -250,38 +250,29 @@ fn player(
 	};
 
 	// v1_3
-	let name_tag = v1_3.map(|v1_3| {
-		let first_null = v1_3.iter().position(|&x| x == 0).unwrap_or(16);
-		SHIFT_JIS
-			.decode_without_bom_handling(&v1_3[0..first_null])
-			.0
-			.to_string()
-	});
+	let name_tag = v1_3
+		.map(|v1_3| MeleeString::try_from(v1_3.as_slice()))
+		.transpose()?;
 
 	// v3.9
-	let netplay = v3_9_name.zip(v3_9_code).map(|(name, code)| {
-		Netplay {
-			name: {
-				let first_null = name.iter().position(|&x| x == 0).unwrap_or(31);
-				SHIFT_JIS
-					.decode_without_bom_handling(&name[0..first_null])
-					.0
-					.to_string()
-			},
-			code: {
-				let first_null = code.iter().position(|&x| x == 0).unwrap_or(10);
-				SHIFT_JIS
-					.decode_without_bom_handling(&code[0..first_null])
-					.0
-					.to_string()
-			},
+	let netplay = v3_9_name
+		.zip(v3_9_code)
+		.map(|(name, code)| {
 			// v3.11
-			suid: v3_11.map(|v3_11| {
-				let first_null = v3_11.iter().position(|&x| x == 0).unwrap_or(28);
-				String::from_utf8_lossy(&v3_11[0..first_null]).to_string()
-			}),
-		}
-	});
+			let suid = v3_11
+				.map(|v3_11| {
+					let first_null = v3_11.iter().position(|&x| x == 0).unwrap_or(28);
+					let result = std::str::from_utf8(&v3_11[0..first_null]);
+					result.map(String::from).map_err(|_| err!("invalid suid"))
+				})
+				.transpose()?;
+			Result::Ok(Netplay {
+				name: MeleeString::try_from(name.as_slice())?,
+				code: MeleeString::try_from(code.as_slice())?,
+				suid,
+			})
+		})
+		.transpose()?;
 
 	Ok(match r#type {
 		PlayerType::HUMAN | PlayerType::CPU | PlayerType::DEMO => Some(Player {
