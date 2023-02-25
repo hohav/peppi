@@ -796,7 +796,7 @@ pub trait Handlers {
 	// https://github.com/project-slippi/slippi-wiki/blob/master/SPEC.md
 
 	/// List of enabled Gecko codes. Currently unparsed.
-	fn gecko_codes(&mut self, _codes: &[u8], _actual_size: u16) -> Result<()> {
+	fn gecko_codes(&mut self, _codes: &[u8], _actual_size: u32) -> Result<()> {
 		Ok(())
 	}
 
@@ -851,21 +851,23 @@ fn expect_bytes<R: Read>(r: &mut R, expected: &[u8]) -> Result<()> {
 	}
 }
 
-fn handle_splitter_event(buf: &[u8], accumulator: &mut Option<Vec<u8>>) -> Result<Option<u8>> {
+#[derive(Default)]
+struct SplitAccumulator {
+	raw: Vec<u8>,
+	actual_size: u32,
+}
+
+fn handle_splitter_event(buf: &[u8], accumulator: &mut SplitAccumulator) -> Result<Option<u8>> {
 	assert_eq!(buf.len(), 516);
 	let actual_size = (&buf[512..514]).read_u16::<BE>()?;
 	assert!(actual_size <= 512);
 	let wrapped_event = buf[514];
 	let is_final = buf[515] != 0;
 
-	if accumulator.is_none() {
-		*accumulator = Some(Vec::new());
-	}
-	let accumulator = accumulator.as_mut().unwrap();
-
 	// bytes beyond `actual_size` are meaningless,
 	// but save them anyway for lossless round-tripping
-	accumulator.extend_from_slice(&buf[0..512]);
+	accumulator.raw.extend_from_slice(&buf[0..512]);
+	accumulator.actual_size += actual_size as u32;
 
 	Ok(match is_final {
 		true => Some(wrapped_event),
@@ -883,7 +885,7 @@ fn event<R: Read, H: Handlers, P: AsRef<Path>>(
 	payload_sizes: &HashMap<u8, u16>,
 	last_char_states: &mut [CharState; NUM_PORTS],
 	handlers: &mut H,
-	splitter_accumulator: &mut Option<Vec<u8>>,
+	splitter_accumulator: &mut SplitAccumulator,
 	event_counts: &mut HashMap<u8, usize>,
 	debug_dir: Option<P>,
 ) -> Result<(usize, Option<Event>)> {
@@ -901,7 +903,7 @@ fn event<R: Read, H: Handlers, P: AsRef<Path>>(
 		if let Some(wrapped_event) = handle_splitter_event(&buf, splitter_accumulator)? {
 			code = wrapped_event;
 			buf.clear();
-			buf.append(splitter_accumulator.as_mut().unwrap());
+			buf.append(&mut splitter_accumulator.raw);
 		}
 	};
 
@@ -927,7 +929,7 @@ fn event<R: Read, H: Handlers, P: AsRef<Path>>(
 			FramePost => handlers.frame_post(frame_post(&mut &*buf, last_char_states)?)?,
 			FrameEnd => handlers.frame_end(frame_end(&mut &*buf)?)?,
 			Item => handlers.item(item(&mut &*buf)?)?,
-			GeckoCodes => handlers.gecko_codes(&buf, payload_sizes[&(GeckoCodes as u8)])?,
+			GeckoCodes => handlers.gecko_codes(&buf, splitter_accumulator.actual_size)?,
 		};
 	}
 
@@ -960,7 +962,7 @@ pub fn deserialize<R: Read, H: Handlers>(
 	let mut last_event: Option<Event> = None;
 	let skip_frames = opts.map(|o| o.skip_frames).unwrap_or(false);
 
-	let mut splitter_accumulator = None;
+	let mut splitter_accumulator = Default::default();
 
 	let debug_dir = opts.map(|o| o.debug_dir.as_ref()).unwrap_or(None);
 	// track how many of each event we've seen so we know where to put the debug output
