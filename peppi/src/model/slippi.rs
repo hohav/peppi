@@ -5,6 +5,12 @@ use serde::Serialize;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Version(pub u8, pub u8, pub u8);
 
+impl Default for Version {
+	fn default() -> Self {
+		Version(0, 1, 0)
+	}
+}
+
 impl Version {
 	pub fn gte(&self, major: u8, minor: u8) -> bool {
 		self.0 > major || (self.0 == major && self.1 >= minor)
