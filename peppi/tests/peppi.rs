@@ -404,7 +404,7 @@ fn netplay() {
 	let names: Vec<_> = players
 		.into_iter()
 		.flat_map(|p| p.netplay)
-		.map(|n| n.name)
+		.map(|n| n.display_name)
 		.collect();
 	assert_eq!(names, vec!["abcdefghijk", "nobody"]);
 }
@@ -460,7 +460,7 @@ fn v3_12() {
 					}),
 					name_tag: Some(MeleeString("".to_string())),
 					netplay: Some(Netplay {
-						name: MeleeString("xxxxxx".to_string()),
+						display_name: MeleeString("xxxxxx".to_string()),
 						code: MeleeString("XX＃111".to_string()),
 						suid: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string())
 					})
@@ -484,7 +484,7 @@ fn v3_12() {
 					}),
 					name_tag: Some(MeleeString("".to_string())),
 					netplay: Some(Netplay {
-						name: MeleeString("yyyyyyyyyy".to_string()),
+						display_name: MeleeString("yyyyyyyyyy".to_string()),
 						code: MeleeString("YYYY＃222".to_string()),
 						suid: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string())
 					})
@@ -569,14 +569,14 @@ fn items() {
 				items[&0],
 				Item {
 					id: 0,
-					damage: 0,
-					direction: Some(Direction::Right),
+					damage_taken: 0,
+					facing_direction: Some(Direction::Right),
 					position: Position {
 						x: -62.709_606,
 						y: -1.493_274_9
 					},
 					state: item::State(0),
-					timer: 140.0,
+					expiration_timer: 140.0,
 					r#type: item::Type::PEACH_TURNIP,
 					velocity: Velocity { x: 0.0, y: 0.0 },
 					misc: Some([5, 5, 5, 5]),
@@ -587,14 +587,14 @@ fn items() {
 				items[&1],
 				Item {
 					id: 1,
-					damage: 0,
-					direction: Some(Direction::Left),
+					damage_taken: 0,
+					facing_direction: Some(Direction::Left),
 					position: Position {
 						x: 20.395_56,
 						y: -1.493_274_9
 					},
 					state: item::State(0),
-					timer: 140.0,
+					expiration_timer: 140.0,
 					r#type: item::Type::PEACH_TURNIP,
 					velocity: Velocity { x: 0.0, y: 0.0 },
 					misc: Some([5, 0, 5, 5]),
@@ -605,14 +605,14 @@ fn items() {
 				items[&2],
 				Item {
 					id: 2,
-					damage: 0,
-					direction: Some(Direction::Right),
+					damage_taken: 0,
+					facing_direction: Some(Direction::Right),
 					position: Position {
 						x: -3.982_539_2,
 						y: -1.493_274_9
 					},
 					state: item::State(0),
-					timer: 140.0,
+					expiration_timer: 140.0,
 					r#type: item::Type::PEACH_TURNIP,
 					velocity: Velocity { x: 0.0, y: 0.0 },
 					misc: Some([5, 0, 5, 5]),

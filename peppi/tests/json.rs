@@ -77,7 +77,7 @@ fn json_start() {
 					},
 					"name_tag":"",
 					"netplay":{
-						"name":"xxxxxx",
+						"display_name":"xxxxxx",
 						"code":"XX＃111",
 						"suid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 					}
@@ -101,7 +101,7 @@ fn json_start() {
 					},
 					"name_tag":"",
 					"netplay":{
-						"name":"yyyyyyyyyy",
+						"display_name":"yyyyyyyyyy",
 						"code":"YYYY＃222",
 						"suid":"bbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 					}
