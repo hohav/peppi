@@ -1,11 +1,11 @@
 pseudo_enum!(Stage: u16 {
-	02 => FOUNTAIN_OF_DREAMS,
-	03 => POKEMON_STADIUM,
+	02 => FOUNTAIN_OF_DREAMS, // tournament legal, singles only
+	03 => POKEMON_STADIUM, // tournament legal
 	04 => PRINCESS_PEACHS_CASTLE,
 	05 => KONGO_JUNGLE,
 	06 => BRINSTAR,
 	07 => CORNERIA,
-	08 => YOSHIS_STORY,
+	08 => YOSHIS_STORY, // tournament legal
 	09 => ONETT,
 	10 => MUTE_CITY,
 	11 => RAINBOW_CRUISE,
@@ -24,9 +24,9 @@ pseudo_enum!(Stage: u16 {
 	25 => ICICLE_MOUNTAIN,
 	26 => ICETOP,
 	27 => FLAT_ZONE,
-	28 => DREAM_LAND_N64,
+	28 => DREAM_LAND_N64, // tournament legal
 	29 => YOSHIS_ISLAND_N64,
 	30 => KONGO_JUNGLE_N64,
-	31 => BATTLEFIELD,
-	32 => FINAL_DESTINATION,
+	31 => BATTLEFIELD, // tournament legal
+	32 => FINAL_DESTINATION, // tournament legal
 });

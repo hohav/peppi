@@ -107,6 +107,8 @@ impl From<u16> for State {
 	}
 }
 
+// Global action state IDs
+
 pseudo_enum!(Common: u16 {
 	000 => DEAD_DOWN,
 	001 => DEAD_LEFT,
@@ -119,9 +121,10 @@ pseudo_enum!(Common: u16 {
 	008 => DEAD_UP_FALL_HIT_CAMERA_FLAT,
 	009 => DEAD_UP_FALL_ICE,
 	010 => DEAD_UP_FALL_HIT_CAMERA_ICE,
-	011 => SLEEP,
+	011 => SLEEP, // "Nothing" state, used for shiek/zelda when the other is inactive, or when teammate runs out of stocks
 	012 => REBIRTH,
 	013 => REBIRTH_WAIT,
+
 	014 => WAIT,
 	015 => WALK_SLOW,
 	016 => WALK_MIDDLE,
@@ -132,57 +135,62 @@ pseudo_enum!(Common: u16 {
 	021 => RUN,
 	022 => RUN_DIRECT,
 	023 => RUN_BRAKE,
-	024 => KNEE_BEND,
+
+	024 => KNEE_BEND, // jumpsquat
 	025 => JUMP_F,
 	026 => JUMP_B,
-	027 => JUMP_AERIAL_F,
+	027 => JUMP_AERIAL_F, // double jump
 	028 => JUMP_AERIAL_B,
 	029 => FALL,
 	030 => FALL_F,
 	031 => FALL_B,
-	032 => FALL_AERIAL,
+	032 => FALL_AERIAL, // fall after double jump
 	033 => FALL_AERIAL_F,
 	034 => FALL_AERIAL_B,
-	035 => FALL_SPECIAL,
+	035 => FALL_SPECIAL, // non-actionable fall
 	036 => FALL_SPECIAL_F,
 	037 => FALL_SPECIAL_B,
-	038 => DAMAGE_FALL,
-	039 => SQUAT,
-	040 => SQUAT_WAIT,
-	041 => SQUAT_RV,
+	038 => DAMAGE_FALL, // tumble
+
+	039 => SQUAT, // stand -> crouch
+	040 => SQUAT_WAIT, // crouch loop
+	041 => SQUAT_RV, // crouch -> stand
 	042 => LANDING,
 	043 => LANDING_FALL_SPECIAL,
-	044 => ATTACK_11,
-	045 => ATTACK_12,
-	046 => ATTACK_13,
-	047 => ATTACK_100_START,
-	048 => ATTACK_100_LOOP,
-	049 => ATTACK_100_END,
-	050 => ATTACK_DASH,
-	051 => ATTACK_S_3_HI,
-	052 => ATTACK_S_3_HI_S,
-	053 => ATTACK_S_3_S,
-	054 => ATTACK_S_3_LW_S,
-	055 => ATTACK_S_3_LW,
-	056 => ATTACK_HI_3,
-	057 => ATTACK_LW_3,
-	058 => ATTACK_S_4_HI,
-	059 => ATTACK_S_4_HI_S,
-	060 => ATTACK_S_4_S,
-	061 => ATTACK_S_4_LW_S,
-	062 => ATTACK_S_4_LW,
-	063 => ATTACK_HI_4,
-	064 => ATTACK_LW_4,
-	065 => ATTACK_AIR_N,
-	066 => ATTACK_AIR_F,
-	067 => ATTACK_AIR_B,
-	068 => ATTACK_AIR_HI,
-	069 => ATTACK_AIR_LW,
-	070 => LANDING_AIR_N,
-	071 => LANDING_AIR_F,
-	072 => LANDING_AIR_B,
-	073 => LANDING_AIR_HI,
-	074 => LANDING_AIR_LW,
+
+	044 => ATTACK_11, // jab 1
+	045 => ATTACK_12, // jab 2
+	046 => ATTACK_13, // jab 3
+	047 => ATTACK_100_START, // rapid jab start
+	048 => ATTACK_100_LOOP, // rapid jab loop
+	049 => ATTACK_100_END, // rapid jab end
+	050 => ATTACK_DASH, // dash attack
+	051 => ATTACK_S_3_HI, // up-angled ftilt
+	052 => ATTACK_S_3_HI_S, // slight up-angled ftilt
+	053 => ATTACK_S_3_S, // no-angle ftilt
+	054 => ATTACK_S_3_LW_S, // slight down-angled ftilt
+	055 => ATTACK_S_3_LW, // down-angled ftilt
+	056 => ATTACK_HI_3, // utilt
+	057 => ATTACK_LW_3, // dtilt
+	058 => ATTACK_S_4_HI, // up-angled fsmash
+	059 => ATTACK_S_4_HI_S, // slight up-angled fsmash
+	060 => ATTACK_S_4_S, // no-angle fsmash
+	061 => ATTACK_S_4_LW_S, // slight down-angled fsmash
+	062 => ATTACK_S_4_LW, // down-angled fsmash
+	063 => ATTACK_HI_4, // usmash
+	064 => ATTACK_LW_4, // dsmash
+	065 => ATTACK_AIR_N, // nair
+	066 => ATTACK_AIR_F, // fair
+	067 => ATTACK_AIR_B, // bair
+	068 => ATTACK_AIR_HI, // uair
+	069 => ATTACK_AIR_LW, // dair
+	070 => LANDING_AIR_N, // nair landlag
+	071 => LANDING_AIR_F, // fair landlag
+	072 => LANDING_AIR_B, // bair landlag
+	073 => LANDING_AIR_HI, // uair landlag
+	074 => LANDING_AIR_LW, // dair landlag
+
+	// generic damage animations
 	075 => DAMAGE_HI_1,
 	076 => DAMAGE_HI_2,
 	077 => DAMAGE_HI_3,
@@ -200,8 +208,10 @@ pseudo_enum!(Common: u16 {
 	089 => DAMAGE_FLY_LW,
 	090 => DAMAGE_FLY_TOP,
 	091 => DAMAGE_FLY_ROLL,
-	092 => LIGHT_GET,
-	093 => HEAVY_GET,
+
+	092 => LIGHT_GET, // picking up most items
+	093 => HEAVY_GET, // picking up heavy items (e.g. barrels)
+	// regular item throw
 	094 => LIGHT_THROW_F,
 	095 => LIGHT_THROW_B,
 	096 => LIGHT_THROW_HI,
@@ -216,6 +226,7 @@ pseudo_enum!(Common: u16 {
 	105 => HEAVY_THROW_B,
 	106 => HEAVY_THROW_HI,
 	107 => HEAVY_THROW_LW,
+	// smash item throw
 	108 => LIGHT_THROW_F_4,
 	109 => LIGHT_THROW_B_4,
 	110 => LIGHT_THROW_HI_4,
@@ -228,6 +239,7 @@ pseudo_enum!(Common: u16 {
 	117 => HEAVY_THROW_B_4,
 	118 => HEAVY_THROW_HI_4,
 	119 => HEAVY_THROW_LW_4,
+	// item-specific
 	120 => SWORD_SWING_1,
 	121 => SWORD_SWING_3,
 	122 => SWORD_SWING_4,
@@ -286,19 +298,25 @@ pseudo_enum!(Common: u16 {
 	175 => LIFT_WALK_1,
 	176 => LIFT_WALK_2,
 	177 => LIFT_TURN,
+
+	// shield
 	178 => GUARD_ON,
 	179 => GUARD,
 	180 => GUARD_OFF,
 	181 => GUARD_SET_OFF,
 	182 => GUARD_REFLECT,
-	183 => DOWN_BOUND_U,
-	184 => DOWN_WAIT_U,
-	185 => DOWN_DAMAGE_U,
-	186 => DOWN_STAND_U,
-	187 => DOWN_ATTACK_U,
-	188 => DOWN_FOWARD_U,
-	189 => DOWN_BACK_U,
-	190 => DOWN_SPOT_U,
+
+	// tech
+	// missed tech facing up
+	183 => DOWN_BOUND_U, // missed tech bounce
+	184 => DOWN_WAIT_U, // downed
+	185 => DOWN_DAMAGE_U, // jab reset
+	186 => DOWN_STAND_U, // neutral getup
+	187 => DOWN_ATTACK_U, // getup attack
+	188 => DOWN_FOWARD_U, // missed tech roll forward
+	189 => DOWN_BACK_U, // missed tech roll backwards
+	190 => DOWN_SPOT_U, // does not appear to be used
+	// missed tech facing down
 	191 => DOWN_BOUND_D,
 	192 => DOWN_WAIT_D,
 	193 => DOWN_DAMAGE_D,
@@ -307,82 +325,105 @@ pseudo_enum!(Common: u16 {
 	196 => DOWN_FOWARD_D,
 	197 => DOWN_BACK_D,
 	198 => DOWN_SPOT_D,
-	199 => PASSIVE,
-	200 => PASSIVE_STAND_F,
-	201 => PASSIVE_STAND_B,
-	202 => PASSIVE_WALL,
-	203 => PASSIVE_WALL_JUMP,
-	204 => PASSIVE_CEIL,
-	205 => SHIELD_BREAK_FLY,
-	206 => SHIELD_BREAK_FALL,
+	// successful tech
+	199 => PASSIVE, // neutral tech
+	200 => PASSIVE_STAND_F, // tech forward
+	201 => PASSIVE_STAND_B, // tech backward
+	202 => PASSIVE_WALL, // walltech
+	203 => PASSIVE_WALL_JUMP, // walljump & walljump tech
+	204 => PASSIVE_CEIL, // ceiling tech
+
+	205 => SHIELD_BREAK_FLY, // Initial bounce when shield is broken
+	206 => SHIELD_BREAK_FALL, // fall during shield break
 	207 => SHIELD_BREAK_DOWN_U,
 	208 => SHIELD_BREAK_DOWN_D,
 	209 => SHIELD_BREAK_STAND_U,
 	210 => SHIELD_BREAK_STAND_D,
-	211 => FURA_FURA,
-	212 => CATCH,
-	213 => CATCH_PULL,
-	214 => CATCH_DASH,
-	215 => CATCH_DASH_PULL,
-	216 => CATCH_WAIT,
-	217 => CATCH_ATTACK,
-	218 => CATCH_CUT,
+	211 => FURA_FURA, // shield break totter
+
+	// grab/throw
+	//grabbing
+	212 => CATCH, // grab
+	213 => CATCH_PULL, // successful grab, pulling opponent in
+	214 => CATCH_DASH, // dash grab
+	215 => CATCH_DASH_PULL, // successful dashgrab
+	216 => CATCH_WAIT, // grab hold
+	217 => CATCH_ATTACK, // pummel
+	218 => CATCH_CUT, // opponent breaks out of grab
+	// throw
 	219 => THROW_F,
 	220 => THROW_B,
 	221 => THROW_HI,
 	222 => THROW_LW,
+	// being grabbed
 	223 => CAPTURE_PULLED_HI,
 	224 => CAPTURE_WAIT_HI,
 	225 => CAPTURE_DAMAGE_HI,
 	226 => CAPTURE_PULLED_LW,
 	227 => CAPTURE_WAIT_LW,
 	228 => CAPTURE_DAMAGE_LW,
-	229 => CAPTURE_CUT,
-	230 => CAPTURE_JUMP,
-	231 => CAPTURE_NECK,
-	232 => CAPTURE_FOOT,
-	233 => ESCAPE_F,
-	234 => ESCAPE_B,
-	235 => ESCAPE,
-	236 => ESCAPE_AIR,
+	// grab end
+	229 => CAPTURE_CUT, // released from grab
+	230 => CAPTURE_JUMP, // jumping release from grab
+	231 => CAPTURE_NECK, // does not appear to be used
+	232 => CAPTURE_FOOT, // does not appear to be used
+
+	// shield options
+	233 => ESCAPE_F, // roll forward
+	234 => ESCAPE_B, // roll backward
+	235 => ESCAPE, // spot dodge
+	236 => ESCAPE_AIR, // air dodge
+
 	237 => REBOUND_STOP,
 	238 => REBOUND,
+
+	// being thrown
 	239 => THROWN_F,
 	240 => THROWN_B,
 	241 => THROWN_HI,
 	242 => THROWN_LW,
 	243 => THROWN_LW_WOMEN,
-	244 => PASS,
-	245 => OTTOTTO,
+
+	244 => PASS, // drop through platform
+	245 => OTTOTTO, // ledge teter
 	246 => OTTOTTO_WAIT,
-	247 => FLY_REFLECT_WALL,
-	248 => FLY_REFLECT_CEIL,
-	249 => STOP_WALL,
-	250 => STOP_CEIL,
-	251 => MISS_FOOT,
-	252 => CLIFF_CATCH,
-	253 => CLIFF_WAIT,
-	254 => CLIFF_CLIMB_SLOW,
-	255 => CLIFF_CLIMB_QUICK,
-	256 => CLIFF_ATTACK_SLOW,
-	257 => CLIFF_ATTACK_QUICK,
-	258 => CLIFF_ESCAPE_SLOW,
-	259 => CLIFF_ESCAPE_QUICK,
-	260 => CLIFF_JUMP_SLOW_1,
-	261 => CLIFF_JUMP_SLOW_2,
-	262 => CLIFF_JUMP_QUICK_1,
-	263 => CLIFF_JUMP_QUICK_2,
-	264 => APPEAL_R,
-	265 => APPEAL_L,
+	247 => FLY_REFLECT_WALL, // missed walltech
+	248 => FLY_REFLECT_CEIL, // missed ceiling tech
+	249 => STOP_WALL, // wall bonk
+	250 => STOP_CEIL, // ceiling bonk
+	251 => MISS_FOOT, // backwards shield slideoff
+
+	// ledge
+	252 => CLIFF_CATCH, // ledge grab
+	253 => CLIFF_WAIT, // ledge hang
+	254 => CLIFF_CLIMB_SLOW, // regular getup >100%
+	255 => CLIFF_CLIMB_QUICK, // regular getup <100%
+	256 => CLIFF_ATTACK_SLOW, // ledge attack >100%
+	257 => CLIFF_ATTACK_QUICK, // ledge attack <100%
+	258 => CLIFF_ESCAPE_SLOW, // ledge roll >100%
+	259 => CLIFF_ESCAPE_QUICK, // ledge roll <100%
+	260 => CLIFF_JUMP_SLOW_1, // ledge jump >100%
+	261 => CLIFF_JUMP_SLOW_2, // ledge jump >100%
+	262 => CLIFF_JUMP_QUICK_1, // ledge jump <100%
+	263 => CLIFF_JUMP_QUICK_2, // ledge jump <100%
+
+	// taunt
+	264 => APPEAL_R, // facing right
+	265 => APPEAL_L, // facing left
+
+	//dk cargo carry
 	266 => SHOULDERED_WAIT,
 	267 => SHOULDERED_WALK_SLOW,
 	268 => SHOULDERED_WALK_MIDDLE,
 	269 => SHOULDERED_WALK_FAST,
 	270 => SHOULDERED_TURN,
+
+	//dk cargo throws
 	271 => THROWN_F_F,
 	272 => THROWN_F_B,
 	273 => THROWN_F_HI,
 	274 => THROWN_F_LW,
+
 	275 => CAPTURE_CAPTAIN,
 	276 => CAPTURE_YOSHI,
 	277 => YOSHI_EGG,
@@ -396,23 +437,23 @@ pseudo_enum!(Common: u16 {
 	285 => CAPTURE_WAIT_KOOPA_AIR,
 	286 => THROWN_KOOPA_AIR_F,
 	287 => THROWN_KOOPA_AIR_B,
-	288 => CAPTURE_KIRBY,
-	289 => CAPTURE_WAIT_KIRBY,
-	290 => THROWN_KIRBY_STAR,
-	291 => THROWN_COPY_STAR,
+	288 => CAPTURE_KIRBY, // kirby succ
+	289 => CAPTURE_WAIT_KIRBY, // held in kirby's mouth
+	290 => THROWN_KIRBY_STAR, // kirby spit
+	291 => THROWN_COPY_STAR, // kirby swallow
 	292 => THROWN_KIRBY,
 	293 => BARREL_WAIT,
-	294 => BURY,
+	294 => BURY, // stuck in ground by dk side b or similar
 	295 => BURY_WAIT,
 	296 => BURY_JUMP,
-	297 => DAMAGE_SONG,
+	297 => DAMAGE_SONG, // put to sleep by jiggs up b or similar
 	298 => DAMAGE_SONG_WAIT,
 	299 => DAMAGE_SONG_RV,
-	300 => DAMAGE_BIND,
-	301 => CAPTURE_MEWTWO,
-	302 => CAPTURE_MEWTWO_AIR,
-	303 => THROWN_MEWTWO,
-	304 => THROWN_MEWTWO_AIR,
+	300 => DAMAGE_BIND, // hit by mewtwo disable
+	301 => CAPTURE_MEWTWO, // does not appear to be used
+	302 => CAPTURE_MEWTWO_AIR, // does not appear to be used
+	303 => THROWN_MEWTWO, // hit by mewtwo confusion
+	304 => THROWN_MEWTWO_AIR, // hit by mewtwo confusion
 	305 => WARP_STAR_JUMP,
 	306 => WARP_STAR_FALL,
 	307 => HAMMER_WAIT,
@@ -422,6 +463,7 @@ pseudo_enum!(Common: u16 {
 	311 => HAMMER_FALL,
 	312 => HAMMER_JUMP,
 	313 => HAMMER_LANDING,
+	// super/poison mushroom
 	314 => KINOKO_GIANT_START,
 	315 => KINOKO_GIANT_START_AIR,
 	316 => KINOKO_GIANT_END,
@@ -430,9 +472,11 @@ pseudo_enum!(Common: u16 {
 	319 => KINOKO_SMALL_START_AIR,
 	320 => KINOKO_SMALL_END,
 	321 => KINOKO_SMALL_END_AIR,
+	// warp in on match start
 	322 => ENTRY,
 	323 => ENTRY_START,
 	324 => ENTRY_END,
+
 	325 => DAMAGE_ICE,
 	326 => DAMAGE_ICE_JUMP,
 	327 => CAPTURE_MASTER_HAND,
@@ -443,13 +487,15 @@ pseudo_enum!(Common: u16 {
 	332 => KIRBY_YOSHI_EGG,
 	333 => CAPTURE_REDEAD,
 	334 => CAPTURE_LIKE_LIKE,
-	335 => DOWN_REFLECT,
+	335 => DOWN_REFLECT, // down_bound_u or down_bound_d -> wallbounce. Not tech-able, nor is the next floor hit
 	336 => CAPTURE_CRAZY_HAND,
 	337 => CAPTURE_DAMAGE_CRAZY_HAND,
 	338 => CAPTURE_WAIT_CRAZY_HAND,
 	339 => THROWN_CRAZY_HAND,
 	340 => BARREL_CANNON_WAIT,
 });
+
+// Character specific action state IDs
 
 pseudo_enum!(Bowser: u16 {
 	341 => FIRE_BREATH_GROUND_STARTUP,
