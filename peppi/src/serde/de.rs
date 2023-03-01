@@ -267,7 +267,7 @@ fn player(
 				})
 				.transpose()?;
 			Result::Ok(Netplay {
-				name: MeleeString::try_from(name.as_slice())?,
+				display_name: MeleeString::try_from(name.as_slice())?,
 				code: MeleeString::try_from(code.as_slice())?,
 				suid,
 			})
@@ -511,7 +511,7 @@ fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, Item>> {
 		event: Item {
 			r#type: r#type,
 			state: item::State(r.read_u8()?),
-			direction: {
+			facing_direction: {
 				let x = r.read_f32::<BE>()?;
 				if x == 0.0 {
 					None
@@ -527,8 +527,8 @@ fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, Item>> {
 				x: r.read_f32::<BE>()?,
 				y: r.read_f32::<BE>()?,
 			},
-			damage: r.read_u16::<BE>()?,
-			timer: r.read_f32::<BE>()?,
+			damage_taken: r.read_u16::<BE>()?,
+			expiration_timer: r.read_f32::<BE>()?,
 			id: r.read_u32::<BE>()?,
 			// v3.2
 			misc: if_more(r, |r| {
@@ -611,7 +611,7 @@ fn frame_pre(
 			random_seed,
 			state,
 			position,
-			direction,
+			facing_direction: direction,
 			joystick,
 			cstick,
 			triggers,
@@ -619,7 +619,7 @@ fn frame_pre(
 			// v1.2
 			raw_analog_x,
 			// v1.4
-			damage,
+			percent: damage,
 		},
 	})
 }
@@ -726,14 +726,14 @@ fn frame_post(
 			let knockback_y = r.read_f32::<BE>()?;
 			let autogenous_x_ground = r.read_f32::<BE>()?;
 			frame::Velocities {
-				autogenous: Velocity {
+				self_induced: Velocity {
 					x: match airborne.unwrap() {
 						true => autogenous_x_air,
 						_ => autogenous_x_ground,
 					},
 					y: autogenous_y,
 				},
-				autogenous_x: frame::AutogenousXVelocity {
+				self_induced_x: frame::SelfXVelocity {
 					air: autogenous_x_air,
 					ground: autogenous_x_ground,
 				},
@@ -759,28 +759,28 @@ fn frame_post(
 			character,
 			state,
 			position,
-			direction,
-			damage,
-			shield,
+			facing_direction: direction,
+			percent: damage,
+			shield_health: shield,
 			last_attack_landed,
 			combo_count,
 			last_hit_by,
-			stocks,
+			stocks_remaining: stocks,
 			// v0.2
 			state_age,
 			// v2.0
 			flags,
 			misc_as,
-			airborne,
-			ground,
-			jumps,
+			is_airborne: airborne,
+			last_ground_id: ground,
+			jumps_remaining: jumps,
 			l_cancel,
 			// v2.1
 			hurtbox_state,
 			// v3.5
 			velocities,
 			// v3.8
-			hitlag,
+			hitlag_remaining: hitlag,
 			// v3.11
 			animation_index,
 		},

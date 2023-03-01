@@ -145,7 +145,7 @@ fn frame_pre<W: Write>(w: &mut W, p: &frame::Pre, ver: Version, id: PortId) -> R
 	w.write_u16::<BE>(p.state.into())?;
 	w.write_f32::<BE>(p.position.x)?;
 	w.write_f32::<BE>(p.position.y)?;
-	w.write_f32::<BE>(p.direction.into())?;
+	w.write_f32::<BE>(p.facing_direction.into())?;
 	w.write_f32::<BE>(p.joystick.x)?;
 	w.write_f32::<BE>(p.joystick.y)?;
 	w.write_f32::<BE>(p.cstick.x)?;
@@ -161,7 +161,7 @@ fn frame_pre<W: Write>(w: &mut W, p: &frame::Pre, ver: Version, id: PortId) -> R
 	}
 
 	if ver.gte(1, 4) {
-		w.write_f32::<BE>(p.damage.unwrap())?;
+		w.write_f32::<BE>(p.percent.unwrap())?;
 	}
 
 	Ok(())
@@ -177,13 +177,13 @@ fn frame_post<W: Write>(w: &mut W, p: &frame::Post, ver: Version, id: PortId) ->
 	w.write_u16::<BE>(p.state.into())?;
 	w.write_f32::<BE>(p.position.x)?;
 	w.write_f32::<BE>(p.position.y)?;
-	w.write_f32::<BE>(p.direction.into())?;
-	w.write_f32::<BE>(p.damage)?;
-	w.write_f32::<BE>(p.shield)?;
+	w.write_f32::<BE>(p.facing_direction.into())?;
+	w.write_f32::<BE>(p.percent)?;
+	w.write_f32::<BE>(p.shield_health)?;
 	w.write_u8(p.last_attack_landed.map(|a| a.0).unwrap_or(0))?;
 	w.write_u8(p.combo_count)?;
 	w.write_u8(p.last_hit_by.map(|p| p as u8).unwrap_or(6))?;
-	w.write_u8(p.stocks)?;
+	w.write_u8(p.stocks_remaining)?;
 
 	if ver.gte(0, 2) {
 		w.write_f32::<BE>(p.state_age.unwrap())?;
@@ -194,9 +194,9 @@ fn frame_post<W: Write>(w: &mut W, p: &frame::Post, ver: Version, id: PortId) ->
 		buf.as_mut().write_u64::<LittleEndian>(p.flags.unwrap().0)?;
 		w.write_all(&buf[0..5])?;
 		w.write_f32::<BE>(p.misc_as.unwrap())?;
-		w.write_u8(p.airborne.unwrap() as u8)?;
-		w.write_u16::<BE>(p.ground.unwrap().0)?;
-		w.write_u8(p.jumps.unwrap())?;
+		w.write_u8(p.is_airborne.unwrap() as u8)?;
+		w.write_u16::<BE>(p.last_ground_id.unwrap().0)?;
+		w.write_u8(p.jumps_remaining.unwrap())?;
 		w.write_u8(match p.l_cancel.unwrap() {
 			Some(true) => 1,
 			Some(false) => 2,
@@ -210,15 +210,15 @@ fn frame_post<W: Write>(w: &mut W, p: &frame::Post, ver: Version, id: PortId) ->
 
 	if ver.gte(3, 5) {
 		let vel = p.velocities.unwrap();
-		w.write_f32::<BE>(vel.autogenous_x.air)?;
-		w.write_f32::<BE>(vel.autogenous.y)?;
+		w.write_f32::<BE>(vel.self_induced_x.air)?;
+		w.write_f32::<BE>(vel.self_induced.y)?;
 		w.write_f32::<BE>(vel.knockback.x)?;
 		w.write_f32::<BE>(vel.knockback.y)?;
-		w.write_f32::<BE>(vel.autogenous_x.ground)?;
+		w.write_f32::<BE>(vel.self_induced_x.ground)?;
 	}
 
 	if ver.gte(3, 8) {
-		w.write_f32::<BE>(p.hitlag.unwrap())?;
+		w.write_f32::<BE>(p.hitlag_remaining.unwrap())?;
 	}
 
 	if ver.gte(3, 11) {
@@ -234,13 +234,13 @@ fn item<W: Write>(w: &mut W, i: &item::Item, ver: Version, frame_idx: i32) -> Re
 
 	w.write_u16::<BE>(i.r#type.0)?;
 	w.write_u8(i.state.0)?;
-	w.write_f32::<BE>(i.direction.map(|d| d.into()).unwrap_or(0.0))?;
+	w.write_f32::<BE>(i.facing_direction.map(|d| d.into()).unwrap_or(0.0))?;
 	w.write_f32::<BE>(i.velocity.x)?;
 	w.write_f32::<BE>(i.velocity.y)?;
 	w.write_f32::<BE>(i.position.x)?;
 	w.write_f32::<BE>(i.position.y)?;
-	w.write_u16::<BE>(i.damage)?;
-	w.write_f32::<BE>(i.timer)?;
+	w.write_u16::<BE>(i.damage_taken)?;
+	w.write_f32::<BE>(i.expiration_timer)?;
 	w.write_u32::<BE>(i.id)?;
 
 	if ver.gte(3, 2) {

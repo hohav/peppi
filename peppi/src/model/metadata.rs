@@ -18,7 +18,7 @@ pub struct Metadata {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Netplay {
 	pub code: String,
-	pub name: String,
+	pub display_name: String,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -160,7 +160,7 @@ fn metadata_player(port: Port, player: &Map<String, Value>) -> Result<Player> {
 					}
 					Some(Value::String(name)) => Some(Netplay {
 						code: code.clone(),
-						name: name.clone(),
+						display_name: name.clone(),
 					}),
 					name => {
 						return Err(err!(

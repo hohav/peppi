@@ -79,7 +79,7 @@ pub struct Ucf {
 /// Netplay name, connect code, and Slippi UID.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Netplay {
-	pub name: MeleeString,
+	pub display_name: MeleeString,
 
 	pub code: MeleeString,
 

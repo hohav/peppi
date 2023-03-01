@@ -14,15 +14,15 @@ pub struct Item {
 
 	pub state: State,
 
-	pub direction: Option<Direction>,
+	pub facing_direction: Option<Direction>,
 
 	pub position: Position,
 
 	pub velocity: Velocity,
 
-	pub damage: u16,
+	pub damage_taken: u16,
 
-	pub timer: f32,
+	pub expiration_timer: f32,
 
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "3.2")]

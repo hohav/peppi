@@ -12,28 +12,32 @@ use peppi_derive::Arrow;
 /// Controller button state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Arrow)]
 pub struct Buttons {
+	/// Bitfield representing all currently active buttons and analog inputs that the game engine uses to calculate the next frame
 	pub logical: buttons::Logical,
+	/// Bitfield representing all currently active buttons read by the console
 	pub physical: buttons::Physical,
 }
 
 /// Controller trigger state.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct Triggers {
+	/// The analog trigger value the game engine uses to calculate the next frame
 	pub logical: triggers::Logical,
+	/// The analog trigger values of each trigger read by the console
 	pub physical: triggers::Physical,
 }
 
 pseudo_bitmask!(StateFlags: u64 {
-	1u64 << 04 => REFLECT,
-	1u64 << 10 => UNTOUCHABLE,
-	1u64 << 11 => FAST_FALL,
+	1u64 << 04 => REFLECT_BUBBLE, // any reflect bubble is active
+	1u64 << 10 => STATE_INVULN, // used for state-based intang/invinc that is removed upon state change
+	1u64 << 11 => FAST_FALLING,
 	1u64 << 13 => HIT_LAG,
-	1u64 << 23 => SHIELD,
+	1u64 << 23 => SHIELDING,
 	1u64 << 25 => HIT_STUN,
-	1u64 << 26 => SHIELD_TOUCH,
-	1u64 << 29 => POWER_SHIELD,
-	1u64 << 35 => FOLLOWER,
-	1u64 << 36 => SLEEP,
+	1u64 << 26 => SHIELD_TOUCH, // per unclepunch this has to do with gfx on charge projectiles?
+	1u64 << 29 => POWER_SHIELD_BUBBLE, // powershield bubble is active
+	1u64 << 35 => FOLLOWER, // Nana
+	1u64 << 36 => INACTIVE, // shiek/zelda when other is in play, teammate with no stocks, etc. Should never appear in replays
 	1u64 << 38 => DEAD,
 	1u64 << 39 => OFF_SCREEN,
 });
@@ -70,7 +74,7 @@ pub struct End {
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct Velocities {
 	/// self-induced velocity
-	pub autogenous: Velocity,
+	pub self_induced: Velocity,
 
 	/// knockback-induced velocity
 	pub knockback: Velocity,
@@ -79,11 +83,11 @@ pub struct Velocities {
 	/// the character's `airborne` state. But we also keep the original values for round-tripping.
 	#[serde(skip)]
 	#[doc(hidden)]
-	pub autogenous_x: AutogenousXVelocity,
+	pub self_induced_x: SelfXVelocity,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
-pub struct AutogenousXVelocity {
+pub struct SelfXVelocity {
 	pub air: f32,
 	pub ground: f32,
 }
@@ -95,7 +99,7 @@ pub struct AutogenousXVelocity {
 pub struct Pre {
 	pub position: Position,
 
-	pub direction: Direction,
+	pub facing_direction: Direction,
 
 	pub joystick: Position,
 
@@ -115,7 +119,7 @@ pub struct Pre {
 
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "1.4")]
-	pub damage: Option<f32>,
+	pub percent: Option<f32>,
 }
 
 /// Post-frame update data, for computing stats etc.
@@ -131,13 +135,11 @@ pub struct Post {
 
 	pub position: Position,
 
-	pub direction: Direction,
+	pub facing_direction: Direction,
 
-	/// damage percent
-	pub damage: f32,
+	pub percent: f32,
 
-	/// shield size
-	pub shield: f32,
+	pub shield_health: f32,
 
 	pub last_attack_landed: Option<attack::Attack>,
 
@@ -146,7 +148,7 @@ pub struct Post {
 	pub last_hit_by: Option<Port>,
 
 	/// stocks remaining
-	pub stocks: u8,
+	pub stocks_remaining: u8,
 
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "0.2")]
@@ -163,17 +165,17 @@ pub struct Post {
 
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "2.0")]
-	pub airborne: Option<bool>,
+	pub is_airborne: Option<bool>,
 
 	/// ground the character is standing on, if any
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "2.0")]
-	pub ground: Option<ground::Ground>,
+	pub last_ground_id: Option<ground::Ground>,
 
 	/// jumps remaining
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "2.0")]
-	pub jumps: Option<u8>,
+	pub jumps_remaining: Option<u8>,
 
 	/// true = successful L-Cancel
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -191,7 +193,7 @@ pub struct Post {
 	/// hitlag remaining
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "3.8")]
-	pub hitlag: Option<f32>,
+	pub hitlag_remaining: Option<f32>,
 
 	/// animation the character is in (for Wait: 2 = Wait1, 3 = Wait2, 4 = Wait3)
 	#[serde(skip_serializing_if = "Option::is_none")]
