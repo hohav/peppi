@@ -76,7 +76,7 @@ pub struct Ucf {
 	pub shield_drop: Option<ShieldDrop>,
 }
 
-/// Netplay name, connect code, and Slippi UID.
+/// Netplay display name, connect code, and Slippi UID.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Netplay {
 	pub display_name: MeleeString,
