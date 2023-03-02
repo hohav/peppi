@@ -34,7 +34,7 @@ pseudo_bitmask!(StateFlags: u64 {
 	1u64 << 13 => HIT_LAG,
 	1u64 << 23 => SHIELDING,
 	1u64 << 25 => HIT_STUN,
-	1u64 << 26 => SHIELD_TOUCH, // per unclepunch this has to do with gfx on charge projectiles?
+	1u64 << 26 => SHIELD_TOUCH, // relevant to player touching other player's shield, but only activates under rare obscure circumstances
 	1u64 << 29 => POWER_SHIELD_BUBBLE, // powershield bubble is active
 	1u64 << 35 => FOLLOWER, // Nana
 	1u64 << 36 => INACTIVE, // shiek/zelda when other is in play, teammate with no stocks, etc. Should never appear in replays
