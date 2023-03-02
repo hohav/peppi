@@ -54,15 +54,6 @@ fn ics_ditto_event_handlers() {
 fn ics_ditto_skip_frames() {
 	skip_frames(path("ics_ditto"));
 }
-fn long_pause_into_game() {
-	into_game(path("long_pause"));
-}
-fn long_pause_event_handlers() {
-	event_handlers(path("long_pause"));
-}
-fn long_pause_skip_frames() {
-	skip_frames(path("long_pause"));
-}
 fn mango_zain_netplay_into_game() {
 	into_game(path("mango_zain_netplay"));
 }
@@ -101,9 +92,6 @@ iai::main!(
 	ics_ditto_into_game,
 	ics_ditto_event_handlers,
 	ics_ditto_skip_frames,
-	long_pause_into_game,
-	long_pause_event_handlers,
-	long_pause_skip_frames,
 	mango_zain_netplay_into_game,
 	mango_zain_netplay_event_handlers,
 	mango_zain_netplay_skip_frames,
