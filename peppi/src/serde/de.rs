@@ -51,7 +51,7 @@ struct CharState {
 
 pub(super) const PAYLOADS_EVENT_CODE: u8 = 0x35;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, num_enum::TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, num_enum::TryFromPrimitive)]
 #[repr(u8)]
 pub(super) enum Event {
 	GameStart = 0x36,
