@@ -1,10 +1,15 @@
 macro_rules! pseudo_bitmask {
-	($name: ident : $type: ty { $( $value: expr => $variant: ident ),* $(,)? }) => {
+	($name: ident : $type: ty {
+		$( $(#[$attr: meta])* ($value: expr) => $variant: ident ),* $(,)?
+	}) => {
 		#[derive(Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
 		pub struct $name(pub $type);
 
 		impl $name {
-			$( pub const $variant:$name = $name($value); )*
+			$(
+				$(#[$attr])*
+				pub const $variant:$name = $name($value);
+			)*
 		}
 
 		#[allow(clippy::bad_bit_mask)]

@@ -24,18 +24,18 @@ pub struct Triggers {
 }
 
 pseudo_bitmask!(StateFlags: u64 {
-	1u64 << 04 => REFLECT,
-	1u64 << 10 => UNTOUCHABLE,
-	1u64 << 11 => FAST_FALL,
-	1u64 << 13 => HIT_LAG,
-	1u64 << 23 => SHIELD,
-	1u64 << 25 => HIT_STUN,
-	1u64 << 26 => SHIELD_TOUCH,
-	1u64 << 29 => POWER_SHIELD,
-	1u64 << 35 => FOLLOWER,
-	1u64 << 36 => SLEEP,
-	1u64 << 38 => DEAD,
-	1u64 << 39 => OFF_SCREEN,
+	(1u64 << 04) => REFLECT,
+	(1u64 << 10) => UNTOUCHABLE,
+	(1u64 << 11) => FAST_FALL,
+	(1u64 << 13) => HIT_LAG,
+	(1u64 << 23) => SHIELD,
+	(1u64 << 25) => HIT_STUN,
+	(1u64 << 26) => SHIELD_TOUCH,
+	(1u64 << 29) => POWER_SHIELD,
+	(1u64 << 35) => FOLLOWER,
+	(1u64 << 36) => SLEEP,
+	(1u64 << 38) => DEAD,
+	(1u64 << 39) => OFF_SCREEN,
 });
 
 pseudo_enum!(HurtboxState: u8 {
