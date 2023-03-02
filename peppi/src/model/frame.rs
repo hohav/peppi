@@ -167,7 +167,7 @@ pub struct Post {
 	#[slippi(version = "2.0")]
 	pub is_airborne: Option<bool>,
 
-	/// ground the character is standing on, if any
+	/// The ground the character was standing on most recently
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "2.0")]
 	pub last_ground_id: Option<ground::Ground>,
