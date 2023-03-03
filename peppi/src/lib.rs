@@ -107,6 +107,11 @@ impl<R: Read> Read for TrackingReader<R> {
 		}
 		result
 	}
+	fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
+		self.reader
+			.read_exact(buf)
+			.map(|_| self.pos += buf.len() as u64)
+	}
 }
 
 /// Parse a Slippi replay from `r`, passing events to the callbacks in `handlers` as they occur.
