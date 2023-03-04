@@ -922,14 +922,15 @@ fn event<R: Read, H: Handlers, P: AsRef<Path>>(
 	if let Some(event) = event {
 		use Event::*;
 		match event {
-			GameStart => handlers.game_start(game_start(&mut &*buf)?)?,
-			GameEnd => handlers.game_end(game_end(&mut &*buf)?)?,
-			FrameStart => handlers.frame_start(frame_start(&mut &*buf)?)?,
 			FramePre => handlers.frame_pre(frame_pre(&mut &*buf, last_char_states)?)?,
 			FramePost => handlers.frame_post(frame_post(&mut &*buf, last_char_states)?)?,
+			FrameStart => handlers.frame_start(frame_start(&mut &*buf)?)?,
 			FrameEnd => handlers.frame_end(frame_end(&mut &*buf)?)?,
 			Item => handlers.item(item(&mut &*buf)?)?,
+			GameStart => handlers.game_start(game_start(&mut &*buf)?)?,
+			GameEnd => handlers.game_end(game_end(&mut &*buf)?)?,
 			GeckoCodes => handlers.gecko_codes(&buf, splitter_accumulator.actual_size)?,
+			
 		};
 	}
 
