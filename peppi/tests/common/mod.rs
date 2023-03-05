@@ -1,4 +1,5 @@
 use peppi::model::game::Game;
+use peppi::serde::de;
 use peppi::ParseError;
 
 use std::{
@@ -7,9 +8,13 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-pub fn read_game(path: impl AsRef<Path>) -> Result<Game, ParseError> {
+pub fn read_game(path: impl AsRef<Path>, skip_frames: bool) -> Result<Game, ParseError> {
 	let mut buf = BufReader::new(File::open(path).unwrap());
-	peppi::game(&mut buf, None, None)
+	let opts = de::Opts {
+		skip_frames,
+		..Default::default()
+	};
+	peppi::game(&mut buf, Some(&opts), None)
 }
 
 pub fn get_path(name: &str) -> PathBuf {
@@ -17,5 +22,5 @@ pub fn get_path(name: &str) -> PathBuf {
 }
 
 pub fn game(name: &str) -> Game {
-	read_game(get_path(name)).unwrap()
+	read_game(get_path(name), false).unwrap()
 }

@@ -202,6 +202,16 @@ fn basic_game() {
 }
 
 #[test]
+fn skip_frames() {
+	let game1 = game("game");
+	let game2 = read_game(get_path("game"), true).unwrap();
+	assert_eq!(game1.start, game2.start);
+	assert_eq!(game1.end, game2.end);
+	assert_eq!(game1.metadata, game2.metadata);
+	assert_eq!(game1.metadata_raw, game2.metadata_raw);
+}
+
+#[test]
 fn ics() {
 	let game = game("ics");
 	assert_eq!(
@@ -539,7 +549,8 @@ fn unknown_event() {
 
 #[test]
 fn corrupt_replay() {
-	assert!(matches!(read_game(get_path("corrupt")), Err(_)));
+	assert!(matches!(read_game(get_path("corrupt"), false), Err(_)));
+	assert!(matches!(read_game(get_path("corrupt"), true), Err(_)));
 }
 
 #[test]
@@ -639,11 +650,11 @@ fn frames<const N: usize>(f1: Vec<Frame<N>>, f2: Vec<Frame<N>>) {
 }
 
 fn _round_trip(in_path: impl AsRef<Path> + Clone) {
-	let game1 = read_game(in_path.clone()).unwrap();
+	let game1 = read_game(in_path.clone(), false).unwrap();
 	let out_path = "/tmp/peppi_test_round_trip.slp";
 	let mut buf = File::create(out_path).unwrap();
 	serde::ser::serialize(&mut buf, &game1).unwrap();
-	let game2 = read_game(out_path).unwrap();
+	let game2 = read_game(out_path, false).unwrap();
 
 	assert_eq!(game1.start, game2.start);
 	assert_eq!(game1.end, game2.end);
