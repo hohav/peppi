@@ -22,7 +22,7 @@ fn skip_frames(path: PathBuf) {
 	let mut buf = BufReader::new(File::open(path).unwrap());
 	let opts = de::Opts {
 		skip_frames: true,
-		debug_dir: None,
+        ..Default::default()
 	};
 	peppi::game(&mut buf, Some(&opts), None).unwrap();
 }

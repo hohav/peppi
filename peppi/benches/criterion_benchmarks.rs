@@ -46,7 +46,7 @@ pub fn bench(c: &mut Criterion) {
 					|mut buf| {
 						let opts = de::Opts {
 							skip_frames: true,
-							debug_dir: None,
+                            ..Default::default()
 						};
 						peppi::game(&mut buf, Some(&opts), None)
 					},
