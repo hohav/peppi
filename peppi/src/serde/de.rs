@@ -145,13 +145,15 @@ where
 	})
 }
 
+type PayloadSizes = [Option<u16>; 256];
+
 /// Reads the Event Payloads event, which must come first in the raw stream
 /// and tells us the sizes for all other events to follow.
 /// Returns the number of bytes read by this function, plus a map of event
 /// codes to payload sizes. This map uses raw event codes as keys (as opposed
 /// to `Event` enum values) for forwards compatibility, as it allows us to
 /// skip unknown event types. We use an array for speed.
-fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, [Option<u16>; 256])> {
+fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, PayloadSizes)> {
 	let code = r.read_u8()?;
 	if code != PAYLOADS_EVENT_CODE {
 		return Err(err!("expected event payloads, but got: {}", code));
@@ -165,7 +167,7 @@ fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, [Option<u16>; 256])> {
 		return Err(err!("invalid payload size: {}", size));
 	}
 
-	let mut sizes: [Option<u16>; 256] = [None; 256];
+	let mut sizes: PayloadSizes = [None; 256];
 	for _ in (0..size - 1).step_by(3) {
 		let code = r.read_u8()?;
 		let size = r.read_u16::<BE>()?;
@@ -888,7 +890,7 @@ fn handle_splitter_event(buf: &[u8], accumulator: &mut SplitAccumulator) -> Resu
 /// Returns the number of bytes read by this function.
 fn event<R: Read, H: Handlers, P: AsRef<Path>>(
 	mut r: R,
-	payload_sizes: &[Option<u16>; 256],
+	payload_sizes: &PayloadSizes,
 	last_char_states: &mut [CharState; NUM_PORTS],
 	handlers: &mut H,
 	splitter_accumulator: &mut SplitAccumulator,
