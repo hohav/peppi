@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use peppi::{self, serde::de};
 
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, time::Duration};
 
 struct DumbHandler;
 impl de::Handlers for DumbHandler {}
@@ -58,6 +58,9 @@ pub fn bench(c: &mut Criterion) {
 
 	group.finish();
 }
-
-criterion_group!(benches, bench);
+criterion_group!{
+    name = benches;
+    config = Criterion::default().warm_up_time(Duration::from_secs(1));
+    targets = bench
+}
 criterion_main!(benches);
