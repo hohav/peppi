@@ -930,7 +930,6 @@ fn event<R: Read, H: Handlers, P: AsRef<Path>>(
 			GameStart => handlers.game_start(game_start(&mut &*buf)?)?,
 			GameEnd => handlers.game_end(game_end(&mut &*buf)?)?,
 			GeckoCodes => handlers.gecko_codes(&buf, splitter_accumulator.actual_size)?,
-			
 		};
 	}
 
