@@ -209,6 +209,7 @@ fn skip_frames() {
 	assert_eq!(game1.end, game2.end);
 	assert_eq!(game1.metadata, game2.metadata);
 	assert_eq!(game1.metadata_raw, game2.metadata_raw);
+	assert_eq!(game2.frames, Frames::P2(Vec::new()));
 }
 
 #[test]
