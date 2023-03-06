@@ -46,7 +46,7 @@ pub fn bench(c: &mut Criterion) {
 					|mut buf| {
 						let opts = de::Opts {
 							skip_frames: true,
-                            ..Default::default()
+							..Default::default()
 						};
 						peppi::game(&mut buf, Some(&opts), None)
 					},
@@ -58,9 +58,9 @@ pub fn bench(c: &mut Criterion) {
 
 	group.finish();
 }
-criterion_group!{
-    name = benches;
-    config = Criterion::default().warm_up_time(Duration::from_secs(1));
-    targets = bench
+criterion_group! {
+	name = benches;
+	config = Criterion::default().warm_up_time(Duration::from_secs(1));
+	targets = bench
 }
 criterion_main!(benches);
