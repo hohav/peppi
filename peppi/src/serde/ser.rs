@@ -244,7 +244,11 @@ fn item<W: Write>(w: &mut W, i: &item::Item, ver: Version, frame_idx: i32) -> Re
 	w.write_u32::<BE>(i.id)?;
 
 	if ver.gte(3, 2) {
-		w.write_all(&i.misc.unwrap())?;
+		let misc = &i.misc_info.unwrap();
+		w.write_u8(misc.missile_type.0)?;
+		w.write_u8(misc.turnip_type.0)?;
+		w.write_u8(misc.charge_state.0)?;
+		w.write_u8(misc.charge_power)?;
 	}
 
 	if ver.gte(3, 6) {

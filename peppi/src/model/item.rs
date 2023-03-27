@@ -1,10 +1,18 @@
 use serde::Serialize;
 
 use crate::model::{
-	enums::item::{State, Type},
+	enums::item::{ChargeState, MissileType, State, TurnipType, Type},
 	primitives::{Direction, Port, Position, Velocity},
 };
 use peppi_derive::Arrow;
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
+pub struct MiscInfo {
+	pub missile_type: MissileType,
+	pub turnip_type: TurnipType,
+	pub charge_state: ChargeState,
+	pub charge_power: u8,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Arrow)]
 pub struct Item {
@@ -26,7 +34,7 @@ pub struct Item {
 
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "3.2")]
-	pub misc: Option<[u8; 4]>,
+	pub misc_info: Option<MiscInfo>,
 
 	#[serde(skip_serializing_if = "Option::is_none")]
 	#[slippi(version = "3.5")]
