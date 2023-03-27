@@ -540,7 +540,7 @@ fn item(r: &mut &[u8]) -> Result<FrameEvent<FrameId, Item>> {
 		Ok(MiscInfo {
 			missile_type: item::MissileType(r.read_u8()?),
 			turnip_type: item::TurnipType(r.read_u8()?),
-			charge_launched: item::ChargeLaunched(r.read_u8()?),
+			charge_state: item::ChargeState(r.read_u8()?),
 			charge_power: r.read_u8()?,
 		})
 	})?;

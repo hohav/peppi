@@ -248,7 +248,7 @@ pseudo_enum!(MissileType: u8 {
 	1 => SUPER,
 });
 
-pseudo_enum!(ChargeLaunched: u8 {
+pseudo_enum!(ChargeState: u8 {
 	0 => CHARGING,
 	1 => LAUNCHED,
 });

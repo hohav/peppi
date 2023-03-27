@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use crate::model::{
-	enums::item::{ChargeLaunched, MissileType, State, TurnipType, Type},
+	enums::item::{ChargeState, MissileType, State, TurnipType, Type},
 	primitives::{Direction, Port, Position, Velocity},
 };
 use peppi_derive::Arrow;
@@ -10,7 +10,7 @@ use peppi_derive::Arrow;
 pub struct MiscInfo {
 	pub missile_type: MissileType,
 	pub turnip_type: TurnipType,
-	pub charge_launched: ChargeLaunched,
+	pub charge_state: ChargeState,
 	pub charge_power: u8,
 }
 

@@ -576,7 +576,7 @@ fn items() {
 					misc_info: Some(MiscInfo {
 						missile_type: item::MissileType(5),
 						turnip_type: item::TurnipType::WINK,
-						charge_launched: item::ChargeLaunched(5),
+						charge_state: item::ChargeState(5),
 						charge_power: 5,
 					}),
 					owner: Some(Some(Port::P1)),
@@ -599,7 +599,7 @@ fn items() {
 					misc_info: Some(MiscInfo {
 						missile_type: item::MissileType(5),
 						turnip_type: item::TurnipType::SMILEY,
-						charge_launched: item::ChargeLaunched(5),
+						charge_state: item::ChargeState(5),
 						charge_power: 5,
 					}),
 					owner: Some(Some(Port::P1)),
@@ -622,7 +622,7 @@ fn items() {
 					misc_info: Some(MiscInfo {
 						missile_type: item::MissileType(5),
 						turnip_type: item::TurnipType::SMILEY,
-						charge_launched: item::ChargeLaunched(5),
+						charge_state: item::ChargeState(5),
 						charge_power: 5,
 					}),
 					owner: Some(Some(Port::P1)),
