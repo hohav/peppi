@@ -2,4 +2,4 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-clj -M -m peppi-codegen resources/structs.json
+clj -M -m peppi-codegen.structs resources/structs.json
