@@ -63,7 +63,7 @@ impl Data {
 		}
 	}
 
-	pub fn write<W: Write>(
+	pub fn write_pre<W: Write>(
 		&self,
 		w: &mut W,
 		version: Version,
@@ -79,7 +79,17 @@ impl Data {
 			_ => 0,
 		})?;
 		self.pre.write(w, version, idx)?;
+		Ok(())
+	}
 
+	pub fn write_post<W: Write>(
+		&self,
+		w: &mut W,
+		version: Version,
+		idx: usize,
+		frame_id: i32,
+		port: PortOccupancy,
+	) -> Result<()> {
 		w.write_u8(0x38)?; // FIXME: don't hard-code
 		w.write_i32::<BE>(frame_id)?;
 		w.write_u8(port.port as u8)?;
@@ -88,7 +98,6 @@ impl Data {
 			_ => 0,
 		})?;
 		self.post.write(w, version, idx)?;
-
 		Ok(())
 	}
 }
@@ -168,14 +177,14 @@ impl PortData {
 		}
 	}
 
-	pub fn write<W: Write>(
+	pub fn write_pre<W: Write>(
 		&self,
 		w: &mut W,
 		version: Version,
 		idx: usize,
 		frame_id: i32,
 	) -> Result<()> {
-		self.leader.write(
+		self.leader.write_pre(
 			w,
 			version,
 			idx,
@@ -188,7 +197,7 @@ impl PortData {
 		self.follower
 			.as_ref()
 			.map(|f| {
-				f.write(
+				f.write_pre(
 					w,
 					version,
 					idx,
@@ -201,6 +210,41 @@ impl PortData {
 			})
 			.unwrap_or(Ok(()))
 	}
+
+	pub fn write_post<W: Write>(
+		&self,
+		w: &mut W,
+		version: Version,
+		idx: usize,
+		frame_id: i32,
+	) -> Result<()> {
+		self.leader.write_post(
+			w,
+			version,
+			idx,
+			frame_id,
+			PortOccupancy {
+				port: self.port,
+				follower: false,
+			},
+		)?;
+		self.follower
+			.as_ref()
+			.map(|f| {
+				f.write_post(
+					w,
+					version,
+					idx,
+					frame_id,
+					PortOccupancy {
+						port: self.port,
+						follower: false,
+					},
+				)
+			})
+			.unwrap_or(Ok(()))
+	}
+
 }
 
 pub struct MutablePortData {
@@ -377,12 +421,15 @@ impl Frame {
 				self.start.write(w, version, idx)?;
 			}
 			for port in &self.port {
-				port.write(w, version, idx, frame_id)?;
+				port.write_pre(w, version, idx, frame_id)?;
 			}
 			for item_idx in self.item_offset[idx] as usize..self.item_offset[idx + 1] as usize {
 				w.write_u8(0x3B)?;
 				w.write_i32::<BE>(frame_id)?;
 				self.item.write(w, version, item_idx)?;
+			}
+			for port in &self.port {
+				port.write_post(w, version, idx, frame_id)?;
 			}
 			if version > Version(3, 0, 0) {
 				w.write_u8(0x3C)?;
