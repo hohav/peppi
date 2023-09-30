@@ -8,7 +8,6 @@ use serde::Serialize;
 
 use crate::{
 	model::{
-		enums::{character, costume, stage},
 		frame,
 		primitives::Port,
 		shift_jis::MeleeString,
@@ -28,50 +27,17 @@ pub const FIRST_FRAME_INDEX: i32 = -123;
 /// the conversion will be lossy.
 pub const MAX_SUPPORTED_VERSION: slippi::Version = slippi::Version(3, 12, 0);
 
-pseudo_enum!(PlayerType: u8 {
-	0 => HUMAN,
-	1 => CPU,
-	2 => DEMO,
-});
-
-pseudo_enum!(TeamColor: u8 {
-	0 => RED,
-	1 => BLUE,
-	2 => GREEN,
-});
-
-pseudo_enum!(TeamShade: u8 {
-	0 => NORMAL,
-	1 => LIGHT,
-	2 => DARK,
-});
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Team {
-	pub color: TeamColor,
-	pub shade: TeamShade,
+	pub color: u8,
+	pub shade: u8,
 }
-
-pseudo_enum!(DashBack: u32 {
-	1 => UCF,
-	2 => ARDUINO,
-});
-
-pseudo_enum!(ShieldDrop: u32 {
-	1 => UCF,
-	2 => ARDUINO,
-});
-
-pseudo_enum!(Language: u8 {
-	0 => JAPANESE,
-	1 => ENGLISH,
-});
 
 /// Information about the "Universal Controller Fix" mod.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Ucf {
-	pub dash_back: Option<DashBack>,
-	pub shield_drop: Option<ShieldDrop>,
+	pub dash_back: Option<u32>,
+	pub shield_drop: Option<u32>,
 }
 
 /// Netplay name, connect code, and Slippi UID.
@@ -91,14 +57,14 @@ pub struct Netplay {
 pub struct Player {
 	pub port: Port,
 
-	pub character: character::External,
+	pub character: u8,
 
-	pub r#type: PlayerType,
+	pub r#type: u8,
 
 	/// starting stock count
 	pub stocks: u8,
 
-	pub costume: costume::Costume,
+	pub costume: u8,
 
 	pub team: Option<Team>,
 
@@ -152,7 +118,7 @@ pub struct Start {
 
 	pub self_destruct_score: i8,
 
-	pub stage: stage::Stage,
+	pub stage: u16,
 
 	pub timer: u32,
 
@@ -183,7 +149,7 @@ pub struct Start {
 
 	/// (added: v3.12)
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub language: Option<Language>,
+	pub language: Option<u8>,
 }
 
 impl Start {
@@ -192,19 +158,11 @@ impl Start {
 	}
 }
 
-pseudo_enum!(EndMethod: u8 {
-	0 => UNRESOLVED,
-	1 => TIME,
-	2 => GAME,
-	3 => RESOLVED,
-	7 => NO_CONTEST,
-});
-
 /// Information about the end of the game.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct End {
 	/// how the game ended
-	pub method: EndMethod,
+	pub method: u8,
 
 	/// mostly-redundant copy of the raw start block, for round-tripping
 	#[serde(skip)]

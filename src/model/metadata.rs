@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use log::warn;
 use serde_json::{Map, Value};
 
-use crate::model::{enums::character, game::FIRST_FRAME_INDEX, primitives::Port};
+use crate::model::{game::FIRST_FRAME_INDEX, primitives::Port};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Metadata {
@@ -24,7 +24,7 @@ pub struct Netplay {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Player {
 	pub port: Port,
-	pub characters: Option<HashMap<character::Internal, usize>>,
+	pub characters: Option<HashMap<u8, usize>>,
 	pub netplay: Option<Netplay>,
 }
 
@@ -88,7 +88,7 @@ fn platform(json: &Map<String, Value>) -> Result<Option<String>> {
 
 fn parse_characters(
 	characters: &Map<String, Value>,
-) -> Result<HashMap<character::Internal, usize>> {
+) -> Result<HashMap<u8, usize>> {
 	characters
 		.iter()
 		.map(|(k, v)| {
@@ -102,7 +102,7 @@ fn parse_characters(
 			match v {
 				Value::Number(v) => match v.as_u64() {
 					Some(v) => Ok((
-						character::Internal(k),
+						k,
 						usize::try_from(v).map_err(|e| {
 							err!(
 								"metadata.players.N.characters.{}: invalid duration: {:?}, {:?}",

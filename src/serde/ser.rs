@@ -108,7 +108,7 @@ fn game_start<W: Write>(w: &mut W, s: &game::Start, ver: Version) -> Result<()> 
 
 fn game_end<W: Write>(w: &mut W, e: &game::End, ver: Version) -> Result<()> {
 	w.write_u8(Event::GameEnd as u8)?;
-	w.write_u8(e.method.0)?;
+	w.write_u8(e.method)?;
 	if ver.gte(2, 0) {
 		w.write_u8(
 			e.lras_initiator

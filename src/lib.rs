@@ -30,21 +30,12 @@ pub(crate) mod ubjson {
 }
 
 pub mod model {
-	#[macro_use]
-	#[doc(hidden)]
-	pub(crate) mod pseudo_enum;
-
 	pub mod frame;
 	pub mod game;
 	pub mod metadata;
 	pub mod primitives;
 	pub mod shift_jis;
 	pub mod slippi;
-	pub mod enums {
-		pub mod character;
-		pub mod costume;
-		pub mod stage;
-	}
 }
 
 pub mod serde {

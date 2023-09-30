@@ -13,9 +13,8 @@ type BE = byteorder::BigEndian;
 
 use crate::{
 	model::{
-		enums::{character, costume, stage},
 		frame,
-		game::{self, Game, Netplay, Player, PlayerType, MAX_PLAYERS, NUM_PORTS},
+		game::{self, Game, Netplay, Player, MAX_PLAYERS, NUM_PORTS},
 		primitives::Port,
 		shift_jis::MeleeString,
 		slippi,
@@ -121,10 +120,10 @@ fn player(
 	let mut r = &v0[..];
 	let mut unmapped = [0; 15];
 
-	let character = character::External(r.read_u8()?);
-	let r#type = game::PlayerType(r.read_u8()?);
+	let character = r.read_u8()?;
+	let r#type = r.read_u8()?;
 	let stocks = r.read_u8()?;
-	let costume = costume::Costume::from(r.read_u8()?, character);
+	let costume = r.read_u8()?;
 	r.read_exact(&mut unmapped[0..3])?;
 	let team_shade = r.read_u8()?;
 	let handicap = r.read_u8()?;
@@ -132,8 +131,8 @@ fn player(
 	let team = {
 		match is_teams {
 			true => Some(game::Team {
-				color: game::TeamColor(team_color),
-				shade: game::TeamShade(team_shade),
+				color: team_color,
+				shade: team_shade,
 			}),
 			false => None,
 		}
@@ -144,7 +143,7 @@ fn player(
 	let cpu_level = {
 		let cpu_level = r.read_u8()?;
 		match r#type {
-			PlayerType::CPU => Some(cpu_level),
+			1 => Some(cpu_level), //FIXME: PlayerType::CPU
 			_ => None,
 		}
 	};
@@ -161,11 +160,11 @@ fn player(
 			Some(game::Ucf {
 				dash_back: match r.read_u32::<BE>()? {
 					0 => None,
-					db => Some(game::DashBack(db)),
+					db => Some(db),
 				},
 				shield_drop: match r.read_u32::<BE>()? {
 					0 => None,
-					sd => Some(game::ShieldDrop(sd)),
+					sd => Some(sd),
 				},
 			})
 		}
@@ -197,7 +196,8 @@ fn player(
 		.transpose()?;
 
 	Ok(match r#type {
-		PlayerType::HUMAN | PlayerType::CPU | PlayerType::DEMO => Some(Player {
+		//FIXME: PlayerType::HUMAN | PlayerType::CPU | PlayerType::DEMO
+		0 | 1 | 2 => Some(Player {
 			port,
 			character,
 			r#type,
@@ -272,7 +272,7 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 	let item_spawn_frequency = r.read_i8()?;
 	let self_destruct_score = r.read_i8()?;
 	r.read_exact(&mut unmapped[5..6])?;
-	let stage = stage::Stage(r.read_u16::<BE>()?);
+	let stage = r.read_u16::<BE>()?;
 	let timer = r.read_u32::<BE>()?;
 	r.read_exact(&mut unmapped[6..21])?;
 	let item_spawn_bitfield = {
@@ -364,7 +364,7 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 		}
 	}
 
-	let language = if_more(r, |r| Ok(game::Language(r.read_u8()?)))?;
+	let language = if_more(r, |r| Ok(r.read_u8()?))?;
 
 	Ok(game::Start {
 		slippi,
@@ -394,7 +394,7 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 pub(crate) fn game_end(r: &mut &[u8]) -> Result<game::End> {
 	let raw_bytes = r.to_vec();
 	Ok(game::End {
-		method: game::EndMethod(r.read_u8()?),
+		method: r.read_u8()?,
 		raw_bytes: raw_bytes,
 		// v2.0
 		lras_initiator: if_more(r, |r| Ok(Port::try_from(r.read_u8()?).ok()))?,
@@ -619,7 +619,7 @@ pub fn deserialize<R: Read>(
 		let ports: Vec<_> = start.players.iter().map(|p|
 			frame::PortOccupancy {
 				port: p.port,
-				follower: p.character == character::External::ICE_CLIMBERS
+				follower: p.character == 14, //FIXME: character::External::ICE_CLIMBERS
 			}
 		).collect();
 		let version = start.slippi.version;
