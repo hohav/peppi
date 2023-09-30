@@ -32,10 +32,6 @@ pub(crate) mod ubjson {
 pub mod model {
 	#[macro_use]
 	#[doc(hidden)]
-	pub(crate) mod pseudo_bitmask;
-
-	#[macro_use]
-	#[doc(hidden)]
 	pub(crate) mod pseudo_enum;
 
 	pub mod frame;
@@ -45,12 +41,8 @@ pub mod model {
 	pub mod shift_jis;
 	pub mod slippi;
 	pub mod enums {
-		pub mod action_state;
-		pub mod attack;
 		pub mod character;
 		pub mod costume;
-		pub mod ground;
-		pub mod item;
 		pub mod stage;
 	}
 }
