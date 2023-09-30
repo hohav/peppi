@@ -8,7 +8,7 @@ repository = "https://github.com/hohav/peppi"
 version = "1.0.0-alpha.7"
 
 [dependencies]
-arrow2 = "0.17"
+arrow2 = "0.18"
 byteorder = "1"
 chrono = { version = "0.4", features = ["serde"] }
 encoding_rs = "0.8"
