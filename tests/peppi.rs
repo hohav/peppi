@@ -12,9 +12,8 @@ use peppi::{
 	model::{
 		columnar,
 		game::{
-			End, Game, Netplay, Player, PlayerType, Scene, Start, Ucf,
+			End, Game, Netplay, Player, PlayerType, Port, Scene, Start, Ucf,
 		},
-		primitives::Port,
 		shift_jis::MeleeString,
 		slippi::{Slippi, Version},
 	},
@@ -549,7 +548,7 @@ fn zelda_sheik_transformation() {
 fn items() {
 	let game = game("items");
 	assert_eq!(
-		game.frames.item.slice(0, game.start.slippi.version),
+		game.frames.item.transpose_one(0, game.start.slippi.version),
 		columnar::Item {
 			id: 0,
 			damage: 0,
@@ -567,7 +566,7 @@ fn items() {
 		}
 	);
 	assert_eq!(
-		game.frames.item.slice(102, game.start.slippi.version),
+		game.frames.item.transpose_one(102, game.start.slippi.version),
 		columnar::Item {
 			id: 1,
 			damage: 0,
@@ -585,7 +584,7 @@ fn items() {
 		}
 	);
 	assert_eq!(
-		game.frames.item.slice(290, game.start.slippi.version),
+		game.frames.item.transpose_one(290, game.start.slippi.version),
 		columnar::Item {
 			id: 2,
 			damage: 0,
@@ -625,9 +624,11 @@ fn _round_trip(in_path: impl AsRef<Path> + Clone) {
 	assert_eq!(game1.frames.id.len(), game2.frames.id.len());
 	for idx in 0 .. game1.frames.id.len() {
 		assert_eq!(
-			game1.frames.slice(idx, game1.start.slippi.version),
-			game2.frames.slice(idx, game2.start.slippi.version),
-			"frame: {}", idx);
+			game1.frames.transpose_one(idx, game1.start.slippi.version),
+			game2.frames.transpose_one(idx, game2.start.slippi.version),
+			"frame: {}",
+			idx
+		);
 	}
 
 	assert_eq!(hash(in_path), hash(out_path));

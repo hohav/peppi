@@ -1,6 +1,6 @@
 use peppi::model::{
 	frame::PortOccupancy,
-	primitives::Port,
+	game::Port,
 };
 
 use std::io::BufWriter;
