@@ -1,25 +1,347 @@
-use peppi::serde::arrow;
+use peppi::model::{
+	frame::PortOccupancy,
+	primitives::Port,
+};
+
+use std::io::BufWriter;
+use serde_json::json;
+use arrow2::io::json::write as json_write;
 
 mod common;
 use common::game;
 
 #[test]
-fn frames_to_arrow() {
+fn into_struct_array() {
 	let game = game("v3.12");
-	let frames = arrow::frames_to_arrow(&game, None);
+	let ports = vec![
+		PortOccupancy {
+			port: Port::P1,
+			follower: false,
+		},
+		PortOccupancy {
+			port: Port::P2,
+			follower: false,
+		},
+	];
+	let frames = game.frames.into_struct_array(game.start.slippi.version, &ports);
 
 	assert_eq!(
-		vec![124, 124, 124, 124, 124],
-		frames.values().iter().map(|v| v.len()).collect::<Vec<_>>()
+		vec![124; 5],
+		frames.values().iter().map(|v| v.len()).collect::<Vec<_>>(),
 	);
 
-	assert_eq!(
-		"StructArray[{index: -123, ports: [{leader: {pre: {position: {x: -40, y: 32}, direction: 1, joystick: {x: 0, y: 0}, cstick: {x: 0, y: 0}, triggers: {logical: 0, physical: {l: 0, r: 0}}, random_seed: 39656, buttons: {logical: 0, physical: 0}, state: 322, raw_analog_x: 0, damage: 0}, post: {character: 18, state: 322, position: {x: -40, y: 32}, direction: 1, damage: 0, shield: 60, last_attack_landed: None, combo_count: 0, last_hit_by: None, stocks: 4, state_age: -1, flags: 274877906944, misc_as: 0.000000000000000000000000000000000000000000006, airborne: true, ground: 65535, jumps: 1, l_cancel: None, hurtbox_state: 0, velocities: {autogenous: {x: 0, y: 0}, knockback: {x: 0, y: 0}, autogenous_x: {air: 0, ground: 0}}, hitlag: 0, animation_index: 4294967295}}, follower: None}, {leader: {pre: {position: {x: 40, y: 32}, direction: 0, joystick: {x: 0, y: 0}, cstick: {x: 0, y: 0}, triggers: {logical: 0, physical: {l: 0, r: 0}}, random_seed: 39656, buttons: {logical: 0, physical: 0}, state: 322, raw_analog_x: 0, damage: 0}, post: {character: 18, state: 322, position: {x: 40, y: 32}, direction: 0, damage: 0, shield: 60, last_attack_landed: None, combo_count: 0, last_hit_by: None, stocks: 4, state_age: -1, flags: 274877906944, misc_as: 0.000000000000000000000000000000000000000000013, airborne: true, ground: 65535, jumps: 1, l_cancel: None, hurtbox_state: 0, velocities: {autogenous: {x: 0, y: 0}, knockback: {x: 0, y: 0}, autogenous_x: {air: 0, ground: 0}}, hitlag: 0, animation_index: 4294967295}}, follower: None}], start: {random_seed: 39656, scene_frame_counter: 0}, end: {latest_finalized_frame: -123}, items: []}]",
-		format!("{:?}", frames.slice(0, 1))
-	);
+	let frames = frames.boxed();
+	{
+		let mut serializer = json_write::Serializer::new(vec![Ok(frames.sliced(0, 1))].into_iter(), vec![]);
+		let mut buf = BufWriter::new(Vec::new());
+		json_write::write(&mut buf, &mut serializer).unwrap();
+		assert_eq!(
+			serde_json::from_slice::<serde_json::Value>(&buf.into_inner().unwrap()).unwrap(),
+			json!([{
+				"id": -123,
+				"start": {
+					"random_seed": 39656,
+					"scene_frame_counter":0
+				},
+				"end": {
+					"latest_finalized_frame": -123
+				},
+				"port": {
+					"0": {
+						"leader": {
+							"pre": {
+								"random_seed": 39656,
+								"state": 322,
+								"position": {
+									"x": -40.0,
+									"y": 32.0
+								},
+								"direction": 1.0,
+								"joystick": {
+									"x": 0.0,
+									"y": 0.0
+								},
+								"cstick": {
+									"x": 0.0,"y": 0.0
+								},
+								"triggers": 0.0,
+								"buttons": 0,
+								"buttons_physical": 0,
+								"triggers_physical": {
+									"l": 0.0,
+									"r": 0.0
+								},
+								"raw_analog_x": 0,
+								"percent": 0.0
+							},
+							"post": {
+								"character": 18,
+								"state": 322,
+								"position": {
+									"x": -40.0,
+									"y": 32.0
+								},
+								"direction": 1.0,
+								"percent": 0.0,
+								"shield": 60.0,
+								"last_attack_landed": 0,
+								"combo_count": 0,
+								"last_hit_by": 6,
+								"stocks": 4,
+								"state_age": -1.0,
+								"state_flags": {
+									"0": 0,
+									"1": 0,
+									"2": 0,
+									"3": 0,
+									"4": 64
+								},
+								"misc_as": 6e-45,
+								"airborne": 1,
+								"ground": 65535,
+								"jumps": 1,
+								"l_cancel": 0,
+								"hurtbox_state": 0,
+								"velocities": {
+									"self_x_air": 0.0,
+									"self_y": 0.0,
+									"knockback_x": 0.0,
+									"knockback_y": 0.0,
+									"self_x_ground": 0.0
+								},
+								"hitlag": 0.0,
+								"animation_index": 4294967295u32
+							}
+						}
+					},
+					"1": {
+						"leader": {
+							"pre": {
+								"random_seed": 39656,
+								"state": 322,
+								"position": {
+									"x": 40.0,
+									"y": 32.0
+								},
+								"direction": -1.0,
+								"joystick": {
+									"x": 0.0,
+									"y": 0.0
+								},
+								"cstick": {
+									"x": 0.0,
+									"y": 0.0
+								},
+								"triggers": 0.0,
+								"buttons": 0,
+								"buttons_physical": 0,
+								"triggers_physical": {
+									"l": 0.0,
+									"r": 0.0
+								},
+								"raw_analog_x": 0,
+								"percent": 0.0
+							},"post": {
+								"character": 18,
+								"state": 322,
+								"position": {
+									"x": 40.0,
+									"y": 32.0
+								},
+								"direction": -1.0,
+								"percent": 0.0,
+								"shield": 60.0,
+								"last_attack_landed": 0,
+								"combo_count": 0,
+								"last_hit_by": 6,
+								"stocks": 4,
+								"state_age": -1.0,
+								"state_flags": {
+									"0": 0,
+									"1": 0,
+									"2": 0,
+									"3": 0,
+									"4": 64
+								},
+								"misc_as": 1.3000000000000002e-44,
+								"airborne": 1,
+								"ground": 65535,
+								"jumps": 1,
+								"l_cancel": 0,
+								"hurtbox_state": 0,
+								"velocities": {
+									"self_x_air": 0.0,
+									"self_y": 0.0,
+									"knockback_x": 0.0,
+									"knockback_y": 0.0,
+									"self_x_ground": 0.0
+								},
+								"hitlag": 0.0,
+								"animation_index": 4294967295u32
+							}
+						}
+					}
+				},
+				"item": []
+			}]),
+		);
+	}
 
-	assert_eq!(
-		"StructArray[{index: 0, ports: [{leader: {pre: {position: {x: -35.766, y: 0.0001}, direction: 0, joystick: {x: -0.95, y: 0}, cstick: {x: 0, y: 0}, triggers: {logical: 0, physical: {l: 0, r: 0}}, random_seed: 8100584, buttons: {logical: 262144, physical: 0}, state: 20, raw_analog_x: -127, damage: 0}, post: {character: 18, state: 20, position: {x: -37.322998, y: 0.0001}, direction: 0, damage: 0, shield: 60, last_attack_landed: None, combo_count: 0, last_hit_by: None, stocks: 4, state_age: 2, flags: 0, misc_as: 0, airborne: false, ground: 34, jumps: 2, l_cancel: None, hurtbox_state: 0, velocities: {autogenous: {x: -1.557, y: -0}, knockback: {x: 0, y: 0}, autogenous_x: {air: -1.5569999, ground: -1.557}}, hitlag: 0, animation_index: 12}}, follower: None}, {leader: {pre: {position: {x: 40, y: 25.0001}, direction: 0, joystick: {x: 0, y: 0}, cstick: {x: 0, y: 0}, triggers: {logical: 1, physical: {l: 0.71428573, r: 0}}, random_seed: 8100584, buttons: {logical: 2147488096, physical: 4448}, state: 341, raw_analog_x: 0, damage: 0}, post: {character: 18, state: 341, position: {x: 40, y: 25.0001}, direction: 0, damage: 0, shield: 60, last_attack_landed: None, combo_count: 0, last_hit_by: None, stocks: 4, state_age: 10, flags: 0, misc_as: 0, airborne: false, ground: 36, jumps: 2, l_cancel: None, hurtbox_state: 0, velocities: {autogenous: {x: 0, y: 0}, knockback: {x: 0, y: 0}, autogenous_x: {air: 0, ground: 0}}, hitlag: 0, animation_index: 295}}, follower: None}], start: {random_seed: 8100584, scene_frame_counter: 123}, end: {latest_finalized_frame: 0}, items: []}]",
-		format!("{:?}", frames.slice(123, 1))
-	);
+	{
+		let mut serializer = json_write::Serializer::new(vec![Ok(frames.sliced(123, 1))].into_iter(), vec![]);
+		let mut buf = BufWriter::new(Vec::new());
+		json_write::write(&mut buf, &mut serializer).unwrap();
+		assert_eq!(
+			serde_json::from_slice::<serde_json::Value>(&buf.into_inner().unwrap()).unwrap(),
+			json!([{
+				"id": 0,
+				"start": {
+					"random_seed": 8100584,
+					"scene_frame_counter": 123
+				},
+				"end": {
+					"latest_finalized_frame": 0
+				},
+				"port": {
+					"0": {
+						"leader": {
+							"pre": {
+								"random_seed": 8100584,
+								"state": 20,
+								"position": {
+									"x": -35.766,
+									"y": 0.0001
+								},
+								"direction": -1.0,
+								"joystick": {
+									"x": -0.95,
+									"y": 0.0
+								},
+								"cstick": {
+									"x": 0.0,
+									"y": 0.0
+								},
+								"triggers": 0.0,
+								"buttons": 262144,
+								"buttons_physical": 0,
+								"triggers_physical": {
+									"l": 0.0,
+									"r": 0.0
+								},
+								"raw_analog_x": -127,
+								"percent": 0.0
+							},
+							"post": {
+								"character": 18,
+								"state": 20,
+								"position": {
+									"x": -37.322998,
+									"y": 0.0001
+								},
+								"direction": -1.0,
+								"percent": 0.0,
+								"shield": 60.0,
+								"last_attack_landed": 0,
+								"combo_count": 0,
+								"last_hit_by": 6,
+								"stocks": 4,
+								"state_age": 2.0,
+								"state_flags": {
+									"0": 0,
+									"1": 0,
+									"2": 0,
+									"3": 0,
+									"4": 0
+								},
+								"misc_as": 0.0,
+								"airborne": 0,
+								"ground": 34,
+								"jumps": 2,
+								"l_cancel": 0,
+								"hurtbox_state": 0,
+								"velocities": {
+									"self_x_air": -1.5569999,
+									"self_y": 0.0,
+									"knockback_x": 0.0,
+									"knockback_y": 0.0,
+									"self_x_ground": -1.557
+								},
+								"hitlag": 0.0,
+								"animation_index": 12
+							}
+						}
+					},
+					"1": {
+						"leader": {
+							"pre": {
+								"random_seed": 8100584,
+								"state": 341,
+								"position": {
+									"x": 40.0,
+									"y": 25.0001
+								},
+								"direction": -1.0,
+								"joystick": {
+									"x": 0.0,
+									"y": 0.0
+								},
+								"cstick": {
+									"x": 0.0,
+									"y": 0.0
+								},
+								"triggers": 1.0,
+								"buttons": 2147488096u32,
+								"buttons_physical": 4448,
+								"triggers_physical": {
+									"l": 0.71428573,
+									"r": 0.0
+								},
+								"raw_analog_x": 0,
+								"percent": 0.0
+							},
+							"post": {
+								"character": 18,
+								"state": 341,
+								"position": {
+									"x": 40.0,
+									"y": 25.0001
+								},
+								"direction": -1.0,
+								"percent": 0.0,
+								"shield": 60.0,
+								"last_attack_landed": 0,
+								"combo_count": 0,
+								"last_hit_by": 6,
+								"stocks": 4,
+								"state_age": 10.0,
+								"state_flags": {
+									"0": 0,
+									"1": 0,
+									"2": 0,
+									"3": 0,
+									"4": 0
+								},
+								"misc_as": 0.0,
+								"airborne": 0,
+								"ground": 36,
+								"jumps": 2,
+								"l_cancel": 0,
+								"hurtbox_state": 0,
+								"velocities": {
+									"self_x_air": 0.0,
+									"self_y": 0.0,
+									"knockback_x": 0.0,
+									"knockback_y": 0.0,
+									"self_x_ground": 0.0
+								},
+								"hitlag": 0.0,
+								"animation_index": 295
+							}
+						}
+					}
+				},
+				"item": []
+			}]),
+		);
+	}
 }

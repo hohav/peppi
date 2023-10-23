@@ -1,60 +1,49 @@
 use std::{
-	collections::HashMap,
 	fs::{self, File},
-	io::{BufReader, Read},
+	io::Read,
 	path::Path,
 };
 
-use chrono::{DateTime, Utc};
 use pretty_assertions::assert_eq;
 use xxhash_rust::xxh3::xxh3_64;
+use serde_json::json;
 
 use peppi::{
 	model::{
-		buttons::{Logical, Physical},
-		enums::{
-			action_state::{State, Zelda},
-			character::{External, Internal},
-			costume::Costume,
-			item,
-			stage::Stage,
-		},
-		frame::{self, Buttons, Frame},
+		columnar,
 		game::{
-			DashBack, End, EndMethod, Frames, Game, Language, Netplay, Player, PlayerType, Scene,
-			ShieldDrop, Start, Ucf,
+			End, Game, Netplay, Player, PlayerType, Scene, Start, Ucf,
 		},
-		item::Item,
-		metadata::{self, Metadata},
-		primitives::{Direction, Port, Position, Velocity},
+		primitives::Port,
 		shift_jis::MeleeString,
 		slippi::{Slippi, Version},
 	},
-	serde::{
-		self,
-		collect::{self, Rollback},
-	},
+	serde,
 };
 
 mod common;
 use common::{game, get_path, read_game};
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+struct Buttons {
+	physical: u16,
+	logical: u32,
+}
+
 fn button_seq(game: &Game) -> Vec<Buttons> {
-	match &game.frames {
-		Frames::P2(frames) => {
-			let mut last_buttons: Option<Buttons> = None;
-			let mut button_seq = Vec::<Buttons>::new();
-			for frame in frames {
-				let b = frame.ports[0].leader.pre.buttons;
-				if (b.logical.0 > 0 || b.physical.0 > 0) && Some(b) != last_buttons {
-					button_seq.push(b);
-					last_buttons = Some(b);
-				}
-			}
-			button_seq
+	let mut last_buttons: Option<Buttons> = None;
+	let mut button_seq = vec![];
+	for idx in 0 .. game.frames.id.len() {
+		let b = Buttons {
+			logical: game.frames.port[0].leader.pre.buttons.values()[idx],
+			physical: game.frames.port[0].leader.pre.buttons_physical.values()[idx],
+		};
+		if (b.physical > 0 || b.logical > 0) && Some(b) != last_buttons {
+			button_seq.push(b);
+			last_buttons = Some(b);
 		}
-		_ => panic!("wrong number of ports"),
 	}
+	button_seq
 }
 
 #[test]
@@ -63,11 +52,17 @@ fn slippi_old_version() {
 	let players = game.start.players;
 
 	assert_eq!(game.start.slippi.version, Version(0, 1, 0));
-	assert_eq!(game.metadata.duration, None);
+	assert_eq!(
+		serde_json::Value::Object(game.metadata.unwrap()),
+		json!({
+			"startAt": "2018-01-24T06:19:54Z",
+			"playedOn": "dolphin"
+		})
+	);
 
 	assert_eq!(players.len(), 2);
-	assert_eq!(players[0].character, External::FOX);
-	assert_eq!(players[1].character, External::GANONDORF);
+	assert_eq!(players[0].character, 2); // External::FOX
+	assert_eq!(players[1].character, 25); // External::GANONDORF
 }
 
 #[test]
@@ -75,33 +70,24 @@ fn basic_game() {
 	let game = game("game");
 
 	assert_eq!(
-		game.metadata,
-		Metadata {
-			date: "2018-06-22T07:52:59Z".parse::<DateTime<Utc>>().ok(),
-			duration: Some(5209),
-			platform: Some("dolphin".to_string()),
-			players: Some(vec![
-				metadata::Player {
-					port: Port::P1,
-					characters: {
-						let mut m = HashMap::new();
-						m.insert(Internal::MARTH, 5209);
-						Some(m)
-					},
-					netplay: None,
+		serde_json::Value::Object(game.metadata.unwrap()),
+		json!({
+			"startAt": "2018-06-22T07:52:59Z",
+			"lastFrame": 5085,
+			"players": {
+				"1": {
+					"characters": {
+						"1": 5209, // Internal::FOX
+					}
 				},
-				metadata::Player {
-					port: Port::P2,
-					characters: {
-						let mut m = HashMap::new();
-						m.insert(Internal::FOX, 5209);
-						Some(m)
-					},
-					netplay: None,
-				},
-			]),
-			console: None,
-		}
+				"0": {
+					"characters": {
+						"18": 5209 // Internal::MARTH
+					}
+				}
+			},
+			"playedOn": "dolphin"
+		})
 	);
 
 	assert_eq!(
@@ -115,17 +101,17 @@ fn basic_game() {
 			is_teams: false,
 			item_spawn_frequency: -1,
 			self_destruct_score: -1,
-			stage: Stage::YOSHIS_STORY,
+			stage: 8,
 			timer: 480,
 			item_spawn_bitfield: [255, 255, 255, 255, 255],
 			damage_ratio: 1.0,
 			players: vec![
 				Player {
 					port: Port::P1,
-					character: External::MARTH,
+					character: 9, // External::MARTH
 					r#type: PlayerType::HUMAN,
 					stocks: 4,
-					costume: Costume::from(3, External::MARTH),
+					costume: 3,
 					team: None,
 					handicap: 9,
 					bitfield: 192,
@@ -134,18 +120,18 @@ fn basic_game() {
 					defense_ratio: 1.0,
 					model_scale: 1.0,
 					ucf: Some(Ucf {
-						dash_back: None,
-						shield_drop: None,
+						dash_back: 0, // DashBack::NONE
+						shield_drop: 0, // ShieldDrop::NONE
 					}),
 					name_tag: None,
 					netplay: None,
 				},
 				Player {
 					port: Port::P2,
-					character: External::FOX,
+					character: 2, // External::FOX
 					r#type: PlayerType::CPU,
 					stocks: 4,
-					costume: Costume::from(0, External::FOX),
+					costume: 0,
 					team: None,
 					handicap: 9,
 					bitfield: 64,
@@ -154,8 +140,8 @@ fn basic_game() {
 					defense_ratio: 1.0,
 					model_scale: 1.0,
 					ucf: Some(Ucf {
-						dash_back: None,
-						shield_drop: None,
+						dash_back: 0, // DashBack::NONE
+						shield_drop: 0, // ShieldDrop::NONE
 					}),
 					name_tag: None,
 					netplay: None,
@@ -187,52 +173,38 @@ fn basic_game() {
 	);
 
 	assert_eq!(
-		game.end,
+		game.end.unwrap(),
 		End {
-			method: EndMethod::RESOLVED,
+			method: 3, // EndMethod::RESOLVED
 			lras_initiator: None,
 			raw_bytes: vec![3],
 		}
 	);
 
-	match game.frames {
-		Frames::P2(frames) => assert_eq!(frames.len(), 5209),
-		_ => panic!("wrong number of ports"),
-	};
+	assert_eq!(game.frames.id.len(), 5209);
 }
 
 #[test]
 fn ics() {
 	let game = game("ics");
 	assert_eq!(
-		game.metadata.players,
-		Some(vec![
-			metadata::Player {
-				port: Port::P1,
-				characters: Some({
-					let mut m = HashMap::new();
-					m.insert(Internal::NANA, 344);
-					m.insert(Internal::POPO, 344);
-					m
-				}),
-				netplay: None,
+		game.metadata.unwrap()["players"],
+		json!({
+			"1": {
+				"characters": {
+					"15": 344 // Internal::JIGGLYPUFF
+				}
 			},
-			metadata::Player {
-				port: Port::P2,
-				characters: Some({
-					let mut m = HashMap::new();
-					m.insert(Internal::JIGGLYPUFF, 344);
-					m
-				}),
-				netplay: None,
-			},
-		])
+			"0": {
+				"characters": {
+					"11": 344, // Internal::NANA
+					"10": 344 // Internal::POPO
+				}
+			}
+		})
 	);
-	assert_eq!(game.start.players[0].character, External::ICE_CLIMBERS);
-	match game.frames {
-		Frames::P2(frames) => assert!(frames[0].ports[0].follower.is_some()),
-		_ => panic!("wrong number of ports"),
-	};
+	assert_eq!(game.start.players[0].character, 14);
+	assert!(game.frames.port[0].follower.is_some());
 }
 
 #[test]
@@ -240,15 +212,15 @@ fn ucf() {
 	assert_eq!(
 		game("shield_drop").start.players[0].ucf,
 		Some(Ucf {
-			dash_back: None,
-			shield_drop: Some(ShieldDrop::UCF)
+			dash_back: 0,
+			shield_drop: 1, // ShieldDrop::UCF
 		})
 	);
 	assert_eq!(
 		game("dash_back").start.players[0].ucf,
 		Some(Ucf {
-			dash_back: Some(DashBack::UCF),
-			shield_drop: None
+			dash_back: 1, // DashBack::UCF
+			shield_drop: 0,
 		})
 	);
 }
@@ -260,28 +232,28 @@ fn buttons_lzrs() {
 		button_seq(&game),
 		vec![
 			Buttons {
-				logical: Logical::TRIGGER_ANALOG,
-				physical: Physical::NONE,
+				logical: 2147483648, // Logical::TRIGGER_ANALOG,
+				physical: 0, // Physical::NONE,
 			},
 			Buttons {
-				logical: Logical::TRIGGER_ANALOG | Logical::L,
-				physical: Physical::L,
+				logical: 2147483712, // Logical::TRIGGER_ANALOG | Logical::L,
+				physical: 64, // Physical::L,
 			},
 			Buttons {
-				logical: Logical::TRIGGER_ANALOG,
-				physical: Physical::NONE,
+				logical: 2147483648, // Logical::TRIGGER_ANALOG,
+				physical: 0, // Physical::NONE,
 			},
 			Buttons {
-				logical: Logical::TRIGGER_ANALOG | Logical::R,
-				physical: Physical::R,
+				logical: 2147483680, // Logical::TRIGGER_ANALOG | Logical::R,
+				physical: 32, // Physical::R,
 			},
 			Buttons {
-				logical: Logical::TRIGGER_ANALOG | Logical::A | Logical::Z,
-				physical: Physical::Z,
+				logical: 2147483920, // Logical::TRIGGER_ANALOG | Logical::A | Logical::Z,
+				physical: 16, // Physical::Z,
 			},
 			Buttons {
-				logical: Logical::START,
-				physical: Physical::START,
+				logical: 4096, // Logical::START,
+				physical: 4096, // Physical::START,
 			},
 		]
 	);
@@ -294,20 +266,20 @@ fn buttons_abxy() {
 		button_seq(&game),
 		vec![
 			Buttons {
-				logical: Logical::A,
-				physical: Physical::A,
+				logical: 256, // Logical::A,
+				physical: 256, // Physical::A,
 			},
 			Buttons {
-				logical: Logical::B,
-				physical: Physical::B,
+				logical: 512, // Logical::B,
+				physical: 512, // Physical::B,
 			},
 			Buttons {
-				logical: Logical::X,
-				physical: Physical::X,
+				logical: 1024, // Logical::X,
+				physical: 1024, // Physical::X,
 			},
 			Buttons {
-				logical: Logical::Y,
-				physical: Physical::Y,
+				logical: 2048, // Logical::Y,
+				physical: 2048, // Physical::Y,
 			},
 		]
 	);
@@ -320,20 +292,20 @@ fn dpad_udlr() {
 		button_seq(&game),
 		vec![
 			Buttons {
-				logical: Logical::DPAD_UP,
-				physical: Physical::DPAD_UP,
+				logical: 8, // Logical::DPAD_UP,
+				physical: 8, // Physical::DPAD_UP,
 			},
 			Buttons {
-				logical: Logical::DPAD_DOWN,
-				physical: Physical::DPAD_DOWN,
+				logical: 4, // Logical::DPAD_DOWN,
+				physical: 4, // Physical::DPAD_DOWN,
 			},
 			Buttons {
-				logical: Logical::DPAD_LEFT,
-				physical: Physical::DPAD_LEFT,
+				logical: 1, // Logical::DPAD_LEFT,
+				physical: 1, // Physical::DPAD_LEFT,
 			},
 			Buttons {
-				logical: Logical::DPAD_RIGHT,
-				physical: Physical::DPAD_RIGHT,
+				logical: 2, // Logical::DPAD_RIGHT,
+				physical: 2, // Physical::DPAD_RIGHT,
 			},
 		]
 	);
@@ -346,20 +318,20 @@ fn cstick_udlr() {
 		button_seq(&game),
 		vec![
 			Buttons {
-				logical: Logical::CSTICK_UP,
-				physical: Physical::NONE,
+				logical: 1048576, // Logical::CSTICK_UP,
+				physical: 0, // Physical::NONE,
 			},
 			Buttons {
-				logical: Logical::CSTICK_DOWN,
-				physical: Physical::NONE,
+				logical: 2097152, // Logical::CSTICK_DOWN,
+				physical: 0, // Physical::NONE,
 			},
 			Buttons {
-				logical: Logical::CSTICK_LEFT,
-				physical: Physical::NONE,
+				logical: 4194304, // Logical::CSTICK_LEFT,
+				physical: 0, // Physical::NONE,
 			},
 			Buttons {
-				logical: Logical::CSTICK_RIGHT,
-				physical: Physical::NONE,
+				logical: 8388608, // Logical::CSTICK_RIGHT,
+				physical: 0, // Physical::NONE,
 			},
 		]
 	);
@@ -372,20 +344,20 @@ fn joystick_udlr() {
 		button_seq(&game),
 		vec![
 			Buttons {
-				logical: Logical::JOYSTICK_UP,
-				physical: Physical::NONE,
+				logical: 65536, // Logical::JOYSTICK_UP,
+				physical: 0, // Physical::NONE,
 			},
 			Buttons {
-				logical: Logical::JOYSTICK_DOWN,
-				physical: Physical::NONE,
+				logical: 131072, // Logical::JOYSTICK_DOWN,
+				physical: 0, // Physical::NONE,
 			},
 			Buttons {
-				logical: Logical::JOYSTICK_LEFT,
-				physical: Physical::NONE,
+				logical: 262144, // Logical::JOYSTICK_LEFT,
+				physical: 0, // Physical::NONE,
 			},
 			Buttons {
-				logical: Logical::JOYSTICK_RIGHT,
-				physical: Physical::NONE,
+				logical: 524288, // Logical::JOYSTICK_RIGHT,
+				physical: 0, // Physical::NONE,
 			},
 		]
 	);
@@ -394,25 +366,47 @@ fn joystick_udlr() {
 #[test]
 fn nintendont() {
 	let game = game("nintendont");
-	assert_eq!(game.metadata.platform, Some("nintendont".to_string()));
+	assert_eq!(
+		game.metadata.unwrap()["playedOn"],
+		serde_json::Value::String("nintendont".to_string())
+	);
 }
 
 #[test]
 fn netplay() {
 	let game = game("netplay");
-	let players = game.metadata.players.unwrap();
-	let names: Vec<_> = players
-		.into_iter()
-		.flat_map(|p| p.netplay)
-		.map(|n| n.name)
-		.collect();
-	assert_eq!(names, vec!["abcdefghijk", "nobody"]);
+	assert_eq!(
+		game.metadata.unwrap()["players"],
+		json!({
+			"0": {
+				"names": {
+					"netplay": "abcdefghijk",
+					"code": "ABCD#123"
+				},
+				"characters": {
+					"13": 128,
+				}
+			},
+			"1": {
+				"names": {
+					"netplay": "nobody",
+					"code": "XX#000"
+				},
+				"characters": {
+					"18": 128,
+				}
+			}
+		})
+	);
 }
 
 #[test]
 fn console_name() {
 	let game = game("console_name");
-	assert_eq!(game.metadata.console, Some("Station 1".to_string()));
+	assert_eq!(
+		game.metadata.unwrap()["consoleNick"],
+		serde_json::Value::String("Station 1".to_string())
+	)
 }
 
 #[test]
@@ -436,17 +430,17 @@ fn v3_12() {
 			is_teams: false,
 			item_spawn_frequency: -1,
 			self_destruct_score: -1,
-			stage: Stage::POKEMON_STADIUM,
+			stage: 3,
 			timer: 480,
 			item_spawn_bitfield: [255, 255, 255, 255, 255],
 			damage_ratio: 1.0,
 			players: vec![
 				Player {
 					port: Port::P1,
-					character: External::MARTH,
+					character: 9, // External::MARTH
 					r#type: PlayerType::HUMAN,
 					stocks: 4,
-					costume: Costume::from(3, External::MARTH),
+					costume: 3,
 					team: None,
 					handicap: 9,
 					bitfield: 192,
@@ -455,8 +449,8 @@ fn v3_12() {
 					defense_ratio: 1.0,
 					model_scale: 1.0,
 					ucf: Some(Ucf {
-						dash_back: Some(DashBack::UCF),
-						shield_drop: Some(ShieldDrop::UCF)
+						dash_back: 1, // DashBack::UCF
+						shield_drop: 1, // ShieldDrop::UCF
 					}),
 					name_tag: Some(MeleeString("".to_string())),
 					netplay: Some(Netplay {
@@ -467,10 +461,10 @@ fn v3_12() {
 				},
 				Player {
 					port: Port::P2,
-					character: External::MARTH,
+					character: 9, // External::MARTH
 					r#type: PlayerType::HUMAN,
 					stocks: 4,
-					costume: Costume::from(0, External::MARTH),
+					costume: 0,
 					team: None,
 					handicap: 9,
 					bitfield: 192,
@@ -479,8 +473,8 @@ fn v3_12() {
 					defense_ratio: 1.0,
 					model_scale: 1.0,
 					ucf: Some(Ucf {
-						dash_back: Some(DashBack::UCF),
-						shield_drop: Some(ShieldDrop::UCF)
+						dash_back: 1, // DashBack::UCF
+						shield_drop: 1, // ShieldDrop::UCF
 					}),
 					name_tag: Some(MeleeString("".to_string())),
 					netplay: Some(Netplay {
@@ -525,7 +519,7 @@ fn v3_12() {
 			is_pal: Some(false),
 			is_frozen_ps: Some(false),
 			scene: Some(Scene { minor: 2, major: 8 }),
-			language: Some(Language::ENGLISH)
+			language: Some(1), // Language::ENGLISH
 		}
 	);
 }
@@ -545,83 +539,69 @@ fn corrupt_replay() {
 #[test]
 fn zelda_sheik_transformation() {
 	let game = game("transform");
-	match game.frames {
-		Frames::P2(frames) => assert_eq!(
-			frames[400].ports[1].leader.pre.state,
-			State::Zelda(Zelda::TRANSFORM_GROUND)
-		),
-		_ => panic!("wrong number of ports"),
-	};
+	assert_eq!(
+		game.frames.port[1].leader.pre.state.values()[400],
+		355, // State::Zelda(Zelda::TRANSFORM_GROUND)
+	);
 }
 
 #[test]
 fn items() {
 	let game = game("items");
-	match game.frames {
-		Frames::P2(frames) => {
-			let mut items: HashMap<u32, Item> = HashMap::new();
-			for f in frames {
-				for i in f.items.unwrap() {
-					items.entry(i.id).or_insert(i);
-				}
-			}
-			assert_eq!(
-				items[&0],
-				Item {
-					id: 0,
-					damage: 0,
-					direction: Some(Direction::Right),
-					position: Position {
-						x: -62.709_606,
-						y: -1.493_274_9
-					},
-					state: item::State(0),
-					timer: 140.0,
-					r#type: item::Type::PEACH_TURNIP,
-					velocity: Velocity { x: 0.0, y: 0.0 },
-					misc: Some([5, 5, 5, 5]),
-					owner: Some(Some(Port::P1)),
-				}
-			);
-			assert_eq!(
-				items[&1],
-				Item {
-					id: 1,
-					damage: 0,
-					direction: Some(Direction::Left),
-					position: Position {
-						x: 20.395_56,
-						y: -1.493_274_9
-					},
-					state: item::State(0),
-					timer: 140.0,
-					r#type: item::Type::PEACH_TURNIP,
-					velocity: Velocity { x: 0.0, y: 0.0 },
-					misc: Some([5, 0, 5, 5]),
-					owner: Some(Some(Port::P1)),
-				}
-			);
-			assert_eq!(
-				items[&2],
-				Item {
-					id: 2,
-					damage: 0,
-					direction: Some(Direction::Right),
-					position: Position {
-						x: -3.982_539_2,
-						y: -1.493_274_9
-					},
-					state: item::State(0),
-					timer: 140.0,
-					r#type: item::Type::PEACH_TURNIP,
-					velocity: Velocity { x: 0.0, y: 0.0 },
-					misc: Some([5, 0, 5, 5]),
-					owner: Some(Some(Port::P1)),
-				}
-			);
+	assert_eq!(
+		game.frames.item.slice(0, game.start.slippi.version),
+		columnar::Item {
+			id: 0,
+			damage: 0,
+			direction: 1.0,
+			position: columnar::Position {
+				x: -62.709_606,
+				y: -1.493_274_9
+			},
+			state: 0,
+			timer: 140.0,
+			r#type: 99, // item::Type::PEACH_TURNIP,
+			velocity: columnar::Velocity { x: 0.0, y: 0.0 },
+			misc: Some(columnar::ItemMisc(5, 5, 5, 5)),
+			owner: Some(0),
 		}
-		_ => panic!("wrong number of ports"),
-	};
+	);
+	assert_eq!(
+		game.frames.item.slice(102, game.start.slippi.version),
+		columnar::Item {
+			id: 1,
+			damage: 0,
+			direction: -1.0,
+			position: columnar::Position {
+				x: 20.395_56,
+				y: -1.493_274_9
+			},
+			state: 0,
+			timer: 140.0,
+			r#type: 99, // item::Type::PEACH_TURNIP,
+			velocity: columnar::Velocity { x: 0.0, y: 0.0 },
+			misc: Some(columnar::ItemMisc(5, 0, 5, 5)),
+			owner: Some(0),
+		}
+	);
+	assert_eq!(
+		game.frames.item.slice(290, game.start.slippi.version),
+		columnar::Item {
+			id: 2,
+			damage: 0,
+			direction: 1.0,
+			position: columnar::Position {
+				x: -3.982_539_2,
+				y: -1.493_274_9
+			},
+			state: 0,
+			timer: 140.0,
+			r#type: 99, // item::Type::PEACH_TURNIP,
+			velocity: columnar::Velocity { x: 0.0, y: 0.0 },
+			misc: Some(columnar::ItemMisc(5, 0, 5, 5)),
+			owner: Some(0),
+		}
+	);
 }
 
 fn hash(path: impl AsRef<Path>) -> u64 {
@@ -629,13 +609,6 @@ fn hash(path: impl AsRef<Path>) -> u64 {
 	let mut f = File::open(path).unwrap();
 	f.read_to_end(&mut buf).unwrap();
 	xxh3_64(&buf)
-}
-
-fn frames<const N: usize>(f1: Vec<Frame<N>>, f2: Vec<Frame<N>>) {
-	assert_eq!(f1.len(), f2.len());
-	for idx in 0..f1.len() {
-		assert_eq!(f1[idx], f2[idx], "frame: {}", idx);
-	}
 }
 
 fn _round_trip(in_path: impl AsRef<Path> + Clone) {
@@ -648,14 +621,13 @@ fn _round_trip(in_path: impl AsRef<Path> + Clone) {
 	assert_eq!(game1.start, game2.start);
 	assert_eq!(game1.end, game2.end);
 	assert_eq!(game1.metadata, game2.metadata);
-	assert_eq!(game1.metadata_raw, game2.metadata_raw);
 
-	match (game1.frames, game2.frames) {
-		(Frames::P1(f1), Frames::P1(f2)) => frames(f1, f2),
-		(Frames::P2(f1), Frames::P2(f2)) => frames(f1, f2),
-		(Frames::P3(f1), Frames::P3(f2)) => frames(f1, f2),
-		(Frames::P4(f1), Frames::P4(f2)) => frames(f1, f2),
-		_ => panic!("wrong number of ports"),
+	assert_eq!(game1.frames.id.len(), game2.frames.id.len());
+	for idx in 0 .. game1.frames.id.len() {
+		assert_eq!(
+			game1.frames.slice(idx, game1.start.slippi.version),
+			game2.frames.slice(idx, game2.start.slippi.version),
+			"frame: {}", idx);
 	}
 
 	assert_eq!(hash(in_path), hash(out_path));
@@ -679,26 +651,20 @@ fn round_trip() {
 	}
 }
 
-fn rollback_frames(rollback: Rollback) -> Vec<frame::Frame<2>> {
-	let mut buf = BufReader::new(File::open("tests/data/ics2.slp").unwrap());
-	let opts = collect::Opts { rollback };
-	let game = peppi::game(&mut buf, None, Some(&opts)).unwrap();
-	match game.frames {
-		Frames::P2(frames) => frames,
-		_ => panic!("wrong number of ports"),
-	}
-}
-
 #[test]
 fn rollback() {
-	let frames_all = rollback_frames(Rollback::All);
-	let frames_first = rollback_frames(Rollback::First);
-	let frames_last = rollback_frames(Rollback::Last);
-	assert_eq!(frames_all.len(), 9530);
-	assert_eq!(frames_first.len(), 9519);
-	assert_eq!(frames_last.len(), 9519);
-	assert_eq!(frames_all[474], frames_first[474]);
-	assert_eq!(frames_all[475], frames_last[474]);
-	assert_eq!(frames_all[476], frames_first[475]);
-	assert_eq!(frames_all[476], frames_last[475]);
+	let game = game("ics2");
+	assert_eq!(game.frames.id.len(), 9530);
+	assert_eq!(
+		game.frames.id.values().clone().sliced(473, 4).as_slice(),
+		[350, 351, 351, 352]
+	);
+	assert_eq!(
+		game.frames.rollback_indexes_initial()[473..476],
+		[473, 474, 476]
+	);
+	assert_eq!(
+		game.frames.rollback_indexes_final()[473..476],
+		[473, 475, 476]
+	);
 }

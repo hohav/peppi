@@ -1,5 +1,6 @@
 #![allow(unused_parens)]
 #![allow(unused_variables)]
+#![allow(dead_code)]
 
 use arrow2::{
 	array::{ListArray, MutablePrimitiveArray, PrimitiveArray, StructArray},
@@ -10,9 +11,19 @@ use arrow2::{
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use std::io::{Result, Write};
 
-use crate::model::{primitives::Port, slippi::Version};
+use crate::{
+	model::{
+		columnar,
+		game::{Port, NUM_PORTS},
+		slippi::Version,
+	},
+	serde::de::Event,
+};
 
 type BE = byteorder::BigEndian;
+
+/// Frame indexes start at -123, and reach 0 at "Go!".
+pub const FIRST_INDEX: i32 = -123;
 
 #[derive(Clone, Copy, Debug)]
 pub struct PortOccupancy {
@@ -71,7 +82,7 @@ impl Data {
 		frame_id: i32,
 		port: PortOccupancy,
 	) -> Result<()> {
-		w.write_u8(0x37)?; // FIXME: don't hard-code
+		w.write_u8(Event::FramePre as u8)?;
 		w.write_i32::<BE>(frame_id)?;
 		w.write_u8(port.port as u8)?;
 		w.write_u8(match port.follower {
@@ -90,7 +101,7 @@ impl Data {
 		frame_id: i32,
 		port: PortOccupancy,
 	) -> Result<()> {
-		w.write_u8(0x38)?; // FIXME: don't hard-code
+		w.write_u8(Event::FramePost as u8)?;
 		w.write_i32::<BE>(frame_id)?;
 		w.write_u8(port.port as u8)?;
 		w.write_u8(match port.follower {
@@ -113,6 +124,11 @@ impl MutableData {
 			pre: MutablePre::with_capacity(capacity, version),
 			post: MutablePost::with_capacity(capacity, version),
 		}
+	}
+
+	pub fn push_none(&mut self, version: Version) {
+		self.pre.push_none(version);
+		self.post.push_none(version);
 	}
 }
 
@@ -197,16 +213,20 @@ impl PortData {
 		self.follower
 			.as_ref()
 			.map(|f| {
-				f.write_pre(
-					w,
-					version,
-					idx,
-					frame_id,
-					PortOccupancy {
-						port: self.port,
-						follower: false,
-					},
-				)
+				if f.pre.random_seed.validity().map(|v| v.get_bit(idx)).unwrap_or(true) {
+					f.write_pre(
+						w,
+						version,
+						idx,
+						frame_id,
+						PortOccupancy {
+							port: self.port,
+							follower: true,
+						},
+					)
+				} else {
+					Ok(())
+				}
 			})
 			.unwrap_or(Ok(()))
 	}
@@ -231,16 +251,20 @@ impl PortData {
 		self.follower
 			.as_ref()
 			.map(|f| {
-				f.write_post(
-					w,
-					version,
-					idx,
-					frame_id,
-					PortOccupancy {
-						port: self.port,
-						follower: false,
-					},
-				)
+				if f.pre.random_seed.validity().map(|v| v.get_bit(idx)).unwrap_or(true) {
+					f.write_post(
+						w,
+						version,
+						idx,
+						frame_id,
+						PortOccupancy {
+							port: self.port,
+							follower: true,
+						},
+					)
+				} else {
+					Ok(())
+				}
 			})
 			.unwrap_or(Ok(()))
 	}
@@ -293,7 +317,7 @@ impl Frame {
 				.enumerate()
 				.map(|(i, p)| {
 					Field::new(
-						format!("_{}", i),
+						format!("{}", i),
 						PortData::data_type(version, *p).clone(),
 						false,
 					)
@@ -305,8 +329,7 @@ impl Frame {
 	pub fn port_data_from_struct_array(array: StructArray, version: Version) -> Vec<PortData> {
 		let (_, values, _) = array.into_data();
 		let mut ports = vec![];
-		for i in 0..4u8 {
-			// FIXME: don't hard-code
+		for i in 0 .. NUM_PORTS {
 			if let Some(a) = values.get(i as usize) {
 				ports.push(PortData::from_struct_array(
 					a.as_any().downcast_ref::<StructArray>().unwrap().clone(),
@@ -415,29 +438,61 @@ impl Frame {
 
 	pub fn write<W: Write>(&self, w: &mut W, version: Version) -> Result<()> {
 		for (idx, &frame_id) in self.id.values().iter().enumerate() {
-			if version > Version(2, 2, 0) {
-				w.write_u8(0x3A)?;
+			if version.gte(2, 2) {
+				w.write_u8(Event::FrameStart as u8)?;
 				w.write_i32::<BE>(frame_id)?;
 				self.start.write(w, version, idx)?;
 			}
 			for port in &self.port {
 				port.write_pre(w, version, idx, frame_id)?;
 			}
-			for item_idx in self.item_offset[idx] as usize..self.item_offset[idx + 1] as usize {
-				w.write_u8(0x3B)?;
-				w.write_i32::<BE>(frame_id)?;
-				self.item.write(w, version, item_idx)?;
+			if version.gte(3, 0) {
+				for item_idx in self.item_offset[idx] as usize .. self.item_offset[idx + 1] as usize {
+					w.write_u8(Event::Item as u8)?;
+					w.write_i32::<BE>(frame_id)?;
+					self.item.write(w, version, item_idx)?;
+				}
 			}
 			for port in &self.port {
 				port.write_post(w, version, idx, frame_id)?;
 			}
-			if version > Version(3, 0, 0) {
-				w.write_u8(0x3C)?;
+			if version.gte(3, 0) {
+				w.write_u8(Event::FrameEnd as u8)?;
 				w.write_i32::<BE>(frame_id)?;
 				self.end.write(w, version, idx)?;
 			}
 		}
 		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> columnar::Frame {
+		columnar::Frame {
+			start: self.start.transpose_one(i, version),
+			end: self.end.transpose_one(i, version),
+		}
+	}
+
+	pub fn rollback_indexes_initial(&self) -> Vec<usize> {
+		self.rollback_indexes(self.id.values().as_slice().iter().enumerate())
+	}
+
+	pub fn rollback_indexes_final(&self) -> Vec<usize> {
+		let mut result = self.rollback_indexes(self.id.values().as_slice().iter().enumerate().rev());
+		result.reverse();
+		result
+	}
+
+	fn rollback_indexes<'a>(&self, ids: impl Iterator<Item=(usize, &'a i32)>) -> Vec<usize> {
+		let mut result = vec![];
+		let mut seen_ids = vec![false; self.id.len()];
+		for (idx, id) in ids {
+			let zero_based_id = usize::try_from(id - FIRST_INDEX).unwrap();
+			if !seen_ids[zero_based_id] {
+				seen_ids[zero_based_id] = true;
+				result.push(idx);
+			}
+		}
+		result
 	}
 }
 

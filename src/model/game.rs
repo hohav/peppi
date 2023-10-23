@@ -4,28 +4,61 @@ use std::{
 	io,
 };
 
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::Serialize;
 
 use crate::{
 	model::{
 		frame,
-		primitives::Port,
 		shift_jis::MeleeString,
 		slippi,
 	},
 	serde::de,
 };
 
-pub const NUM_PORTS: usize = 4;
-pub const MAX_PLAYERS: usize = 6;
-
-/// Frame indexes start at -123, and reach 0 at "Go!".
-pub const FIRST_FRAME_INDEX: i32 = -123;
-
 /// We can parse files with higher versions than this, but we won't expose all information.
 /// When converting a replay with a higher version number to another format like Arrow,
 /// the conversion will be lossy.
 pub const MAX_SUPPORTED_VERSION: slippi::Version = slippi::Version(3, 12, 0);
+
+pub const NUM_PORTS: u8 = 4;
+
+#[derive(
+	Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, IntoPrimitive, TryFromPrimitive,
+)]
+#[repr(u8)]
+pub enum Port {
+	P1 = 0,
+	P2 = 1,
+	P3 = 2,
+	P4 = 3,
+}
+
+impl Display for Port {
+	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+		use Port::*;
+		match *self {
+			P1 => write!(f, "P1"),
+			P2 => write!(f, "P2"),
+			P3 => write!(f, "P3"),
+			P4 => write!(f, "P4"),
+		}
+	}
+}
+
+impl Default for Port {
+	fn default() -> Self {
+		Self::P1
+	}
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
+pub enum PlayerType {
+	HUMAN = 0,
+	CPU = 1,
+	DEMO = 2,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Team {
@@ -36,8 +69,8 @@ pub struct Team {
 /// Information about the "Universal Controller Fix" mod.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Ucf {
-	pub dash_back: Option<u32>,
-	pub shield_drop: Option<u32>,
+	pub dash_back: u32,
+	pub shield_drop: u32,
 }
 
 /// Netplay name, connect code, and Slippi UID.
@@ -59,7 +92,7 @@ pub struct Player {
 
 	pub character: u8,
 
-	pub r#type: u8,
+	pub r#type: PlayerType,
 
 	/// starting stock count
 	pub stocks: u8,

@@ -9,7 +9,7 @@ use std::{
 
 pub fn read_game(path: impl AsRef<Path>) -> Result<Game, ParseError> {
 	let mut buf = BufReader::new(File::open(path).unwrap());
-	peppi::game(&mut buf, None, None)
+	peppi::game(&mut buf, None)
 }
 
 pub fn get_path(name: &str) -> PathBuf {

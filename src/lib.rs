@@ -1,6 +1,3 @@
-#![allow(clippy::zero_prefixed_literal)]
-#![allow(clippy::redundant_field_names)]
-
 macro_rules! err {
 	($( $arg: expr ),*) => {
 		std::io::Error::new(std::io::ErrorKind::InvalidData, format!($( $arg ),*))
@@ -12,28 +9,15 @@ pub const SLIPPI_FILE_SIGNATURE: [u8; 11] = [
 	0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c,
 ];
 
-#[derive(Clone, Copy, Debug)]
-pub struct SerializationConfig {
-	/// Print enum names with numeric values (e.g. `14:WAIT`).
-	pub enum_names: bool,
-}
-
-// TODO: replace with `serde_state`?
-/// Global singleton, a hack to smuggle config into serializers.
-/// You probably don't care about this unless you're serializing with Serde.
-pub static mut SERIALIZATION_CONFIG: SerializationConfig =
-	SerializationConfig { enum_names: false };
-
 pub(crate) mod ubjson {
 	pub(crate) mod de;
 	pub(crate) mod ser;
 }
 
 pub mod model {
+	pub mod columnar;
 	pub mod frame;
 	pub mod game;
-	pub mod metadata;
-	pub mod primitives;
 	pub mod shift_jis;
 	pub mod slippi;
 }

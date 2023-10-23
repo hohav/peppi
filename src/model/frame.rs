@@ -2,6 +2,7 @@
 
 #![allow(unused_parens)]
 #![allow(unused_variables)]
+#![allow(dead_code)]
 
 use arrow2::{
 	array::{ListArray, MutablePrimitiveArray, PrimitiveArray, StructArray},
@@ -12,9 +13,19 @@ use arrow2::{
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use std::io::{Result, Write};
 
-use crate::model::{primitives::Port, slippi::Version};
+use crate::{
+	model::{
+		columnar,
+		game::{Port, NUM_PORTS},
+		slippi::Version,
+	},
+	serde::de::Event,
+};
 
 type BE = byteorder::BigEndian;
+
+/// Frame indexes start at -123, and reach 0 at "Go!".
+pub const FIRST_INDEX: i32 = -123;
 
 #[derive(Clone, Copy, Debug)]
 pub struct PortOccupancy {
@@ -73,7 +84,7 @@ impl Data {
 		frame_id: i32,
 		port: PortOccupancy,
 	) -> Result<()> {
-		w.write_u8(0x37)?; // FIXME: don't hard-code
+		w.write_u8(Event::FramePre as u8)?;
 		w.write_i32::<BE>(frame_id)?;
 		w.write_u8(port.port as u8)?;
 		w.write_u8(match port.follower {
@@ -92,7 +103,7 @@ impl Data {
 		frame_id: i32,
 		port: PortOccupancy,
 	) -> Result<()> {
-		w.write_u8(0x38)?; // FIXME: don't hard-code
+		w.write_u8(Event::FramePost as u8)?;
 		w.write_i32::<BE>(frame_id)?;
 		w.write_u8(port.port as u8)?;
 		w.write_u8(match port.follower {
@@ -115,6 +126,11 @@ impl MutableData {
 			pre: MutablePre::with_capacity(capacity, version),
 			post: MutablePost::with_capacity(capacity, version),
 		}
+	}
+
+	pub fn push_none(&mut self, version: Version) {
+		self.pre.push_none(version);
+		self.post.push_none(version);
 	}
 }
 
@@ -199,16 +215,25 @@ impl PortData {
 		self.follower
 			.as_ref()
 			.map(|f| {
-				f.write_pre(
-					w,
-					version,
-					idx,
-					frame_id,
-					PortOccupancy {
-						port: self.port,
-						follower: false,
-					},
-				)
+				if f.pre
+					.random_seed
+					.validity()
+					.map(|v| v.get_bit(idx))
+					.unwrap_or(true)
+				{
+					f.write_pre(
+						w,
+						version,
+						idx,
+						frame_id,
+						PortOccupancy {
+							port: self.port,
+							follower: true,
+						},
+					)
+				} else {
+					Ok(())
+				}
 			})
 			.unwrap_or(Ok(()))
 	}
@@ -233,16 +258,25 @@ impl PortData {
 		self.follower
 			.as_ref()
 			.map(|f| {
-				f.write_post(
-					w,
-					version,
-					idx,
-					frame_id,
-					PortOccupancy {
-						port: self.port,
-						follower: false,
-					},
-				)
+				if f.pre
+					.random_seed
+					.validity()
+					.map(|v| v.get_bit(idx))
+					.unwrap_or(true)
+				{
+					f.write_post(
+						w,
+						version,
+						idx,
+						frame_id,
+						PortOccupancy {
+							port: self.port,
+							follower: true,
+						},
+					)
+				} else {
+					Ok(())
+				}
 			})
 			.unwrap_or(Ok(()))
 	}
@@ -294,7 +328,7 @@ impl Frame {
 				.enumerate()
 				.map(|(i, p)| {
 					Field::new(
-						format!("_{}", i),
+						format!("{}", i),
 						PortData::data_type(version, *p).clone(),
 						false,
 					)
@@ -306,8 +340,7 @@ impl Frame {
 	pub fn port_data_from_struct_array(array: StructArray, version: Version) -> Vec<PortData> {
 		let (_, values, _) = array.into_data();
 		let mut ports = vec![];
-		for i in 0..4u8 {
-			// FIXME: don't hard-code
+		for i in 0..NUM_PORTS {
 			if let Some(a) = values.get(i as usize) {
 				ports.push(PortData::from_struct_array(
 					a.as_any().downcast_ref::<StructArray>().unwrap().clone(),
@@ -416,29 +449,62 @@ impl Frame {
 
 	pub fn write<W: Write>(&self, w: &mut W, version: Version) -> Result<()> {
 		for (idx, &frame_id) in self.id.values().iter().enumerate() {
-			if version > Version(2, 2, 0) {
-				w.write_u8(0x3A)?;
+			if version.gte(2, 2) {
+				w.write_u8(Event::FrameStart as u8)?;
 				w.write_i32::<BE>(frame_id)?;
 				self.start.write(w, version, idx)?;
 			}
 			for port in &self.port {
 				port.write_pre(w, version, idx, frame_id)?;
 			}
-			for item_idx in self.item_offset[idx] as usize..self.item_offset[idx + 1] as usize {
-				w.write_u8(0x3B)?;
-				w.write_i32::<BE>(frame_id)?;
-				self.item.write(w, version, item_idx)?;
+			if version.gte(3, 0) {
+				for item_idx in self.item_offset[idx] as usize..self.item_offset[idx + 1] as usize {
+					w.write_u8(Event::Item as u8)?;
+					w.write_i32::<BE>(frame_id)?;
+					self.item.write(w, version, item_idx)?;
+				}
 			}
 			for port in &self.port {
 				port.write_post(w, version, idx, frame_id)?;
 			}
-			if version > Version(3, 0, 0) {
-				w.write_u8(0x3C)?;
+			if version.gte(3, 0) {
+				w.write_u8(Event::FrameEnd as u8)?;
 				w.write_i32::<BE>(frame_id)?;
 				self.end.write(w, version, idx)?;
 			}
 		}
 		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> columnar::Frame {
+		columnar::Frame {
+			start: self.start.transpose_one(i, version),
+			end: self.end.transpose_one(i, version),
+		}
+	}
+
+	pub fn rollback_indexes_initial(&self) -> Vec<usize> {
+		self.rollback_indexes(self.id.values().as_slice().iter().enumerate())
+	}
+
+	pub fn rollback_indexes_final(&self) -> Vec<usize> {
+		let mut result =
+			self.rollback_indexes(self.id.values().as_slice().iter().enumerate().rev());
+		result.reverse();
+		result
+	}
+
+	fn rollback_indexes<'a>(&self, ids: impl Iterator<Item = (usize, &'a i32)>) -> Vec<usize> {
+		let mut result = vec![];
+		let mut seen_ids = vec![false; self.id.len()];
+		for (idx, id) in ids {
+			let zero_based_id = usize::try_from(id - FIRST_INDEX).unwrap();
+			if !seen_ids[zero_based_id] {
+				seen_ids[zero_based_id] = true;
+				result.push(idx);
+			}
+		}
+		result
 	}
 }
 
@@ -485,7 +551,7 @@ pub struct MutablePost {
 	pub state: MutablePrimitiveArray<u16>,
 	pub position: MutablePosition,
 	pub direction: MutablePrimitiveArray<f32>,
-	pub damage: MutablePrimitiveArray<f32>,
+	pub percent: MutablePrimitiveArray<f32>,
 	pub shield: MutablePrimitiveArray<f32>,
 	pub last_attack_landed: MutablePrimitiveArray<u8>,
 	pub combo_count: MutablePrimitiveArray<u8>,
@@ -511,7 +577,7 @@ impl MutablePost {
 			state: MutablePrimitiveArray::<u16>::with_capacity(capacity),
 			position: MutablePosition::with_capacity(capacity, version),
 			direction: MutablePrimitiveArray::<f32>::with_capacity(capacity),
-			damage: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			percent: MutablePrimitiveArray::<f32>::with_capacity(capacity),
 			shield: MutablePrimitiveArray::<f32>::with_capacity(capacity),
 			last_attack_landed: MutablePrimitiveArray::<u8>::with_capacity(capacity),
 			combo_count: MutablePrimitiveArray::<u8>::with_capacity(capacity),
@@ -553,12 +619,48 @@ impl MutablePost {
 		}
 	}
 
+	pub fn push_none(&mut self, version: Version) {
+		self.character.push(None);
+		self.state.push(None);
+		self.position.push_none(version);
+		self.direction.push(None);
+		self.percent.push(None);
+		self.shield.push(None);
+		self.last_attack_landed.push(None);
+		self.combo_count.push(None);
+		self.last_hit_by.push(None);
+		self.stocks.push(None);
+		if version.gte(0, 2) {
+			self.state_age.as_mut().unwrap().push(None);
+			if version.gte(2, 0) {
+				self.state_flags.as_mut().unwrap().push_none(version);
+				self.misc_as.as_mut().unwrap().push(None);
+				self.airborne.as_mut().unwrap().push(None);
+				self.ground.as_mut().unwrap().push(None);
+				self.jumps.as_mut().unwrap().push(None);
+				self.l_cancel.as_mut().unwrap().push(None);
+				if version.gte(2, 1) {
+					self.hurtbox_state.as_mut().unwrap().push(None);
+					if version.gte(3, 5) {
+						self.velocities.as_mut().unwrap().push_none(version);
+						if version.gte(3, 8) {
+							self.hitlag.as_mut().unwrap().push(None);
+							if version.gte(3, 11) {
+								self.animation_index.as_mut().unwrap().push(None)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
 		r.read_u8().map(|x| self.character.push(Some(x)))?;
 		r.read_u16::<BE>().map(|x| self.state.push(Some(x)))?;
 		self.position.read_push(r, version)?;
 		r.read_f32::<BE>().map(|x| self.direction.push(Some(x)))?;
-		r.read_f32::<BE>().map(|x| self.damage.push(Some(x)))?;
+		r.read_f32::<BE>().map(|x| self.percent.push(Some(x)))?;
 		r.read_f32::<BE>().map(|x| self.shield.push(Some(x)))?;
 		r.read_u8().map(|x| self.last_attack_landed.push(Some(x)))?;
 		r.read_u8().map(|x| self.combo_count.push(Some(x)))?;
@@ -617,6 +719,15 @@ impl MutableStart {
 		}
 	}
 
+	pub fn push_none(&mut self, version: Version) {
+		if version.gte(2, 2) {
+			self.random_seed.as_mut().unwrap().push(None);
+			if version.gte(3, 10) {
+				self.scene_frame_counter.as_mut().unwrap().push(None)
+			}
+		}
+	}
+
 	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
 		if version.gte(2, 2) {
 			r.read_u32::<BE>()
@@ -643,6 +754,12 @@ impl MutableEnd {
 		}
 	}
 
+	pub fn push_none(&mut self, version: Version) {
+		if version.gte(3, 7) {
+			self.latest_finalized_frame.as_mut().unwrap().push(None)
+		}
+	}
+
 	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
 		if version.gte(3, 7) {
 			r.read_i32::<BE>()
@@ -653,11 +770,11 @@ impl MutableEnd {
 }
 
 pub struct MutableStateFlags(
-	MutablePrimitiveArray<u8>,
-	MutablePrimitiveArray<u8>,
-	MutablePrimitiveArray<u8>,
-	MutablePrimitiveArray<u8>,
-	MutablePrimitiveArray<u8>,
+	pub MutablePrimitiveArray<u8>,
+	pub MutablePrimitiveArray<u8>,
+	pub MutablePrimitiveArray<u8>,
+	pub MutablePrimitiveArray<u8>,
+	pub MutablePrimitiveArray<u8>,
 );
 
 impl MutableStateFlags {
@@ -669,6 +786,14 @@ impl MutableStateFlags {
 			MutablePrimitiveArray::<u8>::with_capacity(capacity),
 			MutablePrimitiveArray::<u8>::with_capacity(capacity),
 		)
+	}
+
+	pub fn push_none(&mut self, version: Version) {
+		self.0.push(None);
+		self.1.push(None);
+		self.2.push(None);
+		self.3.push(None);
+		self.4.push(None)
 	}
 
 	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
@@ -688,10 +813,12 @@ pub struct MutablePre {
 	pub direction: MutablePrimitiveArray<f32>,
 	pub joystick: MutablePosition,
 	pub cstick: MutablePosition,
-	pub triggers: MutableTriggers,
-	pub buttons: MutableButtons,
+	pub triggers: MutablePrimitiveArray<f32>,
+	pub buttons: MutablePrimitiveArray<u32>,
+	pub buttons_physical: MutablePrimitiveArray<u16>,
+	pub triggers_physical: MutableTriggersPhysical,
 	pub raw_analog_x: Option<MutablePrimitiveArray<i8>>,
-	pub damage: Option<MutablePrimitiveArray<f32>>,
+	pub percent: Option<MutablePrimitiveArray<f32>>,
 }
 
 impl MutablePre {
@@ -703,14 +830,35 @@ impl MutablePre {
 			direction: MutablePrimitiveArray::<f32>::with_capacity(capacity),
 			joystick: MutablePosition::with_capacity(capacity, version),
 			cstick: MutablePosition::with_capacity(capacity, version),
-			triggers: MutableTriggers::with_capacity(capacity, version),
-			buttons: MutableButtons::with_capacity(capacity, version),
+			triggers: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			buttons: MutablePrimitiveArray::<u32>::with_capacity(capacity),
+			buttons_physical: MutablePrimitiveArray::<u16>::with_capacity(capacity),
+			triggers_physical: MutableTriggersPhysical::with_capacity(capacity, version),
 			raw_analog_x: version
 				.gte(1, 2)
 				.then(|| MutablePrimitiveArray::<i8>::with_capacity(capacity)),
-			damage: version
+			percent: version
 				.gte(1, 4)
 				.then(|| MutablePrimitiveArray::<f32>::with_capacity(capacity)),
+		}
+	}
+
+	pub fn push_none(&mut self, version: Version) {
+		self.random_seed.push(None);
+		self.state.push(None);
+		self.position.push_none(version);
+		self.direction.push(None);
+		self.joystick.push_none(version);
+		self.cstick.push_none(version);
+		self.triggers.push(None);
+		self.buttons.push(None);
+		self.buttons_physical.push(None);
+		self.triggers_physical.push_none(version);
+		if version.gte(1, 2) {
+			self.raw_analog_x.as_mut().unwrap().push(None);
+			if version.gte(1, 4) {
+				self.percent.as_mut().unwrap().push(None)
+			}
 		}
 	}
 
@@ -721,14 +869,17 @@ impl MutablePre {
 		r.read_f32::<BE>().map(|x| self.direction.push(Some(x)))?;
 		self.joystick.read_push(r, version)?;
 		self.cstick.read_push(r, version)?;
-		self.triggers.read_push(r, version)?;
-		self.buttons.read_push(r, version)?;
+		r.read_f32::<BE>().map(|x| self.triggers.push(Some(x)))?;
+		r.read_u32::<BE>().map(|x| self.buttons.push(Some(x)))?;
+		r.read_u16::<BE>()
+			.map(|x| self.buttons_physical.push(Some(x)))?;
+		self.triggers_physical.read_push(r, version)?;
 		if version.gte(1, 2) {
 			r.read_i8()
 				.map(|x| self.raw_analog_x.as_mut().unwrap().push(Some(x)))?;
 			if version.gte(1, 4) {
 				r.read_f32::<BE>()
-					.map(|x| self.damage.as_mut().unwrap().push(Some(x)))?
+					.map(|x| self.percent.as_mut().unwrap().push(Some(x)))?
 			}
 		};
 		Ok(())
@@ -736,10 +887,10 @@ impl MutablePre {
 }
 
 pub struct MutableItemMisc(
-	MutablePrimitiveArray<u8>,
-	MutablePrimitiveArray<u8>,
-	MutablePrimitiveArray<u8>,
-	MutablePrimitiveArray<u8>,
+	pub MutablePrimitiveArray<u8>,
+	pub MutablePrimitiveArray<u8>,
+	pub MutablePrimitiveArray<u8>,
+	pub MutablePrimitiveArray<u8>,
 );
 
 impl MutableItemMisc {
@@ -750,6 +901,13 @@ impl MutableItemMisc {
 			MutablePrimitiveArray::<u8>::with_capacity(capacity),
 			MutablePrimitiveArray::<u8>::with_capacity(capacity),
 		)
+	}
+
+	pub fn push_none(&mut self, version: Version) {
+		self.0.push(None);
+		self.1.push(None);
+		self.2.push(None);
+		self.3.push(None)
 	}
 
 	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
@@ -774,6 +932,11 @@ impl MutablePosition {
 		}
 	}
 
+	pub fn push_none(&mut self, version: Version) {
+		self.x.push(None);
+		self.y.push(None)
+	}
+
 	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
 		r.read_f32::<BE>().map(|x| self.x.push(Some(x)))?;
 		r.read_f32::<BE>().map(|x| self.y.push(Some(x)))?;
@@ -781,74 +944,40 @@ impl MutablePosition {
 	}
 }
 
-pub struct MutableTriggers {
-	pub physical: MutableTriggersPhysical,
-	pub logical: MutablePrimitiveArray<f32>,
-}
-
-impl MutableTriggers {
-	fn with_capacity(capacity: usize, version: Version) -> Self {
-		Self {
-			physical: MutableTriggersPhysical::with_capacity(capacity, version),
-			logical: MutablePrimitiveArray::<f32>::with_capacity(capacity),
-		}
-	}
-
-	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		self.physical.read_push(r, version)?;
-		r.read_f32::<BE>().map(|x| self.logical.push(Some(x)))?;
-		Ok(())
-	}
-}
-
 pub struct MutableVelocities {
-	pub autogenous_x_air: MutablePrimitiveArray<f32>,
-	pub autogenous_y: MutablePrimitiveArray<f32>,
+	pub self_x_air: MutablePrimitiveArray<f32>,
+	pub self_y: MutablePrimitiveArray<f32>,
 	pub knockback_x: MutablePrimitiveArray<f32>,
 	pub knockback_y: MutablePrimitiveArray<f32>,
-	pub autogenous_x_ground: MutablePrimitiveArray<f32>,
+	pub self_x_ground: MutablePrimitiveArray<f32>,
 }
 
 impl MutableVelocities {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self {
-			autogenous_x_air: MutablePrimitiveArray::<f32>::with_capacity(capacity),
-			autogenous_y: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			self_x_air: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			self_y: MutablePrimitiveArray::<f32>::with_capacity(capacity),
 			knockback_x: MutablePrimitiveArray::<f32>::with_capacity(capacity),
 			knockback_y: MutablePrimitiveArray::<f32>::with_capacity(capacity),
-			autogenous_x_ground: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			self_x_ground: MutablePrimitiveArray::<f32>::with_capacity(capacity),
 		}
 	}
 
+	pub fn push_none(&mut self, version: Version) {
+		self.self_x_air.push(None);
+		self.self_y.push(None);
+		self.knockback_x.push(None);
+		self.knockback_y.push(None);
+		self.self_x_ground.push(None)
+	}
+
 	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>()
-			.map(|x| self.autogenous_x_air.push(Some(x)))?;
-		r.read_f32::<BE>()
-			.map(|x| self.autogenous_y.push(Some(x)))?;
+		r.read_f32::<BE>().map(|x| self.self_x_air.push(Some(x)))?;
+		r.read_f32::<BE>().map(|x| self.self_y.push(Some(x)))?;
 		r.read_f32::<BE>().map(|x| self.knockback_x.push(Some(x)))?;
 		r.read_f32::<BE>().map(|x| self.knockback_y.push(Some(x)))?;
 		r.read_f32::<BE>()
-			.map(|x| self.autogenous_x_ground.push(Some(x)))?;
-		Ok(())
-	}
-}
-
-pub struct MutableButtons {
-	pub physical: MutablePrimitiveArray<u16>,
-	pub logical: MutablePrimitiveArray<u32>,
-}
-
-impl MutableButtons {
-	fn with_capacity(capacity: usize, version: Version) -> Self {
-		Self {
-			physical: MutablePrimitiveArray::<u16>::with_capacity(capacity),
-			logical: MutablePrimitiveArray::<u32>::with_capacity(capacity),
-		}
-	}
-
-	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u16::<BE>().map(|x| self.physical.push(Some(x)))?;
-		r.read_u32::<BE>().map(|x| self.logical.push(Some(x)))?;
+			.map(|x| self.self_x_ground.push(Some(x)))?;
 		Ok(())
 	}
 }
@@ -864,6 +993,11 @@ impl MutableTriggersPhysical {
 			l: MutablePrimitiveArray::<f32>::with_capacity(capacity),
 			r: MutablePrimitiveArray::<f32>::with_capacity(capacity),
 		}
+	}
+
+	pub fn push_none(&mut self, version: Version) {
+		self.l.push(None);
+		self.r.push(None)
 	}
 
 	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
@@ -884,6 +1018,11 @@ impl MutableVelocity {
 			x: MutablePrimitiveArray::<f32>::with_capacity(capacity),
 			y: MutablePrimitiveArray::<f32>::with_capacity(capacity),
 		}
+	}
+
+	pub fn push_none(&mut self, version: Version) {
+		self.x.push(None);
+		self.y.push(None)
 	}
 
 	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
@@ -926,6 +1065,23 @@ impl MutableItem {
 		}
 	}
 
+	pub fn push_none(&mut self, version: Version) {
+		self.r#type.push(None);
+		self.state.push(None);
+		self.direction.push(None);
+		self.velocity.push_none(version);
+		self.position.push_none(version);
+		self.damage.push(None);
+		self.timer.push(None);
+		self.id.push(None);
+		if version.gte(3, 2) {
+			self.misc.as_mut().unwrap().push_none(version);
+			if version.gte(3, 6) {
+				self.owner.as_mut().unwrap().push(None)
+			}
+		}
+	}
+
 	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
 		r.read_u16::<BE>().map(|x| self.r#type.push(Some(x)))?;
 		r.read_u8().map(|x| self.state.push(Some(x)))?;
@@ -951,7 +1107,7 @@ pub struct Post {
 	pub state: PrimitiveArray<u16>,
 	pub position: Position,
 	pub direction: PrimitiveArray<f32>,
-	pub damage: PrimitiveArray<f32>,
+	pub percent: PrimitiveArray<f32>,
 	pub shield: PrimitiveArray<f32>,
 	pub last_attack_landed: PrimitiveArray<u8>,
 	pub combo_count: PrimitiveArray<u8>,
@@ -978,7 +1134,7 @@ impl Post {
 			fields.push(Field::new("state", DataType::UInt16, false));
 			fields.push(Field::new("position", Position::data_type(version), false));
 			fields.push(Field::new("direction", DataType::Float32, false));
-			fields.push(Field::new("damage", DataType::Float32, false));
+			fields.push(Field::new("percent", DataType::Float32, false));
 			fields.push(Field::new("shield", DataType::Float32, false));
 			fields.push(Field::new("last_attack_landed", DataType::UInt8, false));
 			fields.push(Field::new("combo_count", DataType::UInt8, false));
@@ -1030,7 +1186,7 @@ impl Post {
 			values.push(self.state.boxed());
 			values.push(self.position.into_struct_array(version).boxed());
 			values.push(self.direction.boxed());
-			values.push(self.damage.boxed());
+			values.push(self.percent.boxed());
 			values.push(self.shield.boxed());
 			values.push(self.last_attack_landed.boxed());
 			values.push(self.combo_count.boxed());
@@ -1090,7 +1246,7 @@ impl Post {
 				.downcast_ref::<PrimitiveArray<f32>>()
 				.unwrap()
 				.clone(),
-			damage: values[4]
+			percent: values[4]
 				.as_any()
 				.downcast_ref::<PrimitiveArray<f32>>()
 				.unwrap()
@@ -1194,7 +1350,7 @@ impl Post {
 		w.write_u16::<BE>(self.state.value(i))?;
 		self.position.write(w, version, i)?;
 		w.write_f32::<BE>(self.direction.value(i))?;
-		w.write_f32::<BE>(self.damage.value(i))?;
+		w.write_f32::<BE>(self.percent.value(i))?;
 		w.write_f32::<BE>(self.shield.value(i))?;
 		w.write_u8(self.last_attack_landed.value(i))?;
 		w.write_u8(self.combo_count.value(i))?;
@@ -1225,6 +1381,38 @@ impl Post {
 		};
 		Ok(())
 	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> columnar::Post {
+		columnar::Post {
+			character: self.character.values()[i],
+			state: self.state.values()[i],
+			position: self.position.transpose_one(i, version),
+			direction: self.direction.values()[i],
+			percent: self.percent.values()[i],
+			shield: self.shield.values()[i],
+			last_attack_landed: self.last_attack_landed.values()[i],
+			combo_count: self.combo_count.values()[i],
+			last_hit_by: self.last_hit_by.values()[i],
+			stocks: self.stocks.values()[i],
+			state_age: self.state_age.as_ref().map(|x| x.values()[i]),
+			state_flags: self
+				.state_flags
+				.as_ref()
+				.map(|x| x.transpose_one(i, version)),
+			misc_as: self.misc_as.as_ref().map(|x| x.values()[i]),
+			airborne: self.airborne.as_ref().map(|x| x.values()[i]),
+			ground: self.ground.as_ref().map(|x| x.values()[i]),
+			jumps: self.jumps.as_ref().map(|x| x.values()[i]),
+			l_cancel: self.l_cancel.as_ref().map(|x| x.values()[i]),
+			hurtbox_state: self.hurtbox_state.as_ref().map(|x| x.values()[i]),
+			velocities: self
+				.velocities
+				.as_ref()
+				.map(|x| x.transpose_one(i, version)),
+			hitlag: self.hitlag.as_ref().map(|x| x.values()[i]),
+			animation_index: self.animation_index.as_ref().map(|x| x.values()[i]),
+		}
+	}
 }
 
 impl From<MutablePost> for Post {
@@ -1234,7 +1422,7 @@ impl From<MutablePost> for Post {
 			state: x.state.into(),
 			position: x.position.into(),
 			direction: x.direction.into(),
-			damage: x.damage.into(),
+			percent: x.percent.into(),
 			shield: x.shield.into(),
 			last_attack_landed: x.last_attack_landed.into(),
 			combo_count: x.combo_count.into(),
@@ -1314,6 +1502,13 @@ impl Start {
 		};
 		Ok(())
 	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> columnar::Start {
+		columnar::Start {
+			random_seed: self.random_seed.as_ref().map(|x| x.values()[i]),
+			scene_frame_counter: self.scene_frame_counter.as_ref().map(|x| x.values()[i]),
+		}
+	}
 }
 
 impl From<MutableStart> for Start {
@@ -1368,6 +1563,12 @@ impl End {
 		};
 		Ok(())
 	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> columnar::End {
+		columnar::End {
+			latest_finalized_frame: self.latest_finalized_frame.as_ref().map(|x| x.values()[i]),
+		}
+	}
 }
 
 impl From<MutableEnd> for End {
@@ -1379,22 +1580,22 @@ impl From<MutableEnd> for End {
 }
 
 pub struct StateFlags(
-	PrimitiveArray<u8>,
-	PrimitiveArray<u8>,
-	PrimitiveArray<u8>,
-	PrimitiveArray<u8>,
-	PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
 );
 
 impl StateFlags {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
-			fields.push(Field::new("_0", DataType::UInt8, false));
-			fields.push(Field::new("_1", DataType::UInt8, false));
-			fields.push(Field::new("_2", DataType::UInt8, false));
-			fields.push(Field::new("_3", DataType::UInt8, false));
-			fields.push(Field::new("_4", DataType::UInt8, false))
+			fields.push(Field::new("0", DataType::UInt8, false));
+			fields.push(Field::new("1", DataType::UInt8, false));
+			fields.push(Field::new("2", DataType::UInt8, false));
+			fields.push(Field::new("3", DataType::UInt8, false));
+			fields.push(Field::new("4", DataType::UInt8, false))
 		};
 		DataType::Struct(fields)
 	}
@@ -1450,6 +1651,16 @@ impl StateFlags {
 		w.write_u8(self.4.value(i))?;
 		Ok(())
 	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> columnar::StateFlags {
+		columnar::StateFlags(
+			self.0.values()[i],
+			self.1.values()[i],
+			self.2.values()[i],
+			self.3.values()[i],
+			self.4.values()[i],
+		)
+	}
 }
 
 impl From<MutableStateFlags> for StateFlags {
@@ -1465,10 +1676,12 @@ pub struct Pre {
 	pub direction: PrimitiveArray<f32>,
 	pub joystick: Position,
 	pub cstick: Position,
-	pub triggers: Triggers,
-	pub buttons: Buttons,
+	pub triggers: PrimitiveArray<f32>,
+	pub buttons: PrimitiveArray<u32>,
+	pub buttons_physical: PrimitiveArray<u16>,
+	pub triggers_physical: TriggersPhysical,
 	pub raw_analog_x: Option<PrimitiveArray<i8>>,
-	pub damage: Option<PrimitiveArray<f32>>,
+	pub percent: Option<PrimitiveArray<f32>>,
 }
 
 impl Pre {
@@ -1481,12 +1694,18 @@ impl Pre {
 			fields.push(Field::new("direction", DataType::Float32, false));
 			fields.push(Field::new("joystick", Position::data_type(version), false));
 			fields.push(Field::new("cstick", Position::data_type(version), false));
-			fields.push(Field::new("triggers", Triggers::data_type(version), false));
-			fields.push(Field::new("buttons", Buttons::data_type(version), false));
+			fields.push(Field::new("triggers", DataType::Float32, false));
+			fields.push(Field::new("buttons", DataType::UInt32, false));
+			fields.push(Field::new("buttons_physical", DataType::UInt16, false));
+			fields.push(Field::new(
+				"triggers_physical",
+				TriggersPhysical::data_type(version),
+				false,
+			));
 			if version.gte(1, 2) {
 				fields.push(Field::new("raw_analog_x", DataType::Int8, false));
 				if version.gte(1, 4) {
-					fields.push(Field::new("damage", DataType::Float32, false))
+					fields.push(Field::new("percent", DataType::Float32, false))
 				}
 			}
 		};
@@ -1502,12 +1721,14 @@ impl Pre {
 			values.push(self.direction.boxed());
 			values.push(self.joystick.into_struct_array(version).boxed());
 			values.push(self.cstick.into_struct_array(version).boxed());
-			values.push(self.triggers.into_struct_array(version).boxed());
-			values.push(self.buttons.into_struct_array(version).boxed());
+			values.push(self.triggers.boxed());
+			values.push(self.buttons.boxed());
+			values.push(self.buttons_physical.boxed());
+			values.push(self.triggers_physical.into_struct_array(version).boxed());
 			if version.gte(1, 2) {
 				values.push(self.raw_analog_x.unwrap().boxed());
 				if version.gte(1, 4) {
-					values.push(self.damage.unwrap().boxed())
+					values.push(self.percent.unwrap().boxed())
 				}
 			}
 		};
@@ -1556,29 +1777,36 @@ impl Pre {
 					.clone(),
 				version,
 			),
-			triggers: Triggers::from_struct_array(
-				values[6]
+			triggers: values[6]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<f32>>()
+				.unwrap()
+				.clone(),
+			buttons: values[7]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u32>>()
+				.unwrap()
+				.clone(),
+			buttons_physical: values[8]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u16>>()
+				.unwrap()
+				.clone(),
+			triggers_physical: TriggersPhysical::from_struct_array(
+				values[9]
 					.as_any()
 					.downcast_ref::<StructArray>()
 					.unwrap()
 					.clone(),
 				version,
 			),
-			buttons: Buttons::from_struct_array(
-				values[7]
-					.as_any()
-					.downcast_ref::<StructArray>()
-					.unwrap()
-					.clone(),
-				version,
-			),
-			raw_analog_x: values.get(8).map(|x| {
+			raw_analog_x: values.get(10).map(|x| {
 				x.as_any()
 					.downcast_ref::<PrimitiveArray<i8>>()
 					.unwrap()
 					.clone()
 			}),
-			damage: values.get(9).map(|x| {
+			percent: values.get(11).map(|x| {
 				x.as_any()
 					.downcast_ref::<PrimitiveArray<f32>>()
 					.unwrap()
@@ -1594,15 +1822,34 @@ impl Pre {
 		w.write_f32::<BE>(self.direction.value(i))?;
 		self.joystick.write(w, version, i)?;
 		self.cstick.write(w, version, i)?;
-		self.triggers.write(w, version, i)?;
-		self.buttons.write(w, version, i)?;
+		w.write_f32::<BE>(self.triggers.value(i))?;
+		w.write_u32::<BE>(self.buttons.value(i))?;
+		w.write_u16::<BE>(self.buttons_physical.value(i))?;
+		self.triggers_physical.write(w, version, i)?;
 		if version.gte(1, 2) {
 			w.write_i8(self.raw_analog_x.as_ref().unwrap().value(i))?;
 			if version.gte(1, 4) {
-				w.write_f32::<BE>(self.damage.as_ref().unwrap().value(i))?
+				w.write_f32::<BE>(self.percent.as_ref().unwrap().value(i))?
 			}
 		};
 		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> columnar::Pre {
+		columnar::Pre {
+			random_seed: self.random_seed.values()[i],
+			state: self.state.values()[i],
+			position: self.position.transpose_one(i, version),
+			direction: self.direction.values()[i],
+			joystick: self.joystick.transpose_one(i, version),
+			cstick: self.cstick.transpose_one(i, version),
+			triggers: self.triggers.values()[i],
+			buttons: self.buttons.values()[i],
+			buttons_physical: self.buttons_physical.values()[i],
+			triggers_physical: self.triggers_physical.transpose_one(i, version),
+			raw_analog_x: self.raw_analog_x.as_ref().map(|x| x.values()[i]),
+			percent: self.percent.as_ref().map(|x| x.values()[i]),
+		}
 	}
 }
 
@@ -1617,27 +1864,29 @@ impl From<MutablePre> for Pre {
 			cstick: x.cstick.into(),
 			triggers: x.triggers.into(),
 			buttons: x.buttons.into(),
+			buttons_physical: x.buttons_physical.into(),
+			triggers_physical: x.triggers_physical.into(),
 			raw_analog_x: x.raw_analog_x.map(|x| x.into()),
-			damage: x.damage.map(|x| x.into()),
+			percent: x.percent.map(|x| x.into()),
 		}
 	}
 }
 
 pub struct ItemMisc(
-	PrimitiveArray<u8>,
-	PrimitiveArray<u8>,
-	PrimitiveArray<u8>,
-	PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
 );
 
 impl ItemMisc {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
-			fields.push(Field::new("_0", DataType::UInt8, false));
-			fields.push(Field::new("_1", DataType::UInt8, false));
-			fields.push(Field::new("_2", DataType::UInt8, false));
-			fields.push(Field::new("_3", DataType::UInt8, false))
+			fields.push(Field::new("0", DataType::UInt8, false));
+			fields.push(Field::new("1", DataType::UInt8, false));
+			fields.push(Field::new("2", DataType::UInt8, false));
+			fields.push(Field::new("3", DataType::UInt8, false))
 		};
 		DataType::Struct(fields)
 	}
@@ -1685,6 +1934,15 @@ impl ItemMisc {
 		w.write_u8(self.2.value(i))?;
 		w.write_u8(self.3.value(i))?;
 		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> columnar::ItemMisc {
+		columnar::ItemMisc(
+			self.0.values()[i],
+			self.1.values()[i],
+			self.2.values()[i],
+			self.3.values()[i],
+		)
 	}
 }
 
@@ -1739,6 +1997,13 @@ impl Position {
 		w.write_f32::<BE>(self.y.value(i))?;
 		Ok(())
 	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> columnar::Position {
+		columnar::Position {
+			x: self.x.values()[i],
+			y: self.y.values()[i],
+		}
+	}
 }
 
 impl From<MutablePosition> for Position {
@@ -1750,86 +2015,23 @@ impl From<MutablePosition> for Position {
 	}
 }
 
-pub struct Triggers {
-	pub physical: TriggersPhysical,
-	pub logical: PrimitiveArray<f32>,
-}
-
-impl Triggers {
-	fn data_type(version: Version) -> DataType {
-		let mut fields = vec![];
-		{
-			fields.push(Field::new(
-				"physical",
-				TriggersPhysical::data_type(version),
-				false,
-			));
-			fields.push(Field::new("logical", DataType::Float32, false))
-		};
-		DataType::Struct(fields)
-	}
-
-	fn into_struct_array(self, version: Version) -> StructArray {
-		let mut values = vec![];
-		{
-			values.push(self.physical.into_struct_array(version).boxed());
-			values.push(self.logical.boxed())
-		};
-		StructArray::new(Self::data_type(version), values, None)
-	}
-
-	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
-		Self {
-			physical: TriggersPhysical::from_struct_array(
-				values[0]
-					.as_any()
-					.downcast_ref::<StructArray>()
-					.unwrap()
-					.clone(),
-				version,
-			),
-			logical: values[1]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
-				.unwrap()
-				.clone(),
-		}
-	}
-
-	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		self.physical.write(w, version, i)?;
-		w.write_f32::<BE>(self.logical.value(i))?;
-		Ok(())
-	}
-}
-
-impl From<MutableTriggers> for Triggers {
-	fn from(x: MutableTriggers) -> Self {
-		Self {
-			physical: x.physical.into(),
-			logical: x.logical.into(),
-		}
-	}
-}
-
 pub struct Velocities {
-	pub autogenous_x_air: PrimitiveArray<f32>,
-	pub autogenous_y: PrimitiveArray<f32>,
+	pub self_x_air: PrimitiveArray<f32>,
+	pub self_y: PrimitiveArray<f32>,
 	pub knockback_x: PrimitiveArray<f32>,
 	pub knockback_y: PrimitiveArray<f32>,
-	pub autogenous_x_ground: PrimitiveArray<f32>,
+	pub self_x_ground: PrimitiveArray<f32>,
 }
 
 impl Velocities {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
-			fields.push(Field::new("autogenous_x_air", DataType::Float32, false));
-			fields.push(Field::new("autogenous_y", DataType::Float32, false));
+			fields.push(Field::new("self_x_air", DataType::Float32, false));
+			fields.push(Field::new("self_y", DataType::Float32, false));
 			fields.push(Field::new("knockback_x", DataType::Float32, false));
 			fields.push(Field::new("knockback_y", DataType::Float32, false));
-			fields.push(Field::new("autogenous_x_ground", DataType::Float32, false))
+			fields.push(Field::new("self_x_ground", DataType::Float32, false))
 		};
 		DataType::Struct(fields)
 	}
@@ -1837,11 +2039,11 @@ impl Velocities {
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
 		{
-			values.push(self.autogenous_x_air.boxed());
-			values.push(self.autogenous_y.boxed());
+			values.push(self.self_x_air.boxed());
+			values.push(self.self_y.boxed());
 			values.push(self.knockback_x.boxed());
 			values.push(self.knockback_y.boxed());
-			values.push(self.autogenous_x_ground.boxed())
+			values.push(self.self_x_ground.boxed())
 		};
 		StructArray::new(Self::data_type(version), values, None)
 	}
@@ -1849,12 +2051,12 @@ impl Velocities {
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
 		let (_, values, _) = array.into_data();
 		Self {
-			autogenous_x_air: values[0]
+			self_x_air: values[0]
 				.as_any()
 				.downcast_ref::<PrimitiveArray<f32>>()
 				.unwrap()
 				.clone(),
-			autogenous_y: values[1]
+			self_y: values[1]
 				.as_any()
 				.downcast_ref::<PrimitiveArray<f32>>()
 				.unwrap()
@@ -1869,7 +2071,7 @@ impl Velocities {
 				.downcast_ref::<PrimitiveArray<f32>>()
 				.unwrap()
 				.clone(),
-			autogenous_x_ground: values[4]
+			self_x_ground: values[4]
 				.as_any()
 				.downcast_ref::<PrimitiveArray<f32>>()
 				.unwrap()
@@ -1878,79 +2080,33 @@ impl Velocities {
 	}
 
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_f32::<BE>(self.autogenous_x_air.value(i))?;
-		w.write_f32::<BE>(self.autogenous_y.value(i))?;
+		w.write_f32::<BE>(self.self_x_air.value(i))?;
+		w.write_f32::<BE>(self.self_y.value(i))?;
 		w.write_f32::<BE>(self.knockback_x.value(i))?;
 		w.write_f32::<BE>(self.knockback_y.value(i))?;
-		w.write_f32::<BE>(self.autogenous_x_ground.value(i))?;
+		w.write_f32::<BE>(self.self_x_ground.value(i))?;
 		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> columnar::Velocities {
+		columnar::Velocities {
+			self_x_air: self.self_x_air.values()[i],
+			self_y: self.self_y.values()[i],
+			knockback_x: self.knockback_x.values()[i],
+			knockback_y: self.knockback_y.values()[i],
+			self_x_ground: self.self_x_ground.values()[i],
+		}
 	}
 }
 
 impl From<MutableVelocities> for Velocities {
 	fn from(x: MutableVelocities) -> Self {
 		Self {
-			autogenous_x_air: x.autogenous_x_air.into(),
-			autogenous_y: x.autogenous_y.into(),
+			self_x_air: x.self_x_air.into(),
+			self_y: x.self_y.into(),
 			knockback_x: x.knockback_x.into(),
 			knockback_y: x.knockback_y.into(),
-			autogenous_x_ground: x.autogenous_x_ground.into(),
-		}
-	}
-}
-
-pub struct Buttons {
-	pub physical: PrimitiveArray<u16>,
-	pub logical: PrimitiveArray<u32>,
-}
-
-impl Buttons {
-	fn data_type(version: Version) -> DataType {
-		let mut fields = vec![];
-		{
-			fields.push(Field::new("physical", DataType::UInt16, false));
-			fields.push(Field::new("logical", DataType::UInt32, false))
-		};
-		DataType::Struct(fields)
-	}
-
-	fn into_struct_array(self, version: Version) -> StructArray {
-		let mut values = vec![];
-		{
-			values.push(self.physical.boxed());
-			values.push(self.logical.boxed())
-		};
-		StructArray::new(Self::data_type(version), values, None)
-	}
-
-	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
-		Self {
-			physical: values[0]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<u16>>()
-				.unwrap()
-				.clone(),
-			logical: values[1]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<u32>>()
-				.unwrap()
-				.clone(),
-		}
-	}
-
-	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_u16::<BE>(self.physical.value(i))?;
-		w.write_u32::<BE>(self.logical.value(i))?;
-		Ok(())
-	}
-}
-
-impl From<MutableButtons> for Buttons {
-	fn from(x: MutableButtons) -> Self {
-		Self {
-			physical: x.physical.into(),
-			logical: x.logical.into(),
+			self_x_ground: x.self_x_ground.into(),
 		}
 	}
 }
@@ -1999,6 +2155,13 @@ impl TriggersPhysical {
 		w.write_f32::<BE>(self.l.value(i))?;
 		w.write_f32::<BE>(self.r.value(i))?;
 		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> columnar::TriggersPhysical {
+		columnar::TriggersPhysical {
+			l: self.l.values()[i],
+			r: self.r.values()[i],
+		}
 	}
 }
 
@@ -2055,6 +2218,13 @@ impl Velocity {
 		w.write_f32::<BE>(self.x.value(i))?;
 		w.write_f32::<BE>(self.y.value(i))?;
 		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> columnar::Velocity {
+		columnar::Velocity {
+			x: self.x.values()[i],
+			y: self.y.values()[i],
+		}
 	}
 }
 
@@ -2203,6 +2373,21 @@ impl Item {
 			}
 		};
 		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> columnar::Item {
+		columnar::Item {
+			r#type: self.r#type.values()[i],
+			state: self.state.values()[i],
+			direction: self.direction.values()[i],
+			velocity: self.velocity.transpose_one(i, version),
+			position: self.position.transpose_one(i, version),
+			damage: self.damage.values()[i],
+			timer: self.timer.values()[i],
+			id: self.id.values()[i],
+			misc: self.misc.as_ref().map(|x| x.transpose_one(i, version)),
+			owner: self.owner.as_ref().map(|x| x.values()[i]),
+		}
 	}
 }
 

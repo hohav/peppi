@@ -14,19 +14,20 @@ type BE = byteorder::BigEndian;
 use crate::{
 	model::{
 		frame,
-		game::{self, Game, Netplay, Player, MAX_PLAYERS, NUM_PORTS},
-		primitives::Port,
+		game::{self, Game, Netplay, Player, PlayerType, Port, NUM_PORTS},
 		shift_jis::MeleeString,
 		slippi,
 	},
 	ubjson,
 };
 
-pub(super) const PAYLOADS_EVENT_CODE: u8 = 0x35;
+pub(crate) const PAYLOADS_EVENT_CODE: u8 = 0x35;
+const MAX_PLAYERS: usize = 6;
+const ICE_CLIMBERS: u8 = 14;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, num_enum::TryFromPrimitive)]
 #[repr(u8)]
-pub(super) enum Event {
+pub(crate) enum Event {
 	GameStart = 0x36,
 	FramePre = 0x37,
 	FramePost = 0x38,
@@ -38,11 +39,12 @@ pub(super) enum Event {
 }
 
 struct MutableGame {
-	pub start: game::Start,
-	pub end: Option<game::End>,
-	pub frames: frame::MutableFrame,
-	pub metadata: Option<serde_json::Map<String, serde_json::Value>>,
-	pub gecko_codes: Option<game::GeckoCodes>,
+	start: game::Start,
+	end: Option<game::End>,
+	frames: frame::MutableFrame,
+	metadata: Option<serde_json::Map<String, serde_json::Value>>,
+	gecko_codes: Option<game::GeckoCodes>,
+	port_indexes: [usize; 4],
 }
 
 impl From<MutableGame> for Game {
@@ -121,7 +123,7 @@ fn player(
 	let mut unmapped = [0; 15];
 
 	let character = r.read_u8()?;
-	let r#type = r.read_u8()?;
+	let r#type = PlayerType::try_from(r.read_u8()?).ok();
 	let stocks = r.read_u8()?;
 	let costume = r.read_u8()?;
 	r.read_exact(&mut unmapped[0..3])?;
@@ -143,7 +145,7 @@ fn player(
 	let cpu_level = {
 		let cpu_level = r.read_u8()?;
 		match r#type {
-			1 => Some(cpu_level), //FIXME: PlayerType::CPU
+			Some(PlayerType::CPU) => Some(cpu_level),
 			_ => None,
 		}
 	};
@@ -158,14 +160,8 @@ fn player(
 		Some(v1_0) => {
 			let mut r = &v1_0[..];
 			Some(game::Ucf {
-				dash_back: match r.read_u32::<BE>()? {
-					0 => None,
-					db => Some(db),
-				},
-				shield_drop: match r.read_u32::<BE>()? {
-					0 => None,
-					sd => Some(sd),
-				},
+				dash_back: r.read_u32::<BE>()?,
+				shield_drop: r.read_u32::<BE>()?,
 			})
 		}
 		_ => None,
@@ -195,9 +191,8 @@ fn player(
 		})
 		.transpose()?;
 
-	Ok(match r#type {
-		//FIXME: PlayerType::HUMAN | PlayerType::CPU | PlayerType::DEMO
-		0 | 1 | 2 => Some(Player {
+	Ok(r#type.map(|r#type|
+		Player {
 			port,
 			character,
 			r#type,
@@ -216,9 +211,8 @@ fn player(
 			name_tag,
 			// v3.9
 			netplay,
-		}),
-		_ => None,
-	})
+		}
+	))
 }
 
 fn player_bytes_v3_11(r: &mut &[u8]) -> Result<[u8; 29]> {
@@ -350,15 +344,16 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 
 	let mut players = Vec::<Player>::new();
 	for n in 0..NUM_PORTS {
+		let nu = n as usize;
 		if let Some(p) = player(
-			Port::try_from(n as u8).unwrap(),
-			&players_v0[n],
+			Port::try_from(n).unwrap(),
+			&players_v0[nu],
 			is_teams,
-			players_v1_0[n],
-			players_v1_3[n],
-			players_v3_9.0[n],
-			players_v3_9.1[n],
-			players_v3_11[n],
+			players_v1_0[nu],
+			players_v1_3[nu],
+			players_v3_9.0[nu],
+			players_v3_9.1[nu],
+			players_v3_11[nu],
 		)? {
 			players.push(p);
 		}
@@ -484,6 +479,18 @@ fn pre_start_event<R: Read, P: AsRef<Path>>(
 	Ok((size + 1, start)) // +1 byte for the event code
 }
 
+fn push_id(game: &mut MutableGame, id: i32) {
+	let len = game.frames.id.len();
+	game.frames.id.push(Some(id));
+	for p in &mut game.frames.port {
+		if let Some(f) = &mut p.follower {
+			while f.pre.random_seed.len() < len {
+				f.push_none(game.start.slippi.version);
+			}
+		}
+	}
+}
+
 fn post_start_event<R: Read, P: AsRef<Path>>(
 	mut r: R,
 	payload_sizes: &HashMap<u8, u16>,
@@ -528,7 +535,7 @@ fn post_start_event<R: Read, P: AsRef<Path>>(
 			FrameStart => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
-				game.frames.id.push(Some(id));
+				push_id(game, id);
 				game.frames.start.read_push(r, game.start.slippi.version)?;
 			},
 			FramePre => {
@@ -536,10 +543,21 @@ fn post_start_event<R: Read, P: AsRef<Path>>(
 				let id = r.read_i32::<BE>()?;
 				let port = r.read_u8()?;
 				let is_follower = r.read_u8()? != 0;
-				assert_eq!(id, *game.frames.id.values().last().unwrap());
+				if game.start.slippi.version.gte(2, 2) {
+					assert_eq!(id, *game.frames.id.values().last().unwrap());
+				} else {
+					// no Frame Start events before Slippi 2.2.0,
+					// but also no rollbacks
+					let last_id = *game.frames.id.values().last().unwrap_or(&(frame::FIRST_INDEX - 1));
+					if last_id + 1 == id {
+						push_id(game, id);
+					} else {
+						assert_eq!(id, last_id);
+					}
+				}
 				match is_follower {
-					true => game.frames.port[port as usize].follower.as_mut().unwrap().pre.read_push(r, game.start.slippi.version)?,
-					_ => game.frames.port[port as usize].leader.pre.read_push(r, game.start.slippi.version)?,
+					true => game.frames.port[game.port_indexes[port as usize]].follower.as_mut().unwrap().pre.read_push(r, game.start.slippi.version)?,
+					_ => game.frames.port[game.port_indexes[port as usize]].leader.pre.read_push(r, game.start.slippi.version)?,
 				};
 			},
 			FramePost => {
@@ -549,8 +567,8 @@ fn post_start_event<R: Read, P: AsRef<Path>>(
 				let is_follower = r.read_u8()? != 0;
 				assert_eq!(id, *game.frames.id.values().last().unwrap());
 				match is_follower {
-					true => game.frames.port[port as usize].follower.as_mut().unwrap().post.read_push(r, game.start.slippi.version)?,
-					_ => game.frames.port[port as usize].leader.post.read_push(r, game.start.slippi.version)?,
+					true => game.frames.port[game.port_indexes[port as usize]].follower.as_mut().unwrap().post.read_push(r, game.start.slippi.version)?,
+					_ => game.frames.port[game.port_indexes[port as usize]].leader.post.read_push(r, game.start.slippi.version)?,
 				};
 			},
 			FrameEnd => {
@@ -619,7 +637,7 @@ pub fn deserialize<R: Read>(
 		let ports: Vec<_> = start.players.iter().map(|p|
 			frame::PortOccupancy {
 				port: p.port,
-				follower: p.character == 14, //FIXME: character::External::ICE_CLIMBERS
+				follower: p.character == ICE_CLIMBERS,
 			}
 		).collect();
 		let version = start.slippi.version;
@@ -629,6 +647,13 @@ pub fn deserialize<R: Read>(
 			frames: frame::MutableFrame::with_capacity(1024, version, &ports),
 			metadata: None,
 			gecko_codes: None,
+			port_indexes: {
+				let mut result = [0, 0, 0, 0];
+				for (i, p) in ports.into_iter().enumerate() {
+					result[p.port as usize] = i;
+				}
+				result
+			}
 		}
 	};
 

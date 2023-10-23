@@ -2,5 +2,9 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-scripts/gen | rustfmt > resources/frame.rs
+
+scripts/frame | rustfmt > resources/frame.rs
 mv resources/frame.rs ../src/model/
+
+scripts/columnar | rustfmt > resources/columnar.rs
+mv resources/columnar.rs ../src/model/

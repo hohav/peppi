@@ -36,7 +36,7 @@ fn json_metadata() {
 	)
 	.unwrap();
 	let actual: serde_json::Value =
-		serde_json::from_str(&serde_json::to_string(&game.metadata_raw).unwrap()).unwrap();
+		serde_json::from_str(&serde_json::to_string(&game.metadata).unwrap()).unwrap();
 	assert_eq!(expected, actual);
 }
 
@@ -61,7 +61,7 @@ fn json_start() {
 				{
 					"port":"P1",
 					"character":9,
-					"type":0,
+					"type":"HUMAN",
 					"stocks":4,
 					"costume":3,
 					"team":null,
@@ -85,7 +85,7 @@ fn json_start() {
 				{
 					"port":"P2",
 					"character":9,
-					"type":0,
+					"type":"HUMAN",
 					"stocks":4,
 					"costume":0,
 					"team":null,
