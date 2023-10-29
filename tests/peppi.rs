@@ -5,14 +5,15 @@ use std::{
 };
 
 use pretty_assertions::assert_eq;
-use xxhash_rust::xxh3::xxh3_64;
 use serde_json::json;
+use xxhash_rust::xxh3::xxh3_64;
 
 use peppi::{
 	model::{
 		frame::transpose,
 		game::{
-			Bytes, DashBack, End, EndMethod, Game, Language, Netplay, Player, PlayerType, Port, Scene, ShieldDrop, Start, Ucf,
+			Bytes, DashBack, End, EndMethod, Game, Language, Netplay, Player, PlayerType, Port,
+			Scene, ShieldDrop, Start, Ucf,
 		},
 		shift_jis::MeleeString,
 		slippi::{Slippi, Version},
@@ -32,7 +33,7 @@ struct Buttons {
 fn button_seq(game: &Game) -> Vec<Buttons> {
 	let mut last_buttons: Option<Buttons> = None;
 	let mut button_seq = vec![];
-	for idx in 0 .. game.frames.id.len() {
+	for idx in 0..game.frames.id.len() {
 		let b = Buttons {
 			logical: game.frames.port[0].leader.pre.buttons.values()[idx],
 			physical: game.frames.port[0].leader.pre.buttons_physical.values()[idx],
@@ -236,7 +237,7 @@ fn buttons_lzrs() {
 			},
 			Buttons {
 				logical: 2147483712, // Trigger | L
-				physical: 64, // L
+				physical: 64,        // L
 			},
 			Buttons {
 				logical: 2147483648, // Trigger
@@ -244,14 +245,14 @@ fn buttons_lzrs() {
 			},
 			Buttons {
 				logical: 2147483680, // Trigger | R
-				physical: 32, // R
+				physical: 32,        // R
 			},
 			Buttons {
 				logical: 2147483920, // Trigger | A | Z
-				physical: 16, // Z
+				physical: 16,        // Z
 			},
 			Buttons {
-				logical: 4096, // Start
+				logical: 4096,  // Start
 				physical: 4096, // Start
 			},
 		]
@@ -265,19 +266,19 @@ fn buttons_abxy() {
 		button_seq(&game),
 		vec![
 			Buttons {
-				logical: 256, // A
+				logical: 256,  // A
 				physical: 256, // A
 			},
 			Buttons {
-				logical: 512, // B
+				logical: 512,  // B
 				physical: 512, // B
 			},
 			Buttons {
-				logical: 1024, // X
+				logical: 1024,  // X
 				physical: 1024, // X
 			},
 			Buttons {
-				logical: 2048, // Y
+				logical: 2048,  // Y
 				physical: 2048, // Y
 			},
 		]
@@ -291,19 +292,19 @@ fn dpad_udlr() {
 		button_seq(&game),
 		vec![
 			Buttons {
-				logical: 8, // D-pad up
+				logical: 8,  // D-pad up
 				physical: 8, // D-pad up
 			},
 			Buttons {
-				logical: 4, // D-pad down
+				logical: 4,  // D-pad down
 				physical: 4, // D-pad down
 			},
 			Buttons {
-				logical: 1, // D-pad left
+				logical: 1,  // D-pad left
 				physical: 1, // D-pad left
 			},
 			Buttons {
-				logical: 2, // D-pad right
+				logical: 2,  // D-pad right
 				physical: 2, // D-pad right
 			},
 		]
@@ -566,7 +567,9 @@ fn items() {
 		}
 	);
 	assert_eq!(
-		game.frames.item.transpose_one(102, game.start.slippi.version),
+		game.frames
+			.item
+			.transpose_one(102, game.start.slippi.version),
 		transpose::Item {
 			id: 1,
 			damage: 0,
@@ -584,7 +587,9 @@ fn items() {
 		}
 	);
 	assert_eq!(
-		game.frames.item.transpose_one(290, game.start.slippi.version),
+		game.frames
+			.item
+			.transpose_one(290, game.start.slippi.version),
 		transpose::Item {
 			id: 2,
 			damage: 0,
@@ -622,7 +627,7 @@ fn _round_trip(in_path: impl AsRef<Path> + Clone) {
 	assert_eq!(game1.metadata, game2.metadata);
 
 	assert_eq!(game1.frames.id.len(), game2.frames.id.len());
-	for idx in 0 .. game1.frames.id.len() {
+	for idx in 0..game1.frames.id.len() {
 		assert_eq!(
 			game1.frames.transpose_one(idx, game1.start.slippi.version),
 			game2.frames.transpose_one(idx, game2.start.slippi.version),

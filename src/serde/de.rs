@@ -203,28 +203,26 @@ fn player(
 		})
 		.transpose()?;
 
-	Ok(r#type.map(|r#type|
-		Player {
-			port,
-			character,
-			r#type,
-			stocks,
-			costume,
-			team,
-			handicap,
-			bitfield,
-			cpu_level,
-			offense_ratio,
-			defense_ratio,
-			model_scale,
-			// v1_0
-			ucf,
-			// v1_3
-			name_tag,
-			// v3.9
-			netplay,
-		}
-	))
+	Ok(r#type.map(|r#type| Player {
+		port,
+		character,
+		r#type,
+		stocks,
+		costume,
+		team,
+		handicap,
+		bitfield,
+		cpu_level,
+		offense_ratio,
+		defense_ratio,
+		model_scale,
+		// v1_0
+		ucf,
+		// v1_3
+		name_tag,
+		// v3.9
+		netplay,
+	}))
 }
 
 fn player_bytes_v3_11(r: &mut &[u8]) -> Result<[u8; 29]> {
@@ -371,12 +369,9 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 		}
 	}
 
-	let language = if_more(r, |r|
-		Ok(
-			game::Language::try_from(r.read_u8()?)
-				.map_err(invalid_data)?
-		)
-	)?;
+	let language = if_more(r, |r| {
+		Ok(game::Language::try_from(r.read_u8()?).map_err(invalid_data)?)
+	})?;
 
 	Ok(game::Start {
 		slippi,
@@ -409,12 +404,12 @@ pub(crate) fn game_end(r: &mut &[u8]) -> Result<game::End> {
 		method: game::EndMethod::try_from(r.read_u8()?).map_err(invalid_data)?,
 		bytes: bytes,
 		// v2.0
-		lras_initiator: if_more(r, |r| Ok(
-			match r.read_u8()? {
+		lras_initiator: if_more(r, |r| {
+			Ok(match r.read_u8()? {
 				255 => None,
 				x => Some(Port::try_from(x).map_err(invalid_data)?),
-			}
-		))?,
+			})
+		})?,
 	})
 }
 
@@ -452,7 +447,12 @@ fn handle_splitter_event(buf: &[u8], accumulator: &mut SplitAccumulator) -> Resu
 	})
 }
 
-fn debug_write_event<P: AsRef<Path>>(buf: &[u8], code: u8, event_counts: &mut HashMap<u8, usize>, debug_dir: P) -> Result<()> {
+fn debug_write_event<P: AsRef<Path>>(
+	buf: &[u8],
+	code: u8,
+	event_counts: &mut HashMap<u8, usize>,
+	debug_dir: P,
+) -> Result<()> {
 	// write the event's raw data to "{debug_dir}/{code}/{count}",
 	// where `count` is how many of that event we've seen already
 	let code_dir = debug_dir.as_ref().join(format!("{}", code));
@@ -548,10 +548,12 @@ fn post_start_event<R: Read, P: AsRef<Path>>(
 	if let Some(event) = event {
 		use Event::*;
 		match event {
-			GeckoCodes => game.gecko_codes = Some(game::GeckoCodes {
-				bytes: buf.to_vec(),
-				actual_size: splitter_accumulator.actual_size,
-			}),
+			GeckoCodes => {
+				game.gecko_codes = Some(game::GeckoCodes {
+					bytes: buf.to_vec(),
+					actual_size: splitter_accumulator.actual_size,
+				})
+			}
 			GameStart => return Err(err!("Duplicate start event")),
 			GameEnd => end = Some(game_end(&mut &*buf)?),
 			FrameStart => {
@@ -559,7 +561,7 @@ fn post_start_event<R: Read, P: AsRef<Path>>(
 				let id = r.read_i32::<BE>()?;
 				push_id(game, id);
 				game.frames.start.read_push(r, game.start.slippi.version)?;
-			},
+			}
 			FramePre => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
@@ -570,7 +572,12 @@ fn post_start_event<R: Read, P: AsRef<Path>>(
 				} else {
 					// no Frame Start events before Slippi 2.2.0,
 					// but also no rollbacks
-					let last_id = *game.frames.id.values().last().unwrap_or(&(frame::FIRST_INDEX - 1));
+					let last_id = *game
+						.frames
+						.id
+						.values()
+						.last()
+						.unwrap_or(&(frame::FIRST_INDEX - 1));
 					if last_id + 1 == id {
 						push_id(game, id);
 					} else {
@@ -578,10 +585,18 @@ fn post_start_event<R: Read, P: AsRef<Path>>(
 					}
 				}
 				match is_follower {
-					true => game.frames.port[game.port_indexes[port as usize]].follower.as_mut().unwrap().pre.read_push(r, game.start.slippi.version)?,
-					_ => game.frames.port[game.port_indexes[port as usize]].leader.pre.read_push(r, game.start.slippi.version)?,
+					true => game.frames.port[game.port_indexes[port as usize]]
+						.follower
+						.as_mut()
+						.unwrap()
+						.pre
+						.read_push(r, game.start.slippi.version)?,
+					_ => game.frames.port[game.port_indexes[port as usize]]
+						.leader
+						.pre
+						.read_push(r, game.start.slippi.version)?,
 				};
-			},
+			}
 			FramePost => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
@@ -589,25 +604,36 @@ fn post_start_event<R: Read, P: AsRef<Path>>(
 				let is_follower = r.read_u8()? != 0;
 				assert_eq!(id, *game.frames.id.values().last().unwrap());
 				match is_follower {
-					true => game.frames.port[game.port_indexes[port as usize]].follower.as_mut().unwrap().post.read_push(r, game.start.slippi.version)?,
-					_ => game.frames.port[game.port_indexes[port as usize]].leader.post.read_push(r, game.start.slippi.version)?,
+					true => game.frames.port[game.port_indexes[port as usize]]
+						.follower
+						.as_mut()
+						.unwrap()
+						.post
+						.read_push(r, game.start.slippi.version)?,
+					_ => game.frames.port[game.port_indexes[port as usize]]
+						.leader
+						.post
+						.read_push(r, game.start.slippi.version)?,
 				};
-			},
+			}
 			FrameEnd => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
 				assert_eq!(id, *game.frames.id.values().last().unwrap());
 				let old_len = *game.frames.item_offset.last();
 				let new_len: i32 = game.frames.item.r#type.len().try_into().unwrap();
-				game.frames.item_offset.try_push(new_len.checked_sub(old_len).unwrap()).unwrap();
+				game.frames
+					.item_offset
+					.try_push(new_len.checked_sub(old_len).unwrap())
+					.unwrap();
 				game.frames.end.read_push(r, game.start.slippi.version)?;
-			},
+			}
 			Item => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
 				assert_eq!(id, *game.frames.id.values().last().unwrap());
 				game.frames.item.read_push(r, game.start.slippi.version)?;
-			},
+			}
 		};
 	}
 
@@ -624,10 +650,7 @@ pub struct Opts {
 }
 
 /// Parses a Slippi replay from `r`.
-pub fn deserialize<R: Read>(
-	mut r: &mut R,
-	opts: Option<&Opts>,
-) -> Result<Game> {
+pub fn deserialize<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> {
 	// For speed, assume the `raw` element comes first and handle it manually.
 	// The official JS parser does this too, so it should be reliable.
 	expect_bytes(&mut r, &crate::SLIPPI_FILE_SIGNATURE)?;
@@ -644,24 +667,22 @@ pub fn deserialize<R: Read>(
 
 	// `raw_len` will be 0 for an in-progress replay
 	while (raw_len == 0 || bytes_read < raw_len) && start.is_none() {
-		let (bytes, _start) = pre_start_event(
-			r.by_ref(),
-			&payload_sizes,
-			&mut event_counts,
-			debug_dir,
-		)?;
+		let (bytes, _start) =
+			pre_start_event(r.by_ref(), &payload_sizes, &mut event_counts, debug_dir)?;
 		bytes_read += bytes;
 		start = _start;
 	}
 
 	let mut game = {
 		let start = start.unwrap();
-		let ports: Vec<_> = start.players.iter().map(|p|
-			frame::PortOccupancy {
+		let ports: Vec<_> = start
+			.players
+			.iter()
+			.map(|p| frame::PortOccupancy {
 				port: p.port,
 				follower: p.character == ICE_CLIMBERS,
-			}
-		).collect();
+			})
+			.collect();
 		let version = start.slippi.version;
 		MutableGame {
 			start: start,
@@ -675,7 +696,7 @@ pub fn deserialize<R: Read>(
 					result[p.port as usize] = i;
 				}
 				result
-			}
+			},
 		}
 	};
 

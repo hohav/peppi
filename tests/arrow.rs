@@ -1,11 +1,8 @@
-use peppi::model::{
-	frame::PortOccupancy,
-	game::Port,
-};
+use peppi::model::{frame::PortOccupancy, game::Port};
 
-use std::io::BufWriter;
-use serde_json::json;
 use arrow2::io::json::write as json_write;
+use serde_json::json;
+use std::io::BufWriter;
 
 mod common;
 use common::game;
@@ -23,7 +20,9 @@ fn into_struct_array() {
 			follower: false,
 		},
 	];
-	let frames = game.frames.into_struct_array(game.start.slippi.version, &ports);
+	let frames = game
+		.frames
+		.into_struct_array(game.start.slippi.version, &ports);
 
 	assert_eq!(
 		vec![124; 5],
@@ -32,7 +31,8 @@ fn into_struct_array() {
 
 	let frames = frames.boxed();
 	{
-		let mut serializer = json_write::Serializer::new(vec![Ok(frames.sliced(0, 1))].into_iter(), vec![]);
+		let mut serializer =
+			json_write::Serializer::new(vec![Ok(frames.sliced(0, 1))].into_iter(), vec![]);
 		let mut buf = BufWriter::new(Vec::new());
 		json_write::write(&mut buf, &mut serializer).unwrap();
 		assert_eq!(
@@ -188,7 +188,8 @@ fn into_struct_array() {
 	}
 
 	{
-		let mut serializer = json_write::Serializer::new(vec![Ok(frames.sliced(123, 1))].into_iter(), vec![]);
+		let mut serializer =
+			json_write::Serializer::new(vec![Ok(frames.sliced(123, 1))].into_iter(), vec![]);
 		let mut buf = BufWriter::new(Vec::new());
 		json_write::write(&mut buf, &mut serializer).unwrap();
 		assert_eq!(

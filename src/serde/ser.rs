@@ -131,13 +131,26 @@ fn frame_counts(frames: &frame::Frame) -> FrameCounts {
 	let len = frames.id.len();
 	FrameCounts {
 		frames: len.try_into().unwrap(),
-		frame_data: frames.port.iter().map(|p|
-			len + p.follower.as_ref().map(|f|
-				len - f.pre.random_seed.validity()
-					.map(|v| v.unset_bits())
+		frame_data: frames
+			.port
+			.iter()
+			.map(|p| {
+				len + p
+					.follower
+					.as_ref()
+					.map(|f| {
+						len - f
+							.pre
+							.random_seed
+							.validity()
+							.map(|v| v.unset_bits())
+							.unwrap_or(0)
+					})
 					.unwrap_or(0)
-			).unwrap_or(0)
-		).sum::<usize>().try_into().unwrap(),
+			})
+			.sum::<usize>()
+			.try_into()
+			.unwrap(),
 		items: frames.item.id.len() as u32,
 	}
 }

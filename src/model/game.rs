@@ -8,11 +8,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::Serialize;
 
 use crate::{
-	model::{
-		frame,
-		shift_jis::MeleeString,
-		slippi,
-	},
+	model::{frame, shift_jis::MeleeString, slippi},
 	serde::de,
 };
 
