@@ -61,7 +61,7 @@ fn json_start() {
 				{
 					"port":"P1",
 					"character":9,
-					"type":"HUMAN",
+					"type":"Human",
 					"stocks":4,
 					"costume":3,
 					"team":null,
@@ -72,8 +72,8 @@ fn json_start() {
 					"defense_ratio":1.0,
 					"model_scale":1.0,
 					"ucf":{
-						"dash_back":1,
-						"shield_drop":1
+						"dash_back":"Ucf",
+						"shield_drop":"Ucf"
 					},
 					"name_tag":"",
 					"netplay":{
@@ -85,7 +85,7 @@ fn json_start() {
 				{
 					"port":"P2",
 					"character":9,
-					"type":"HUMAN",
+					"type":"Human",
 					"stocks":4,
 					"costume":0,
 					"team":null,
@@ -96,8 +96,8 @@ fn json_start() {
 					"defense_ratio":1.0,
 					"model_scale":1.0,
 					"ucf":{
-						"dash_back":1,
-						"shield_drop":1
+						"dash_back":"Ucf",
+						"shield_drop":"Ucf"
 					},
 					"name_tag":"",
 					"netplay":{
@@ -114,7 +114,7 @@ fn json_start() {
 				"minor":2,
 				"major":8
 			},
-			"language":1
+			"language":"English"
 		}"#,
 	)
 	.unwrap();
@@ -128,7 +128,7 @@ fn json_end() {
 	let game = game("v3.12");
 	let expected: serde_json::Value = serde_json::from_str(
 		r#"{
-			"method":7,
+			"method":"NoContest",
 			"lras_initiator":"P2"
 		}"#,
 	)

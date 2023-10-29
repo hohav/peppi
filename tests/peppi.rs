@@ -10,9 +10,9 @@ use serde_json::json;
 
 use peppi::{
 	model::{
-		columnar,
+		frame::transpose,
 		game::{
-			End, Game, Netplay, Player, PlayerType, Port, Scene, Start, Ucf,
+			Bytes, DashBack, End, EndMethod, Game, Language, Netplay, Player, PlayerType, Port, Scene, ShieldDrop, Start, Ucf,
 		},
 		shift_jis::MeleeString,
 		slippi::{Slippi, Version},
@@ -60,8 +60,8 @@ fn slippi_old_version() {
 	);
 
 	assert_eq!(players.len(), 2);
-	assert_eq!(players[0].character, 2); // External::FOX
-	assert_eq!(players[1].character, 25); // External::GANONDORF
+	assert_eq!(players[0].character, 2); // Fox
+	assert_eq!(players[1].character, 25); // Ganondorf
 }
 
 #[test]
@@ -76,12 +76,12 @@ fn basic_game() {
 			"players": {
 				"1": {
 					"characters": {
-						"1": 5209, // Internal::FOX
+						"1": 5209, // Fox
 					}
 				},
 				"0": {
 					"characters": {
-						"18": 5209 // Internal::MARTH
+						"18": 5209 // Marth
 					}
 				}
 			},
@@ -107,8 +107,8 @@ fn basic_game() {
 			players: vec![
 				Player {
 					port: Port::P1,
-					character: 9, // External::MARTH
-					r#type: PlayerType::HUMAN,
+					character: 9, // Marth
+					r#type: PlayerType::Human,
 					stocks: 4,
 					costume: 3,
 					team: None,
@@ -119,16 +119,16 @@ fn basic_game() {
 					defense_ratio: 1.0,
 					model_scale: 1.0,
 					ucf: Some(Ucf {
-						dash_back: 0, // DashBack::NONE
-						shield_drop: 0, // ShieldDrop::NONE
+						dash_back: None,
+						shield_drop: None,
 					}),
 					name_tag: None,
 					netplay: None,
 				},
 				Player {
 					port: Port::P2,
-					character: 2, // External::FOX
-					r#type: PlayerType::CPU,
+					character: 2, // Fox
+					r#type: PlayerType::Cpu,
 					stocks: 4,
 					costume: 0,
 					team: None,
@@ -139,8 +139,8 @@ fn basic_game() {
 					defense_ratio: 1.0,
 					model_scale: 1.0,
 					ucf: Some(Ucf {
-						dash_back: 0, // DashBack::NONE
-						shield_drop: 0, // ShieldDrop::NONE
+						dash_back: None,
+						shield_drop: None,
 					}),
 					name_tag: None,
 					netplay: None,
@@ -151,7 +151,7 @@ fn basic_game() {
 			is_frozen_ps: None,
 			scene: None,
 			language: None,
-			raw_bytes: vec![
+			bytes: Bytes(vec![
 				1, 0, 0, 0, 50, 1, 134, 76, 195, 0, 0, 0, 0, 0, 0, 255, 255, 110, 0, 8, 0, 0, 1,
 				224, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0,
 				0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -167,16 +167,16 @@ fn basic_game() {
 				64, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0,
 				226, 176, 35, 114, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-			],
+			]),
 		}
 	);
 
 	assert_eq!(
 		game.end.unwrap(),
 		End {
-			method: 3, // EndMethod::RESOLVED
+			method: EndMethod::Resolved,
 			lras_initiator: None,
-			raw_bytes: vec![3],
+			bytes: Bytes(vec![3]),
 		}
 	);
 
@@ -191,13 +191,13 @@ fn ics() {
 		json!({
 			"1": {
 				"characters": {
-					"15": 344 // Internal::JIGGLYPUFF
+					"15": 344 // Jigglypuff
 				}
 			},
 			"0": {
 				"characters": {
-					"11": 344, // Internal::NANA
-					"10": 344 // Internal::POPO
+					"11": 344, // Nana
+					"10": 344 // Popo
 				}
 			}
 		})
@@ -211,15 +211,15 @@ fn ucf() {
 	assert_eq!(
 		game("shield_drop").start.players[0].ucf,
 		Some(Ucf {
-			dash_back: 0,
-			shield_drop: 1, // ShieldDrop::UCF
+			dash_back: None,
+			shield_drop: Some(ShieldDrop::Ucf),
 		})
 	);
 	assert_eq!(
 		game("dash_back").start.players[0].ucf,
 		Some(Ucf {
-			dash_back: 1, // DashBack::UCF
-			shield_drop: 0,
+			dash_back: Some(DashBack::Ucf),
+			shield_drop: None,
 		})
 	);
 }
@@ -231,28 +231,28 @@ fn buttons_lzrs() {
 		button_seq(&game),
 		vec![
 			Buttons {
-				logical: 2147483648, // Logical::TRIGGER_ANALOG,
-				physical: 0, // Physical::NONE,
+				logical: 2147483648, // Trigger
+				physical: 0,
 			},
 			Buttons {
-				logical: 2147483712, // Logical::TRIGGER_ANALOG | Logical::L,
-				physical: 64, // Physical::L,
+				logical: 2147483712, // Trigger | L
+				physical: 64, // L
 			},
 			Buttons {
-				logical: 2147483648, // Logical::TRIGGER_ANALOG,
-				physical: 0, // Physical::NONE,
+				logical: 2147483648, // Trigger
+				physical: 0,
 			},
 			Buttons {
-				logical: 2147483680, // Logical::TRIGGER_ANALOG | Logical::R,
-				physical: 32, // Physical::R,
+				logical: 2147483680, // Trigger | R
+				physical: 32, // R
 			},
 			Buttons {
-				logical: 2147483920, // Logical::TRIGGER_ANALOG | Logical::A | Logical::Z,
-				physical: 16, // Physical::Z,
+				logical: 2147483920, // Trigger | A | Z
+				physical: 16, // Z
 			},
 			Buttons {
-				logical: 4096, // Logical::START,
-				physical: 4096, // Physical::START,
+				logical: 4096, // Start
+				physical: 4096, // Start
 			},
 		]
 	);
@@ -265,20 +265,20 @@ fn buttons_abxy() {
 		button_seq(&game),
 		vec![
 			Buttons {
-				logical: 256, // Logical::A,
-				physical: 256, // Physical::A,
+				logical: 256, // A
+				physical: 256, // A
 			},
 			Buttons {
-				logical: 512, // Logical::B,
-				physical: 512, // Physical::B,
+				logical: 512, // B
+				physical: 512, // B
 			},
 			Buttons {
-				logical: 1024, // Logical::X,
-				physical: 1024, // Physical::X,
+				logical: 1024, // X
+				physical: 1024, // X
 			},
 			Buttons {
-				logical: 2048, // Logical::Y,
-				physical: 2048, // Physical::Y,
+				logical: 2048, // Y
+				physical: 2048, // Y
 			},
 		]
 	);
@@ -291,20 +291,20 @@ fn dpad_udlr() {
 		button_seq(&game),
 		vec![
 			Buttons {
-				logical: 8, // Logical::DPAD_UP,
-				physical: 8, // Physical::DPAD_UP,
+				logical: 8, // D-pad up
+				physical: 8, // D-pad up
 			},
 			Buttons {
-				logical: 4, // Logical::DPAD_DOWN,
-				physical: 4, // Physical::DPAD_DOWN,
+				logical: 4, // D-pad down
+				physical: 4, // D-pad down
 			},
 			Buttons {
-				logical: 1, // Logical::DPAD_LEFT,
-				physical: 1, // Physical::DPAD_LEFT,
+				logical: 1, // D-pad left
+				physical: 1, // D-pad left
 			},
 			Buttons {
-				logical: 2, // Logical::DPAD_RIGHT,
-				physical: 2, // Physical::DPAD_RIGHT,
+				logical: 2, // D-pad right
+				physical: 2, // D-pad right
 			},
 		]
 	);
@@ -317,20 +317,20 @@ fn cstick_udlr() {
 		button_seq(&game),
 		vec![
 			Buttons {
-				logical: 1048576, // Logical::CSTICK_UP,
-				physical: 0, // Physical::NONE,
+				logical: 1048576, // C-stick up
+				physical: 0,
 			},
 			Buttons {
-				logical: 2097152, // Logical::CSTICK_DOWN,
-				physical: 0, // Physical::NONE,
+				logical: 2097152, // C-stick down
+				physical: 0,
 			},
 			Buttons {
-				logical: 4194304, // Logical::CSTICK_LEFT,
-				physical: 0, // Physical::NONE,
+				logical: 4194304, // C-stick left
+				physical: 0,
 			},
 			Buttons {
-				logical: 8388608, // Logical::CSTICK_RIGHT,
-				physical: 0, // Physical::NONE,
+				logical: 8388608, // C-stick right
+				physical: 0,
 			},
 		]
 	);
@@ -343,20 +343,20 @@ fn joystick_udlr() {
 		button_seq(&game),
 		vec![
 			Buttons {
-				logical: 65536, // Logical::JOYSTICK_UP,
-				physical: 0, // Physical::NONE,
+				logical: 65536, // Joystick up
+				physical: 0,
 			},
 			Buttons {
-				logical: 131072, // Logical::JOYSTICK_DOWN,
-				physical: 0, // Physical::NONE,
+				logical: 131072, // Joystick down
+				physical: 0,
 			},
 			Buttons {
-				logical: 262144, // Logical::JOYSTICK_LEFT,
-				physical: 0, // Physical::NONE,
+				logical: 262144, // Joystick left
+				physical: 0,
 			},
 			Buttons {
-				logical: 524288, // Logical::JOYSTICK_RIGHT,
-				physical: 0, // Physical::NONE,
+				logical: 524288, // Joystick right
+				physical: 0,
 			},
 		]
 	);
@@ -436,8 +436,8 @@ fn v3_12() {
 			players: vec![
 				Player {
 					port: Port::P1,
-					character: 9, // External::MARTH
-					r#type: PlayerType::HUMAN,
+					character: 9, // Marth
+					r#type: PlayerType::Human,
 					stocks: 4,
 					costume: 3,
 					team: None,
@@ -448,8 +448,8 @@ fn v3_12() {
 					defense_ratio: 1.0,
 					model_scale: 1.0,
 					ucf: Some(Ucf {
-						dash_back: 1, // DashBack::UCF
-						shield_drop: 1, // ShieldDrop::UCF
+						dash_back: Some(DashBack::Ucf),
+						shield_drop: Some(ShieldDrop::Ucf),
 					}),
 					name_tag: Some(MeleeString("".to_string())),
 					netplay: Some(Netplay {
@@ -460,8 +460,8 @@ fn v3_12() {
 				},
 				Player {
 					port: Port::P2,
-					character: 9, // External::MARTH
-					r#type: PlayerType::HUMAN,
+					character: 9, // Marth
+					r#type: PlayerType::Human,
 					stocks: 4,
 					costume: 0,
 					team: None,
@@ -472,8 +472,8 @@ fn v3_12() {
 					defense_ratio: 1.0,
 					model_scale: 1.0,
 					ucf: Some(Ucf {
-						dash_back: 1, // DashBack::UCF
-						shield_drop: 1, // ShieldDrop::UCF
+						dash_back: Some(DashBack::Ucf),
+						shield_drop: Some(ShieldDrop::Ucf),
 					}),
 					name_tag: Some(MeleeString("".to_string())),
 					netplay: Some(Netplay {
@@ -484,7 +484,7 @@ fn v3_12() {
 				}
 			],
 			random_seed: 39656,
-			raw_bytes: vec![
+			bytes: Bytes(vec![
 				3, 12, 0, 0, 50, 1, 142, 76, 195, 0, 0, 0, 0, 0, 0, 255, 255, 110, 0, 3, 0, 0, 1,
 				224, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0,
 				0, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -514,11 +514,11 @@ fn v3_12() {
 				98, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 1
-			],
+			]),
 			is_pal: Some(false),
 			is_frozen_ps: Some(false),
 			scene: Some(Scene { minor: 2, major: 8 }),
-			language: Some(1), // Language::ENGLISH
+			language: Some(Language::English),
 		}
 	);
 }
@@ -540,7 +540,7 @@ fn zelda_sheik_transformation() {
 	let game = game("transform");
 	assert_eq!(
 		game.frames.port[1].leader.pre.state.values()[400],
-		355, // State::Zelda(Zelda::TRANSFORM_GROUND)
+		355, // Zelda Transform (Ground)
 	);
 }
 
@@ -549,55 +549,55 @@ fn items() {
 	let game = game("items");
 	assert_eq!(
 		game.frames.item.transpose_one(0, game.start.slippi.version),
-		columnar::Item {
+		transpose::Item {
 			id: 0,
 			damage: 0,
 			direction: 1.0,
-			position: columnar::Position {
+			position: transpose::Position {
 				x: -62.709_606,
 				y: -1.493_274_9
 			},
 			state: 0,
 			timer: 140.0,
-			r#type: 99, // item::Type::PEACH_TURNIP,
-			velocity: columnar::Velocity { x: 0.0, y: 0.0 },
-			misc: Some(columnar::ItemMisc(5, 5, 5, 5)),
+			r#type: 99, // Peach Turnip
+			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
+			misc: Some(transpose::ItemMisc(5, 5, 5, 5)),
 			owner: Some(0),
 		}
 	);
 	assert_eq!(
 		game.frames.item.transpose_one(102, game.start.slippi.version),
-		columnar::Item {
+		transpose::Item {
 			id: 1,
 			damage: 0,
 			direction: -1.0,
-			position: columnar::Position {
+			position: transpose::Position {
 				x: 20.395_56,
 				y: -1.493_274_9
 			},
 			state: 0,
 			timer: 140.0,
-			r#type: 99, // item::Type::PEACH_TURNIP,
-			velocity: columnar::Velocity { x: 0.0, y: 0.0 },
-			misc: Some(columnar::ItemMisc(5, 0, 5, 5)),
+			r#type: 99, // Peach Turnip
+			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
+			misc: Some(transpose::ItemMisc(5, 0, 5, 5)),
 			owner: Some(0),
 		}
 	);
 	assert_eq!(
 		game.frames.item.transpose_one(290, game.start.slippi.version),
-		columnar::Item {
+		transpose::Item {
 			id: 2,
 			damage: 0,
 			direction: 1.0,
-			position: columnar::Position {
+			position: transpose::Position {
 				x: -3.982_539_2,
 				y: -1.493_274_9
 			},
 			state: 0,
 			timer: 140.0,
-			r#type: 99, // item::Type::PEACH_TURNIP,
-			velocity: columnar::Velocity { x: 0.0, y: 0.0 },
-			misc: Some(columnar::ItemMisc(5, 0, 5, 5)),
+			r#type: 99, // Peach Turnip
+			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
+			misc: Some(transpose::ItemMisc(5, 0, 5, 5)),
 			owner: Some(0),
 		}
 	);

@@ -1,24 +1,28 @@
-#![allow(unused_parens)]
 #![allow(unused_variables)]
-#![allow(dead_code)]
 
+use std::{
+	fmt,
+	io::{Result, Write},
+};
+
+use byteorder::WriteBytesExt;
 use arrow2::{
-	array::{ListArray, MutablePrimitiveArray, PrimitiveArray, StructArray},
+	array::{ListArray, PrimitiveArray, StructArray},
 	buffer::Buffer,
 	datatypes::{DataType, Field},
-	offset::{Offsets, OffsetsBuffer},
+	offset::OffsetsBuffer,
 };
-use byteorder::{ReadBytesExt, WriteBytesExt};
-use std::io::{Result, Write};
 
 use crate::{
 	model::{
-		columnar,
 		game::{Port, NUM_PORTS},
 		slippi::Version,
 	},
 	serde::de::Event,
 };
+
+pub mod mutable;
+pub mod transpose;
 
 type BE = byteorder::BigEndian;
 
@@ -31,6 +35,7 @@ pub struct PortOccupancy {
 	pub follower: bool,
 }
 
+#[derive(Debug)]
 pub struct Data {
 	pub pre: Pre,
 	pub post: Post,
@@ -113,27 +118,8 @@ impl Data {
 	}
 }
 
-pub struct MutableData {
-	pub pre: MutablePre,
-	pub post: MutablePost,
-}
-
-impl MutableData {
-	pub fn with_capacity(capacity: usize, version: Version) -> Self {
-		Self {
-			pre: MutablePre::with_capacity(capacity, version),
-			post: MutablePost::with_capacity(capacity, version),
-		}
-	}
-
-	pub fn push_none(&mut self, version: Version) {
-		self.pre.push_none(version);
-		self.post.push_none(version);
-	}
-}
-
-impl From<MutableData> for Data {
-	fn from(d: MutableData) -> Self {
+impl From<mutable::Data> for Data {
+	fn from(d: mutable::Data) -> Self {
 		Self {
 			pre: d.pre.into(),
 			post: d.post.into(),
@@ -141,6 +127,7 @@ impl From<MutableData> for Data {
 	}
 }
 
+#[derive(Debug)]
 pub struct PortData {
 	pub port: Port,
 	pub leader: Data,
@@ -271,27 +258,8 @@ impl PortData {
 
 }
 
-pub struct MutablePortData {
-	pub port: Port,
-	pub leader: MutableData,
-	pub follower: Option<MutableData>,
-}
-
-impl MutablePortData {
-	pub fn with_capacity(capacity: usize, version: Version, port: PortOccupancy) -> Self {
-		Self {
-			port: port.port,
-			leader: MutableData::with_capacity(capacity, version),
-			follower: match port.follower {
-				true => Some(MutableData::with_capacity(capacity, version)),
-				_ => None,
-			},
-		}
-	}
-}
-
-impl From<MutablePortData> for PortData {
-	fn from(p: MutablePortData) -> Self {
+impl From<mutable::PortData> for PortData {
+	fn from(p: mutable::PortData) -> Self {
 		Self {
 			port: p.port,
 			leader: p.leader.into(),
@@ -465,8 +433,8 @@ impl Frame {
 		Ok(())
 	}
 
-	pub fn transpose_one(&self, i: usize, version: Version) -> columnar::Frame {
-		columnar::Frame {
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Frame {
+		transpose::Frame {
 			start: self.start.transpose_one(i, version),
 			end: self.end.transpose_one(i, version),
 		}
@@ -496,33 +464,8 @@ impl Frame {
 	}
 }
 
-pub struct MutableFrame {
-	pub id: MutablePrimitiveArray<i32>,
-	pub start: MutableStart,
-	pub end: MutableEnd,
-	pub port: Vec<MutablePortData>,
-	pub item_offset: Offsets<i32>,
-	pub item: MutableItem,
-}
-
-impl MutableFrame {
-	pub fn with_capacity(capacity: usize, version: Version, ports: &[PortOccupancy]) -> Self {
-		Self {
-			id: MutablePrimitiveArray::<i32>::with_capacity(capacity),
-			start: MutableStart::with_capacity(capacity, version),
-			end: MutableEnd::with_capacity(capacity, version),
-			port: ports
-				.iter()
-				.map(|p| MutablePortData::with_capacity(capacity, version, *p))
-				.collect(),
-			item_offset: Offsets::<i32>::with_capacity(capacity),
-			item: MutableItem::with_capacity(0, version),
-		}
-	}
-}
-
-impl From<MutableFrame> for Frame {
-	fn from(f: MutableFrame) -> Self {
+impl From<mutable::Frame> for Frame {
+	fn from(f: mutable::Frame) -> Self {
 		Self {
 			id: f.id.into(),
 			start: f.start.into(),
@@ -531,5 +474,11 @@ impl From<MutableFrame> for Frame {
 			item_offset: OffsetsBuffer::try_from(Buffer::from(f.item_offset.into_inner())).unwrap(),
 			item: f.item.into(),
 		}
+	}
+}
+
+impl fmt::Debug for Frame {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
+		write!(f, "Frame {{ len: {} }}", self.id.len())
 	}
 }

@@ -3,8 +3,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-scripts/frame | rustfmt > resources/frame.rs
-mv resources/frame.rs ../src/model/
+mkdir -p target/frame
 
-scripts/columnar | rustfmt > resources/columnar.rs
-mv resources/columnar.rs ../src/model/
+scripts/frame | rustfmt > target/frame.rs
+scripts/frame-mutable | rustfmt > target/frame/mutable.rs
+scripts/frame-transpose | rustfmt > target/frame/transpose.rs
+
+cp target/*.rs ../src/model/
+cp target/frame/*.rs ../src/model/frame/

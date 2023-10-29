@@ -1,4 +1,4 @@
-(ns peppi-codegen.columnar
+(ns peppi-codegen.frame.transpose
   (:require
    [clojure.java.io :as io]
    [peppi-codegen.common :refer :all]))
@@ -11,7 +11,7 @@
 (defn struct-decl
   [[nm fields]]
   [:struct
-   {:derives ["PartialEq", "Debug"]}
+   {:derives #{"PartialEq", "Debug"}}
    nm
    (mapv field fields)])
 
@@ -19,7 +19,7 @@
   (let [json (read-json path)
         decls (mapv struct-decl json)]
     (println do-not-edit)
-    (println (slurp (io/resource "preamble/columnar.rs")))
+    (println (slurp (io/resource "preamble/frame/transpose.rs")))
     (println)
     (doseq [decl decls]
       (println (emit-expr decl) "\n"))))

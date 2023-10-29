@@ -62,17 +62,12 @@
 (def tuple-struct?
   (complement (comp :name first)))
 
-(defn mutable
-  [ty]
-  (str "Mutable" ty))
-
 (defn wrap-transpose
   [call]
   [:method-call {:unwrap true} call "transpose"])
 
 (defn wrap-map
   [target binding-name method-call]
-  ;{:pre [(#{:method-call :fn-call} (first method-call))]}
   (let [map-call [:method-call
                   target
                   "map"
@@ -93,6 +88,34 @@
 (defn unwrap
   [x]
   [:method-call x "unwrap"])
+
+(defn if-ver
+  ([ver then]
+   (if-ver ver then nil))
+  ([ver then else]
+   [:if
+    [:method-call "version" "gte" ver]
+    (cond->> then
+      (not= :block (first then)) (conj [:block]))
+    (cond->> else
+      (and else (not= :block (first else))) (conj [:block]))]))
+
+(defn nested-version-ifs
+  [f fields]
+  (->> fields
+       (partition-by :version)
+       reverse
+       (reduce (fn [acc fields]
+                 (let [ver (:version (first fields))
+                       stmts (concat (mapv f fields) acc)]
+                   (if ver
+                     [(if-ver ver (into [:block] stmts))]
+                     stmts)))
+               [])))
+
+;;;
+;;; AST emitters
+;;;
 
 (defmulti emit-expr*
   (fn [props & _]

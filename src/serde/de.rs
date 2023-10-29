@@ -1,19 +1,21 @@
 use std::{
 	collections::HashMap,
+	error,
 	fs::{self, File},
 	io::{self, Read, Result, Write},
 	path::{Path, PathBuf},
 };
 
+use arrow2::array::MutableArray;
 use byteorder::ReadBytesExt;
 use log::{debug, info};
-use arrow2::array::MutableArray;
 
 type BE = byteorder::BigEndian;
 
 use crate::{
 	model::{
 		frame,
+		frame::mutable::Frame as MutableFrame,
 		game::{self, Game, Netplay, Player, PlayerType, Port, NUM_PORTS},
 		shift_jis::MeleeString,
 		slippi,
@@ -41,7 +43,7 @@ pub(crate) enum Event {
 struct MutableGame {
 	start: game::Start,
 	end: Option<game::End>,
-	frames: frame::MutableFrame,
+	frames: MutableFrame,
 	metadata: Option<serde_json::Map<String, serde_json::Value>>,
 	gecko_codes: Option<game::GeckoCodes>,
 	port_indexes: [usize; 4],
@@ -67,6 +69,10 @@ where
 		true => None,
 		_ => Some(f(r)?),
 	})
+}
+
+fn invalid_data<E: Into<Box<dyn error::Error + Send + Sync>>>(err: E) -> io::Error {
+	io::Error::new(io::ErrorKind::InvalidData, err)
 }
 
 /// Reads the Event Payloads event, which must come first in the raw stream
@@ -145,7 +151,7 @@ fn player(
 	let cpu_level = {
 		let cpu_level = r.read_u8()?;
 		match r#type {
-			Some(PlayerType::CPU) => Some(cpu_level),
+			Some(PlayerType::Cpu) => Some(cpu_level),
 			_ => None,
 		}
 	};
@@ -160,8 +166,14 @@ fn player(
 		Some(v1_0) => {
 			let mut r = &v1_0[..];
 			Some(game::Ucf {
-				dash_back: r.read_u32::<BE>()?,
-				shield_drop: r.read_u32::<BE>()?,
+				dash_back: match r.read_u32::<BE>()? {
+					0 => None,
+					x => Some(game::DashBack::try_from(x).map_err(invalid_data)?),
+				},
+				shield_drop: match r.read_u32::<BE>()? {
+					0 => None,
+					x => Some(game::ShieldDrop::try_from(x).map_err(invalid_data)?),
+				},
 			})
 		}
 		_ => None,
@@ -180,7 +192,7 @@ fn player(
 				.map(|v3_11| {
 					let first_null = v3_11.iter().position(|&x| x == 0).unwrap_or(28);
 					let result = std::str::from_utf8(&v3_11[0..first_null]);
-					result.map(String::from).map_err(|_| err!("invalid suid"))
+					result.map(String::from).map_err(invalid_data)
 				})
 				.transpose()?;
 			Result::Ok(Netplay {
@@ -246,7 +258,7 @@ fn player_bytes_v1_0(r: &mut &[u8]) -> Result<[u8; 8]> {
 }
 
 pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
-	let raw_bytes = r.to_vec();
+	let bytes = game::Bytes(r.to_vec());
 	let slippi = slippi::Slippi {
 		version: slippi::Version(r.read_u8()?, r.read_u8()?, r.read_u8()?),
 	};
@@ -346,7 +358,7 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 	for n in 0..NUM_PORTS {
 		let nu = n as usize;
 		if let Some(p) = player(
-			Port::try_from(n).unwrap(),
+			Port::try_from(n).map_err(invalid_data)?,
 			&players_v0[nu],
 			is_teams,
 			players_v1_0[nu],
@@ -359,7 +371,12 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 		}
 	}
 
-	let language = if_more(r, |r| Ok(r.read_u8()?))?;
+	let language = if_more(r, |r|
+		Ok(
+			game::Language::try_from(r.read_u8()?)
+				.map_err(invalid_data)?
+		)
+	)?;
 
 	Ok(game::Start {
 		slippi,
@@ -374,7 +391,7 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 		damage_ratio,
 		players,
 		random_seed,
-		raw_bytes,
+		bytes,
 		// v1.5
 		is_pal,
 		// v2.0
@@ -387,12 +404,17 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 }
 
 pub(crate) fn game_end(r: &mut &[u8]) -> Result<game::End> {
-	let raw_bytes = r.to_vec();
+	let bytes = game::Bytes(r.to_vec());
 	Ok(game::End {
-		method: r.read_u8()?,
-		raw_bytes: raw_bytes,
+		method: game::EndMethod::try_from(r.read_u8()?).map_err(invalid_data)?,
+		bytes: bytes,
 		// v2.0
-		lras_initiator: if_more(r, |r| Ok(Port::try_from(r.read_u8()?).ok()))?,
+		lras_initiator: if_more(r, |r| Ok(
+			match r.read_u8()? {
+				255 => None,
+				x => Some(Port::try_from(x).map_err(invalid_data)?),
+			}
+		))?,
 	})
 }
 
@@ -644,7 +666,7 @@ pub fn deserialize<R: Read>(
 		MutableGame {
 			start: start,
 			end: None,
-			frames: frame::MutableFrame::with_capacity(1024, version, &ports),
+			frames: MutableFrame::with_capacity(1024, version, &ports),
 			metadata: None,
 			gecko_codes: None,
 			port_indexes: {

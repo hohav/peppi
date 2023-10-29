@@ -15,7 +15,6 @@ pub(crate) mod ubjson {
 }
 
 pub mod model {
-	pub mod columnar;
 	pub mod frame;
 	pub mod game;
 	pub mod shift_jis;

@@ -23,10 +23,10 @@ pub const MAX_SUPPORTED_VERSION: slippi::Version = slippi::Version(3, 12, 0);
 
 pub const NUM_PORTS: u8 = 4;
 
+#[repr(u8)]
 #[derive(
 	Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, IntoPrimitive, TryFromPrimitive,
 )]
-#[repr(u8)]
 pub enum Port {
 	P1 = 0,
 	P2 = 1,
@@ -55,9 +55,9 @@ impl Default for Port {
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
 pub enum PlayerType {
-	HUMAN = 0,
-	CPU = 1,
-	DEMO = 2,
+	Human = 0,
+	Cpu = 1,
+	Demo = 2,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -66,11 +66,32 @@ pub struct Team {
 	pub shade: u8,
 }
 
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
+pub enum DashBack {
+	Ucf = 1,
+	Arduino = 2,
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
+pub enum ShieldDrop {
+	Ucf = 1,
+	Arduino = 2,
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
+pub enum Language {
+	Japanese = 0,
+	English = 1,
+}
+
 /// Information about the "Universal Controller Fix" mod.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Ucf {
-	pub dash_back: u32,
-	pub shield_drop: u32,
+	pub dash_back: Option<DashBack>,
+	pub shield_drop: Option<ShieldDrop>,
 }
 
 /// Netplay name, connect code, and Slippi UID.
@@ -136,6 +157,15 @@ pub struct Scene {
 	pub major: u8,
 }
 
+#[derive(PartialEq, Eq, Clone)]
+pub struct Bytes(pub Vec<u8>);
+
+impl Debug for Bytes {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+		write!(f, "Bytes {{ len: {} }}", self.0.len())
+	}
+}
+
 /// Information used to initialize the game such as the game mode, settings, characters & stage.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Start {
@@ -166,7 +196,7 @@ pub struct Start {
 	/// mostly-redundant copy of the raw start block, for round-tripping
 	#[serde(skip)]
 	#[doc(hidden)]
-	pub raw_bytes: Vec<u8>,
+	pub bytes: Bytes,
 
 	/// (added: v1.5)
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -182,7 +212,7 @@ pub struct Start {
 
 	/// (added: v3.12)
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub language: Option<u8>,
+	pub language: Option<Language>,
 }
 
 impl Start {
@@ -191,16 +221,26 @@ impl Start {
 	}
 }
 
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
+pub enum EndMethod {
+	Unresolved = 0,
+	Time = 1,
+	Game = 2,
+	Resolved = 3,
+	NoContest = 7,
+}
+
 /// Information about the end of the game.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct End {
 	/// how the game ended
-	pub method: u8,
+	pub method: EndMethod,
 
-	/// mostly-redundant copy of the raw start block, for round-tripping
+	/// mostly-redundant copy of the raw end block, for round-tripping
 	#[serde(skip)]
 	#[doc(hidden)]
-	pub raw_bytes: Vec<u8>,
+	pub bytes: Bytes,
 
 	/// player who LRAS'd, if any (added: v2.0)
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -236,6 +276,7 @@ pub struct GeckoCodes {
 	pub actual_size: u32,
 }
 
+#[derive(Debug)]
 pub struct Game {
 	pub start: Start,
 	pub end: Option<End>,

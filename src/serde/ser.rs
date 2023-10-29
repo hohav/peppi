@@ -19,7 +19,7 @@ fn payload_sizes(game: &Game) -> Vec<(u8, u16)> {
 	let ver = start.slippi.version;
 	let mut sizes = Vec::new();
 
-	sizes.push((Event::GameStart as u8, start.raw_bytes.len() as u16));
+	sizes.push((Event::GameStart as u8, start.bytes.0.len() as u16));
 
 	sizes.push((
 		Event::FramePre as u8,
@@ -103,12 +103,12 @@ fn gecko_codes<W: Write>(w: &mut W, codes: &GeckoCodes) -> Result<()> {
 fn game_start<W: Write>(w: &mut W, s: &game::Start, ver: Version) -> Result<()> {
 	assert_eq!(ver, s.slippi.version);
 	w.write_u8(Event::GameStart as u8)?;
-	w.write_all(&s.raw_bytes)
+	w.write_all(&s.bytes.0)
 }
 
 fn game_end<W: Write>(w: &mut W, e: &game::End, ver: Version) -> Result<()> {
 	w.write_u8(Event::GameEnd as u8)?;
-	w.write_u8(e.method)?;
+	w.write_u8(e.method as u8)?;
 	if ver.gte(2, 0) {
 		w.write_u8(
 			e.lras_initiator
