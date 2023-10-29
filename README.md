@@ -10,47 +10,32 @@ In your `Cargo.toml`:
 
 ```toml
 [dependencies]
-peppi = "1.0.0-alpha.6"
+peppi = { git = "https://github.com/hohav/peppi.git", branch = "arrow-in-memory" }
 ```
 
 ## Usage
 
-### Object-based parsing:
-
 ```rust
 use std::{fs, io};
 
 fn main() {
-    let mut buf = io::BufReader::new(
+    let mut r = io::BufReader::new(
         fs::File::open("game.slp").unwrap());
-    let game = peppi::game(&mut buf, None, None).unwrap();
-    println!("{:#?}", game);
-}
-```
+    let game = peppi::game(&mut r, None).unwrap();
 
-### Event-driven parsing:
+    // Print some general info about the game
+    println!("{:?}", game);
 
-```rust
-use std::{fs, io};
-
-use peppi::model::frame;
-use peppi::serde::de::{Handlers, FrameEvent, PortId};
-
-struct FramePrinter {}
-
-impl Handlers for FramePrinter {
-    fn frame_post(&mut self, post: FrameEvent<PortId, frame::Post>) -> io::Result<()> {
-        println!("{}:{}", post.id.port, post.id.index);
-        Ok(())
+    // Iterate over each frame and print percents for each player
+    for i in 0 .. game.frames.id.len() {
+        println!("Frame {}", game.frames.id.get(i).unwrap());
+        for (idx, p) in game.frames.port.iter().enumerate() {
+            println!("{}: {}%",
+                game.start.players[idx].port,
+                p.leader.post.percent.get(i).unwrap()
+            );
+        }
     }
-}
-
-fn main() {
-    let f = fs::File::open("game.slp").unwrap();
-    let mut r = io::BufReader::new(f);
-    let mut handlers = FramePrinter {};
-
-    peppi::parse(&mut r, &mut handlers, None).unwrap();
 }
 ```
 
