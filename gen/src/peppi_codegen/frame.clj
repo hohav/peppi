@@ -215,7 +215,10 @@
 
 (defn immutable-struct
   [[nm fields]]
-  [[:struct {:derives #{"Debug"}} nm (mapv immutable-struct-field fields)]
+  [[:struct
+    {:attrs {:derive ["Debug"]}}
+    nm
+    (mapv immutable-struct-field fields)]
    [:impl nm [(data-type-fn fields)
               (into-struct-array-fn fields)
               (from-struct-array-fn fields)

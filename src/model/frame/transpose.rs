@@ -6,12 +6,12 @@ pub struct Frame {
 	pub end: End,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct End {
 	pub latest_finalized_frame: Option<i32>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct Item {
 	pub r#type: u16,
 	pub state: u8,
@@ -25,16 +25,16 @@ pub struct Item {
 	pub owner: Option<i8>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct ItemMisc(pub u8, pub u8, pub u8, pub u8);
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct Position {
 	pub x: f32,
 	pub y: f32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct Post {
 	pub character: u8,
 	pub state: u16,
@@ -59,7 +59,7 @@ pub struct Post {
 	pub animation_index: Option<u32>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct Pre {
 	pub random_seed: u32,
 	pub state: u16,
@@ -75,22 +75,22 @@ pub struct Pre {
 	pub percent: Option<f32>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct Start {
 	pub random_seed: Option<u32>,
 	pub scene_frame_counter: Option<u32>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct StateFlags(pub u8, pub u8, pub u8, pub u8, pub u8);
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct TriggersPhysical {
 	pub l: f32,
 	pub r: f32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct Velocities {
 	pub self_x_air: f32,
 	pub self_y: f32,
@@ -99,7 +99,7 @@ pub struct Velocities {
 	pub self_x_ground: f32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct Velocity {
 	pub x: f32,
 	pub y: f32,

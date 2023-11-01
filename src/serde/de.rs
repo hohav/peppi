@@ -3,7 +3,7 @@ use std::{
 	error,
 	fs::{self, File},
 	io::{self, Read, Result, Write},
-	path::{Path, PathBuf},
+	path::PathBuf,
 };
 
 use arrow2::array::MutableArray;
@@ -27,9 +27,23 @@ pub(crate) const PAYLOADS_EVENT_CODE: u8 = 0x35;
 const MAX_PLAYERS: usize = 6;
 const ICE_CLIMBERS: u8 = 14;
 
+#[derive(Clone, Debug)]
+pub struct Debug {
+	pub dir: PathBuf,
+}
+
+/// Options for parsing replays.
+#[derive(Clone, Debug, Default)]
+pub struct Opts {
+	/// Skip all frame data when parsing a replay for speed
+	/// (when you only need start/end/metadata).
+	pub skip_frames: bool,
+	pub debug: Option<Debug>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, num_enum::TryFromPrimitive)]
 #[repr(u8)]
-pub(crate) enum Event {
+pub enum Event {
 	GameStart = 0x36,
 	FramePre = 0x37,
 	FramePost = 0x38,
@@ -40,17 +54,31 @@ pub(crate) enum Event {
 	GeckoCodes = 0x3D,
 }
 
-struct MutableGame {
+pub struct ParseState {
+	payload_sizes: HashMap<u8, u16>,
+	bytes_read: usize,
+	event_counts: HashMap<u8, usize>,
+	split_accumulator: SplitAccumulator,
+	game: PartialGame,
+	port_indexes: [usize; 4],
+}
+
+pub struct PartialGame {
 	start: game::Start,
 	end: Option<game::End>,
 	frames: MutableFrame,
 	metadata: Option<serde_json::Map<String, serde_json::Value>>,
 	gecko_codes: Option<game::GeckoCodes>,
-	port_indexes: [usize; 4],
 }
 
-impl From<MutableGame> for Game {
-	fn from(game: MutableGame) -> Self {
+#[derive(Debug, Default)]
+struct SplitAccumulator {
+	raw: Vec<u8>,
+	actual_size: u32,
+}
+
+impl From<PartialGame> for Game {
+	fn from(game: PartialGame) -> Self {
 		Game {
 			start: game.start,
 			end: game.end,
@@ -58,6 +86,12 @@ impl From<MutableGame> for Game {
 			metadata: game.metadata,
 			gecko_codes: game.gecko_codes,
 		}
+	}
+}
+
+impl From<ParseState> for Game {
+	fn from(state: ParseState) -> Self {
+		Self::from(state.game)
 	}
 }
 
@@ -73,45 +107,6 @@ where
 
 fn invalid_data<E: Into<Box<dyn error::Error + Send + Sync>>>(err: E) -> io::Error {
 	io::Error::new(io::ErrorKind::InvalidData, err)
-}
-
-/// Reads the Event Payloads event, which must come first in the raw stream
-/// and tells us the sizes for all other events to follow.
-/// Returns the number of bytes read by this function, plus a map of event
-/// codes to payload sizes. This map uses raw event codes as keys (as opposed
-/// to `Event` enum values) for forwards compatibility, as it allows us to
-/// skip unknown event types.
-fn payload_sizes<R: Read>(r: &mut R) -> Result<(usize, HashMap<u8, u16>)> {
-	let code = r.read_u8()?;
-	if code != PAYLOADS_EVENT_CODE {
-		return Err(err!("expected event payloads, but got: {}", code));
-	}
-
-	// Size in bytes of the subsequent list of payload-size kv pairs.
-	// Each pair is 3 bytes, so this size should be divisible by 3.
-	// However the value includes this size byte itself, so it's off-by-one.
-	let size = r.read_u8()?;
-	if size % 3 != 1 {
-		return Err(err!("invalid payload size: {}", size));
-	}
-
-	let mut sizes = HashMap::new();
-	for _ in (0..size - 1).step_by(3) {
-		let code = r.read_u8()?;
-		let size = r.read_u16::<BE>()?;
-		sizes.insert(code, size);
-	}
-
-	debug!(
-		"Event payload sizes: {{{}}}",
-		sizes
-			.iter()
-			.map(|(k, v)| format!("0x{:x}: {}", k, v))
-			.collect::<Vec<_>>()
-			.join(", ")
-	);
-
-	Ok((1 + size as usize, sizes)) // +1 byte for the event code
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -423,12 +418,6 @@ fn expect_bytes<R: Read>(r: &mut R, expected: &[u8]) -> Result<()> {
 	}
 }
 
-#[derive(Default)]
-struct SplitAccumulator {
-	raw: Vec<u8>,
-	actual_size: u32,
-}
-
 fn handle_splitter_event(buf: &[u8], accumulator: &mut SplitAccumulator) -> Result<Option<u8>> {
 	assert_eq!(buf.len(), 516);
 	let actual_size = (&buf[512..514]).read_u16::<BE>()?;
@@ -447,61 +436,23 @@ fn handle_splitter_event(buf: &[u8], accumulator: &mut SplitAccumulator) -> Resu
 	})
 }
 
-fn debug_write_event<P: AsRef<Path>>(
+fn debug_write_event(
 	buf: &[u8],
 	code: u8,
-	event_counts: &mut HashMap<u8, usize>,
-	debug_dir: P,
+	state: Option<&ParseState>,
+	debug: &Debug,
 ) -> Result<()> {
-	// write the event's raw data to "{debug_dir}/{code}/{count}",
+	// write the event's raw data to "{debug.dir}/{code}/{count}",
 	// where `count` is how many of that event we've seen already
-	let code_dir = debug_dir.as_ref().join(format!("{}", code));
+	let code_dir = debug.dir.join(format!("{}", code));
 	fs::create_dir_all(&code_dir)?;
-	let count = event_counts.get(&code).unwrap_or(&0);
+	let count = state.and_then(|s| s.event_counts.get(&code)).unwrap_or(&0);
 	let mut f = File::create(code_dir.join(format!("{}", count)))?;
 	f.write_all(buf)?;
-	event_counts.insert(code, count + 1);
 	Ok(())
 }
 
-/// Parses a single event from the raw stream. If the event is one of the
-/// supported `Event` types, calls the corresponding `Handler` callback with
-/// the parsed event.
-///
-/// Returns the number of bytes read by this function.
-fn pre_start_event<R: Read, P: AsRef<Path>>(
-	mut r: R,
-	payload_sizes: &HashMap<u8, u16>,
-	event_counts: &mut HashMap<u8, usize>,
-	debug_dir: Option<P>,
-) -> Result<(usize, Option<game::Start>)> {
-	let code = r.read_u8()?;
-	debug!("Event: {:#x}", code);
-
-	let size = *payload_sizes
-		.get(&code)
-		.ok_or_else(|| err!("unknown event: {}", code))? as usize;
-	let mut buf = vec![0; size];
-	r.read_exact(&mut buf)?;
-
-	if let Some(d) = debug_dir {
-		debug_write_event(&buf, code, event_counts, d)?;
-	}
-
-	let event = Event::try_from(code).ok();
-	let mut start = None;
-	if let Some(event) = event {
-		use Event::*;
-		match event {
-			GameStart => start = Some(game_start(&mut &*buf)?),
-			_ => return Err(err!("Invalid event before start: {}", code)),
-		};
-	}
-
-	Ok((size + 1, start)) // +1 byte for the event code
-}
-
-fn push_id(game: &mut MutableGame, id: i32) {
+fn push_id(game: &mut PartialGame, id: i32) {
 	let len = game.frames.id.len();
 	game.frames.id.push(Some(id));
 	for p in &mut game.frames.port {
@@ -513,88 +464,206 @@ fn push_id(game: &mut MutableGame, id: i32) {
 	}
 }
 
-fn post_start_event<R: Read, P: AsRef<Path>>(
+/// Parses an Event Payloads event from `r`, which must come first in the raw
+/// stream and tells us the sizes for all other events to follow.
+///
+/// Returns the number of bytes read, and a map of event codes to payload sizes.
+/// This map uses raw event codes as keys (as opposed to `Event` enum values)
+/// for forwards compatibility, to allow skipping unknown events.
+fn parse_payloads<R: Read>(mut r: R, debug: Option<&Debug>) -> Result<(usize, HashMap<u8, u16>)> {
+	let code = r.read_u8()?;
+	if code != PAYLOADS_EVENT_CODE {
+		return Err(err!("expected event payloads, but got: {:#02x}", code));
+	}
+
+	// Size in bytes of the subsequent list of payload-size kv pairs.
+	// Each pair is 3 bytes, so this size should be divisible by 3.
+	// However the value includes this size byte itself, so it's off-by-one.
+	let size = r.read_u8()?;
+	if size % 3 != 1 {
+		return Err(err!("invalid payload size: {}", size));
+	}
+
+	let mut buf = vec![0; (size - 1) as usize];
+	r.read_exact(&mut buf)?;
+	let buf = &mut &buf[..];
+
+	if let Some(ref d) = debug {
+		debug_write_event(&buf, code, None, d)?;
+	}
+
+	let mut sizes = HashMap::new();
+	for _ in (0..size - 1).step_by(3) {
+		let code = buf.read_u8()?;
+		let size = buf.read_u16::<BE>()?;
+		sizes.insert(code, size);
+	}
+
+	println!(
+		"Event payload sizes: {{{}}}",
+		sizes
+			.iter()
+			.map(|(k, v)| format!("0x{:x}: {}", k, v))
+			.collect::<Vec<_>>()
+			.join(", ")
+	);
+
+	Ok((1 + size as usize, sizes)) // +1 byte for the event code
+}
+
+/// Parses a Game Start event from `r`, which must come immediately after the
+/// Event Payloads.
+///
+/// Returns the number of bytes read, and a parsed `game::Start` event
+/// (or Err if the event wasn't a Game Start).
+fn parse_start<R: Read>(
 	mut r: R,
 	payload_sizes: &HashMap<u8, u16>,
-	splitter_accumulator: &mut SplitAccumulator,
-	event_counts: &mut HashMap<u8, usize>,
-	debug_dir: Option<P>,
-	game: &mut MutableGame,
-) -> Result<(usize, Option<game::End>)> {
-	let mut code = r.read_u8()?;
-	debug!("Event: {:#x}", code);
+	debug: Option<&Debug>,
+) -> Result<(usize, game::Start)> {
+	let code = r.read_u8()?;
+	println!("Event: {:#x}", code);
 
 	let size = *payload_sizes
 		.get(&code)
-		.ok_or_else(|| err!("unknown event: {}", code))? as usize;
+		.ok_or_else(|| err!("unknown event: {:#02x}", code))? as usize;
+	let mut buf = vec![0; size];
+	r.read_exact(&mut buf)?;
+
+	if let Some(ref d) = debug {
+		debug_write_event(&buf, code, None, d)?;
+	}
+
+	match Event::try_from(code) {
+		// +1 byte for the event code
+		Ok(Event::GameStart) => Ok((size + 1, game_start(&mut &*buf)?)),
+		_ => Err(err!("Invalid event before start: {:#02x}", code)),
+	}
+}
+
+pub fn parse_init<R: Read>(mut r: R, debug: Option<&Debug>) -> Result<ParseState> {
+	let (bytes1, payload_sizes) = parse_payloads(&mut r, debug)?;
+	let (bytes2, start) = parse_start(&mut r, &payload_sizes, debug)?;
+
+	let ports: Vec<_> = start
+		.players
+		.iter()
+		.map(|p| frame::PortOccupancy {
+			port: p.port,
+			follower: p.character == ICE_CLIMBERS,
+		})
+		.collect();
+	let version = start.slippi.version;
+	let game = PartialGame {
+		start: start.clone(),
+		end: None,
+		frames: MutableFrame::with_capacity(1024, version, &ports),
+		metadata: None,
+		gecko_codes: None,
+	};
+
+	let port_indexes = {
+		let mut result = [0, 0, 0, 0];
+		for (i, p) in ports.into_iter().enumerate() {
+			result[p.port as usize] = i;
+		}
+		result
+	};
+
+	Ok(ParseState {
+		payload_sizes: payload_sizes,
+		bytes_read: bytes1 + bytes2,
+		event_counts: HashMap::new(), // FIXME: +1 for payloads & start
+		split_accumulator: Default::default(),
+		game: game,
+		port_indexes: port_indexes,
+	})
+}
+
+/// Parses a single event from `r`.
+///
+/// Returns the number of bytes read, and a `game::End` if the event was a
+/// Game End (which signals the end of the event stream).
+pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, debug: Option<&Debug>) -> Result<u8> {
+	let mut code = r.read_u8()?;
+	println!("Event: {:#x}", code);
+
+	let size = *state
+		.payload_sizes
+		.get(&code)
+		.ok_or_else(|| err!("unknown event: {:#02x}", code))? as usize;
 	let mut buf = vec![0; size];
 	r.read_exact(&mut buf)?;
 
 	if code == 0x10 {
 		// message splitter
-		if let Some(wrapped_event) = handle_splitter_event(&buf, splitter_accumulator)? {
+		if let Some(wrapped_event) = handle_splitter_event(&buf, &mut state.split_accumulator)? {
 			code = wrapped_event;
 			buf.clear();
-			buf.append(&mut splitter_accumulator.raw);
+			buf.append(&mut state.split_accumulator.raw);
 		}
 	};
 
-	if let Some(d) = debug_dir {
-		debug_write_event(&buf, code, event_counts, d)?;
+	if let Some(ref d) = debug {
+		debug_write_event(&buf, code, Some(state), d)?;
 	}
 
 	let event = Event::try_from(code).ok();
-	let mut end = None;
 	if let Some(event) = event {
 		use Event::*;
 		match event {
 			GeckoCodes => {
-				game.gecko_codes = Some(game::GeckoCodes {
+				state.game.gecko_codes = Some(game::GeckoCodes {
 					bytes: buf.to_vec(),
-					actual_size: splitter_accumulator.actual_size,
+					actual_size: state.split_accumulator.actual_size,
 				})
 			}
 			GameStart => return Err(err!("Duplicate start event")),
-			GameEnd => end = Some(game_end(&mut &*buf)?),
+			GameEnd => state.game.end = Some(game_end(&mut &*buf)?),
 			FrameStart => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
-				push_id(game, id);
-				game.frames.start.read_push(r, game.start.slippi.version)?;
+				push_id(&mut state.game, id);
+				state
+					.game
+					.frames
+					.start
+					.read_push(r, state.game.start.slippi.version)?;
 			}
 			FramePre => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
 				let port = r.read_u8()?;
 				let is_follower = r.read_u8()? != 0;
-				if game.start.slippi.version.gte(2, 2) {
-					assert_eq!(id, *game.frames.id.values().last().unwrap());
+				if state.game.start.slippi.version.gte(2, 2) {
+					assert_eq!(id, *state.game.frames.id.values().last().unwrap());
 				} else {
 					// no Frame Start events before Slippi 2.2.0,
 					// but also no rollbacks
-					let last_id = *game
+					let last_id = *state
+						.game
 						.frames
 						.id
 						.values()
 						.last()
 						.unwrap_or(&(frame::FIRST_INDEX - 1));
 					if last_id + 1 == id {
-						push_id(game, id);
+						push_id(&mut state.game, id);
 					} else {
 						assert_eq!(id, last_id);
 					}
 				}
 				match is_follower {
-					true => game.frames.port[game.port_indexes[port as usize]]
+					true => state.game.frames.port[state.port_indexes[port as usize]]
 						.follower
 						.as_mut()
 						.unwrap()
 						.pre
-						.read_push(r, game.start.slippi.version)?,
-					_ => game.frames.port[game.port_indexes[port as usize]]
+						.read_push(r, state.game.start.slippi.version)?,
+					_ => state.game.frames.port[state.port_indexes[port as usize]]
 						.leader
 						.pre
-						.read_push(r, game.start.slippi.version)?,
+						.read_push(r, state.game.start.slippi.version)?,
 				};
 			}
 			FramePost => {
@@ -602,51 +671,53 @@ fn post_start_event<R: Read, P: AsRef<Path>>(
 				let id = r.read_i32::<BE>()?;
 				let port = r.read_u8()?;
 				let is_follower = r.read_u8()? != 0;
-				assert_eq!(id, *game.frames.id.values().last().unwrap());
+				assert_eq!(id, *state.game.frames.id.values().last().unwrap());
 				match is_follower {
-					true => game.frames.port[game.port_indexes[port as usize]]
+					true => state.game.frames.port[state.port_indexes[port as usize]]
 						.follower
 						.as_mut()
 						.unwrap()
 						.post
-						.read_push(r, game.start.slippi.version)?,
-					_ => game.frames.port[game.port_indexes[port as usize]]
+						.read_push(r, state.game.start.slippi.version)?,
+					_ => state.game.frames.port[state.port_indexes[port as usize]]
 						.leader
 						.post
-						.read_push(r, game.start.slippi.version)?,
+						.read_push(r, state.game.start.slippi.version)?,
 				};
 			}
 			FrameEnd => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
-				assert_eq!(id, *game.frames.id.values().last().unwrap());
-				let old_len = *game.frames.item_offset.last();
-				let new_len: i32 = game.frames.item.r#type.len().try_into().unwrap();
-				game.frames
+				assert_eq!(id, *state.game.frames.id.values().last().unwrap());
+				let old_len = *state.game.frames.item_offset.last();
+				let new_len: i32 = state.game.frames.item.r#type.len().try_into().unwrap();
+				state
+					.game
+					.frames
 					.item_offset
 					.try_push(new_len.checked_sub(old_len).unwrap())
 					.unwrap();
-				game.frames.end.read_push(r, game.start.slippi.version)?;
+				state
+					.game
+					.frames
+					.end
+					.read_push(r, state.game.start.slippi.version)?;
 			}
 			Item => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
-				assert_eq!(id, *game.frames.id.values().last().unwrap());
-				game.frames.item.read_push(r, game.start.slippi.version)?;
+				assert_eq!(id, *state.game.frames.id.values().last().unwrap());
+				state
+					.game
+					.frames
+					.item
+					.read_push(r, state.game.start.slippi.version)?;
 			}
 		};
 	}
 
-	Ok((size + 1, end)) // +1 byte for the event code
-}
-
-/// Options for parsing replays.
-#[derive(Clone, Debug, Default)]
-pub struct Opts {
-	/// Skip all frame data when parsing a replay for speed
-	/// (when you only need start/end/metadata).
-	pub skip_frames: bool,
-	pub debug_dir: Option<PathBuf>,
+	state.bytes_read += size + 1; // +1 byte for the event code
+	Ok(code)
 }
 
 /// Parses a Slippi replay from `r`.
@@ -657,89 +728,43 @@ pub fn deserialize<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> 
 
 	let raw_len = r.read_u32::<BE>()? as usize;
 	info!("Raw length: {} bytes", raw_len);
-	let (mut bytes_read, payload_sizes) = payload_sizes(&mut r)?;
-	let skip_frames = opts.map(|o| o.skip_frames).unwrap_or(false);
 
-	let debug_dir = opts.map(|o| o.debug_dir.as_ref()).unwrap_or(None);
-	// track how many of each event we've seen so we know where to put the debug output
-	let mut event_counts = HashMap::<u8, usize>::new();
-	let mut start: Option<game::Start> = None;
+	let opts: Opts = opts.map(|o| o.clone()).unwrap_or_default();
+	let mut state = parse_init(&mut r, opts.debug.as_ref())?;
 
-	// `raw_len` will be 0 for an in-progress replay
-	while (raw_len == 0 || bytes_read < raw_len) && start.is_none() {
-		let (bytes, _start) =
-			pre_start_event(r.by_ref(), &payload_sizes, &mut event_counts, debug_dir)?;
-		bytes_read += bytes;
-		start = _start;
-	}
-
-	let mut game = {
-		let start = start.unwrap();
-		let ports: Vec<_> = start
-			.players
-			.iter()
-			.map(|p| frame::PortOccupancy {
-				port: p.port,
-				follower: p.character == ICE_CLIMBERS,
-			})
-			.collect();
-		let version = start.slippi.version;
-		MutableGame {
-			start: start,
-			end: None,
-			frames: MutableFrame::with_capacity(1024, version, &ports),
-			metadata: None,
-			gecko_codes: None,
-			port_indexes: {
-				let mut result = [0, 0, 0, 0];
-				for (i, p) in ports.into_iter().enumerate() {
-					result[p.port as usize] = i;
-				}
-				result
-			},
-		}
-	};
-
-	if skip_frames {
+	if opts.skip_frames {
 		// Skip to GameEnd, which we assume is the last event in the stream!
-		let end_offset: usize = payload_sizes[&(Event::GameEnd as u8)] as usize + 1;
-		if raw_len == 0 || raw_len - bytes_read < end_offset {
+		let end_offset: usize = state.payload_sizes[&(Event::GameEnd as u8)] as usize + 1;
+		if raw_len == 0 || raw_len - state.bytes_read < end_offset {
 			return Err(err!(
 				"Cannot skip to game end. Replay in-progress or corrupted."
 			));
 		}
-		let skip = raw_len - bytes_read - end_offset;
+		let skip = raw_len - state.bytes_read - end_offset;
 		info!("Jumping to GameEnd (skipping {} bytes)", skip);
 		// In theory we should seek() if `r` is Seekable, but it's not much
 		// faster and is very awkward to implement without specialization.
 		io::copy(&mut r.by_ref().take(skip as u64), &mut io::sink())?;
-		bytes_read += skip;
+		state.bytes_read += skip;
 	}
 
-	let mut end = None;
-	let mut splitter_accumulator = Default::default();
-	while (raw_len == 0 || bytes_read < raw_len) && end.is_none() {
-		let (bytes, _end) = post_start_event(
-			r.by_ref(),
-			&payload_sizes,
-			&mut splitter_accumulator,
-			&mut event_counts,
-			debug_dir,
-			&mut game,
-		)?;
-		bytes_read += bytes;
-		end = _end;
+	// `raw_len` will be 0 for an in-progress replay
+	while raw_len == 0 || state.bytes_read < raw_len {
+		if parse_event(r.by_ref(), &mut state, opts.debug.as_ref())? == Event::GameEnd as u8 {
+			break;
+		}
 	}
 
-	game.end = end;
+	info!(
+		"frames: {}",
+		state.game.frames.port[0].leader.pre.state.len()
+	);
 
-	info!("frames: {}", game.frames.port[0].leader.pre.state.len());
-
-	if raw_len != 0 && bytes_read != raw_len {
+	if raw_len != 0 && state.bytes_read != raw_len {
 		return Err(err!(
 			"failed to consume expected number of bytes: {}, {}",
 			raw_len,
-			bytes_read
+			state.bytes_read
 		));
 	}
 
@@ -755,9 +780,9 @@ pub fn deserialize<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> 
 	// we know it's a map. `parse_map` will consume the corresponding "}".
 	let metadata = ubjson::de::to_map(&mut r)?;
 	info!("Raw metadata: {}", serde_json::to_string(&metadata)?);
-	game.metadata = Some(metadata);
+	state.game.metadata = Some(metadata);
 
 	expect_bytes(&mut r, &[0x7d])?; // top-level closing brace ("}")
 
-	Ok(game.into())
+	Ok(state.game.into())
 }

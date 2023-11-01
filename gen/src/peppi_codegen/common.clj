@@ -304,17 +304,30 @@
   [[nm value]]
   (format "%s = %s" nm value))
 
+(defn emit-attr
+  [[nm args]]
+  (format "#[%s%s]"
+          (name nm)
+          (or (some->> args not-empty (str/join ", ") (format "(%s)"))
+              "")))
+
+(defn emit-attrs
+  [attrs]
+  (->> attrs
+       (mapv emit-attr)
+       (str/join "\n")))
+
 (defmethod emit-expr* :enum
-  [{:keys [repr]} nm items]
-  (format "%spub enum %s { %s }"
-          (or (some->> repr (format "#[repr(%s)] ")) "")
+  [{:keys [attrs]} nm items]
+  (format "%s\npub enum %s { %s }"
+          (emit-attrs attrs)
           nm
           (str/join ", " (mapv enum-item items))))
 
 (defmethod emit-expr* :struct
-  [{:keys [derives]} nm fields]
-  (let [decl (format "%s pub struct %s"
-                     (or (some->> derives (str/join ", ") (format "#[derive(%s)]")) "")
+  [{:keys [attrs]} nm fields]
+  (let [decl (format "%s\npub struct %s"
+                     (emit-attrs attrs)
                      nm)]
     (if (ffirst fields)
       (->> fields ; normal struct

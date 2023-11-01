@@ -11,7 +11,7 @@
 (defn struct-decl
   [[nm fields]]
   [:struct
-   {:derives #{"PartialEq", "Debug"}}
+   {:attrs {:derive ["PartialEq" "Clone" "Copy" "Debug"]}}
    nm
    (mapv field fields)])
 
