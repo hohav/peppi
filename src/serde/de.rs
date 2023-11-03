@@ -499,7 +499,7 @@ fn parse_payloads<R: Read>(mut r: R, debug: Option<&Debug>) -> Result<(usize, Ha
 		sizes.insert(code, size);
 	}
 
-	println!(
+	debug!(
 		"Event payload sizes: {{{}}}",
 		sizes
 			.iter()
@@ -522,7 +522,7 @@ fn parse_start<R: Read>(
 	debug: Option<&Debug>,
 ) -> Result<(usize, game::Start)> {
 	let code = r.read_u8()?;
-	println!("Event: {:#x}", code);
+	debug!("Event: {:#x}", code);
 
 	let size = *payload_sizes
 		.get(&code)
@@ -586,7 +586,7 @@ pub fn parse_init<R: Read>(mut r: R, debug: Option<&Debug>) -> Result<ParseState
 /// Game End (which signals the end of the event stream).
 pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, debug: Option<&Debug>) -> Result<u8> {
 	let mut code = r.read_u8()?;
-	println!("Event: {:#x}", code);
+	debug!("Event: {:#x}", code);
 
 	let size = *state
 		.payload_sizes
