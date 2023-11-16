@@ -9,7 +9,11 @@ use arrow2::{array::MutablePrimitiveArray, offset::Offsets};
 use byteorder::ReadBytesExt;
 use std::io::Result;
 
-use crate::model::{frame::PortOccupancy, game::Port, slippi::Version};
+use crate::model::{
+	frame::{transpose, PortOccupancy},
+	game::Port,
+	slippi::Version,
+};
 
 type BE = byteorder::BigEndian;
 
@@ -30,6 +34,13 @@ impl Data {
 		self.pre.push_none(version);
 		self.post.push_none(version);
 	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Data {
+		transpose::Data {
+			pre: self.pre.transpose_one(i, version),
+			post: self.post.transpose_one(i, version),
+		}
+	}
 }
 
 pub struct PortData {
@@ -47,6 +58,14 @@ impl PortData {
 				true => Some(Data::with_capacity(capacity, version)),
 				_ => None,
 			},
+		}
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::PortData {
+		transpose::PortData {
+			port: self.port,
+			leader: self.leader.transpose_one(i, version),
+			follower: self.follower.as_ref().map(|f| f.transpose_one(i, version)),
 		}
 	}
 }
@@ -72,6 +91,19 @@ impl Frame {
 				.collect(),
 			item_offset: Offsets::<i32>::with_capacity(capacity),
 			item: Item::with_capacity(0, version),
+		}
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Frame {
+		transpose::Frame {
+			id: self.id.values()[i],
+			start: self.start.transpose_one(i, version),
+			end: self.end.transpose_one(i, version),
+			port: self
+				.port
+				.iter()
+				.map(|p| p.transpose_one(i, version))
+				.collect(),
 		}
 	}
 }
@@ -230,6 +262,38 @@ impl Post {
 		};
 		Ok(())
 	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Post {
+		transpose::Post {
+			character: self.character.values()[i],
+			state: self.state.values()[i],
+			position: self.position.transpose_one(i, version),
+			direction: self.direction.values()[i],
+			percent: self.percent.values()[i],
+			shield: self.shield.values()[i],
+			last_attack_landed: self.last_attack_landed.values()[i],
+			combo_count: self.combo_count.values()[i],
+			last_hit_by: self.last_hit_by.values()[i],
+			stocks: self.stocks.values()[i],
+			state_age: self.state_age.as_ref().map(|x| x.values()[i]),
+			state_flags: self
+				.state_flags
+				.as_ref()
+				.map(|x| x.transpose_one(i, version)),
+			misc_as: self.misc_as.as_ref().map(|x| x.values()[i]),
+			airborne: self.airborne.as_ref().map(|x| x.values()[i]),
+			ground: self.ground.as_ref().map(|x| x.values()[i]),
+			jumps: self.jumps.as_ref().map(|x| x.values()[i]),
+			l_cancel: self.l_cancel.as_ref().map(|x| x.values()[i]),
+			hurtbox_state: self.hurtbox_state.as_ref().map(|x| x.values()[i]),
+			velocities: self
+				.velocities
+				.as_ref()
+				.map(|x| x.transpose_one(i, version)),
+			hitlag: self.hitlag.as_ref().map(|x| x.values()[i]),
+			animation_index: self.animation_index.as_ref().map(|x| x.values()[i]),
+		}
+	}
 }
 
 pub struct Start {
@@ -269,6 +333,13 @@ impl Start {
 		};
 		Ok(())
 	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Start {
+		transpose::Start {
+			random_seed: self.random_seed.as_ref().map(|x| x.values()[i]),
+			scene_frame_counter: self.scene_frame_counter.as_ref().map(|x| x.values()[i]),
+		}
+	}
 }
 
 pub struct End {
@@ -296,6 +367,12 @@ impl End {
 				.map(|x| self.latest_finalized_frame.as_mut().unwrap().push(Some(x)))?
 		};
 		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::End {
+		transpose::End {
+			latest_finalized_frame: self.latest_finalized_frame.as_ref().map(|x| x.values()[i]),
+		}
 	}
 }
 
@@ -333,6 +410,16 @@ impl StateFlags {
 		r.read_u8().map(|x| self.3.push(Some(x)))?;
 		r.read_u8().map(|x| self.4.push(Some(x)))?;
 		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::StateFlags {
+		transpose::StateFlags(
+			self.0.values()[i],
+			self.1.values()[i],
+			self.2.values()[i],
+			self.3.values()[i],
+			self.4.values()[i],
+		)
 	}
 }
 
@@ -414,6 +501,23 @@ impl Pre {
 		};
 		Ok(())
 	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Pre {
+		transpose::Pre {
+			random_seed: self.random_seed.values()[i],
+			state: self.state.values()[i],
+			position: self.position.transpose_one(i, version),
+			direction: self.direction.values()[i],
+			joystick: self.joystick.transpose_one(i, version),
+			cstick: self.cstick.transpose_one(i, version),
+			triggers: self.triggers.values()[i],
+			buttons: self.buttons.values()[i],
+			buttons_physical: self.buttons_physical.values()[i],
+			triggers_physical: self.triggers_physical.transpose_one(i, version),
+			raw_analog_x: self.raw_analog_x.as_ref().map(|x| x.values()[i]),
+			percent: self.percent.as_ref().map(|x| x.values()[i]),
+		}
+	}
 }
 
 pub struct ItemMisc(
@@ -447,6 +551,15 @@ impl ItemMisc {
 		r.read_u8().map(|x| self.3.push(Some(x)))?;
 		Ok(())
 	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::ItemMisc {
+		transpose::ItemMisc(
+			self.0.values()[i],
+			self.1.values()[i],
+			self.2.values()[i],
+			self.3.values()[i],
+		)
+	}
 }
 
 pub struct Position {
@@ -471,6 +584,13 @@ impl Position {
 		r.read_f32::<BE>().map(|x| self.x.push(Some(x)))?;
 		r.read_f32::<BE>().map(|x| self.y.push(Some(x)))?;
 		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Position {
+		transpose::Position {
+			x: self.x.values()[i],
+			y: self.y.values()[i],
+		}
 	}
 }
 
@@ -510,6 +630,16 @@ impl Velocities {
 			.map(|x| self.self_x_ground.push(Some(x)))?;
 		Ok(())
 	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Velocities {
+		transpose::Velocities {
+			self_x_air: self.self_x_air.values()[i],
+			self_y: self.self_y.values()[i],
+			knockback_x: self.knockback_x.values()[i],
+			knockback_y: self.knockback_y.values()[i],
+			self_x_ground: self.self_x_ground.values()[i],
+		}
+	}
 }
 
 pub struct TriggersPhysical {
@@ -535,6 +665,13 @@ impl TriggersPhysical {
 		r.read_f32::<BE>().map(|x| self.r.push(Some(x)))?;
 		Ok(())
 	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::TriggersPhysical {
+		transpose::TriggersPhysical {
+			l: self.l.values()[i],
+			r: self.r.values()[i],
+		}
+	}
 }
 
 pub struct Velocity {
@@ -559,6 +696,13 @@ impl Velocity {
 		r.read_f32::<BE>().map(|x| self.x.push(Some(x)))?;
 		r.read_f32::<BE>().map(|x| self.y.push(Some(x)))?;
 		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Velocity {
+		transpose::Velocity {
+			x: self.x.values()[i],
+			y: self.y.values()[i],
+		}
 	}
 }
 
@@ -629,5 +773,20 @@ impl Item {
 			}
 		};
 		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Item {
+		transpose::Item {
+			r#type: self.r#type.values()[i],
+			state: self.state.values()[i],
+			direction: self.direction.values()[i],
+			velocity: self.velocity.transpose_one(i, version),
+			position: self.position.transpose_one(i, version),
+			damage: self.damage.values()[i],
+			timer: self.timer.values()[i],
+			id: self.id.values()[i],
+			misc: self.misc.as_ref().map(|x| x.transpose_one(i, version)),
+			owner: self.owner.as_ref().map(|x| x.values()[i]),
+		}
 	}
 }

@@ -15,25 +15,14 @@ use arrow2::{
 
 use crate::{
 	model::{
+		frame::{self, mutable, transpose, PortOccupancy},
 		game::{Port, NUM_PORTS},
 		slippi::Version,
 	},
 	serde::de::Event,
 };
 
-pub mod mutable;
-pub mod transpose;
-
 type BE = byteorder::BigEndian;
-
-/// Frame indexes start at -123, and reach 0 at "Go!".
-pub const FIRST_INDEX: i32 = -123;
-
-#[derive(Clone, Copy, Debug)]
-pub struct PortOccupancy {
-	pub port: Port,
-	pub follower: bool,
-}
 
 #[derive(Debug)]
 pub struct Data {
@@ -115,6 +104,13 @@ impl Data {
 		})?;
 		self.post.write(w, version, idx)?;
 		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Data {
+		transpose::Data {
+			pre: self.pre.transpose_one(i, version),
+			post: self.post.transpose_one(i, version),
+		}
 	}
 }
 
@@ -256,6 +252,13 @@ impl PortData {
 			.unwrap_or(Ok(()))
 	}
 
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::PortData {
+		transpose::PortData {
+			port: self.port,
+			leader: self.leader.transpose_one(i, version),
+			follower: self.follower.as_ref().map(|f| f.transpose_one(i, version)),
+		}
+	}
 }
 
 impl From<mutable::PortData> for PortData {
@@ -435,8 +438,10 @@ impl Frame {
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Frame {
 		transpose::Frame {
+			id: self.id.values()[i],
 			start: self.start.transpose_one(i, version),
 			end: self.end.transpose_one(i, version),
+			port: self.port.iter().map(|p| p.transpose_one(i, version)).collect(),
 		}
 	}
 
@@ -454,7 +459,7 @@ impl Frame {
 		let mut result = vec![];
 		let mut seen_ids = vec![false; self.id.len()];
 		for (idx, id) in ids {
-			let zero_based_id = usize::try_from(id - FIRST_INDEX).unwrap();
+			let zero_based_id = usize::try_from(id - frame::FIRST_INDEX).unwrap();
 			if !seen_ids[zero_based_id] {
 				seen_ids[zero_based_id] = true;
 				result.push(idx);

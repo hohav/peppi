@@ -6,11 +6,19 @@ use std::{
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::Serialize;
+use serde_json;
 
 use crate::{
-	model::{frame, shift_jis::MeleeString, slippi},
+	model::{
+		frame::transpose,
+		shift_jis::MeleeString,
+		slippi,
+	},
 	serde::de,
 };
+
+pub mod immutable;
+pub mod mutable;
 
 /// We can parse files with higher versions than this, but we won't expose all information.
 /// When converting a replay with a higher version number to another format like Arrow,
@@ -272,11 +280,16 @@ pub struct GeckoCodes {
 	pub actual_size: u32,
 }
 
-#[derive(Debug)]
-pub struct Game {
-	pub start: Start,
-	pub end: Option<End>,
-	pub frames: frame::Frame,
-	pub metadata: Option<serde_json::Map<String, serde_json::Value>>,
-	pub gecko_codes: Option<GeckoCodes>,
+pub trait Game {
+	fn start(&self) -> &Start;
+	fn end(&self) -> &Option<End>;
+	fn metadata(&self) -> &Option<serde_json::Map<String, serde_json::Value>>;
+	fn gecko_codes(&self) -> &Option<GeckoCodes>;
+
+	/// Duration of the game in frames.
+	fn len(&self) -> usize;
+
+	/// Combines all data for a single frame into a struct.
+	/// Avoid calling this if you need maximum performance.
+	fn frame(&self, idx: usize) -> transpose::Frame;
 }

@@ -1,4 +1,4 @@
-(ns peppi-codegen.frame
+(ns peppi-codegen.frame.immutable
   (:require
    [clojure.data.json :as json]
    [clojure.java.io :as io]
@@ -247,7 +247,7 @@
                  (update-vals #(map-indexed normalize-field %)))
         decls (mapcat immutable-struct json)]
     (println do-not-edit)
-    (println (slurp (io/resource "preamble/frame.rs")))
+    (println (slurp (io/resource "preamble/frame/immutable.rs")))
     (println)
     (doseq [decl decls]
       (println (emit-expr decl) "\n"))))

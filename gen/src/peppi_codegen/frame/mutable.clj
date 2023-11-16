@@ -4,7 +4,8 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.pprint :refer [pprint]]
-   [peppi-codegen.common :refer :all]))
+   [peppi-codegen.common :refer :all]
+   [peppi-codegen.frame.immutable :as immutable]))
 
 (defn mutable-array-type
   [ty]
@@ -132,7 +133,8 @@
   [[:struct nm (mapv mutable-struct-field fields)]
    [:impl nm [(with-capacity-fn fields)
               (push-none-fn fields)
-              (read-push-fn fields)]]])
+              (read-push-fn fields)
+              (immutable/transpose-one-fn nm fields)]]])
 
 (defn normalize-field
   [idx field]

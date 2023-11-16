@@ -12,7 +12,7 @@ use std::io::Result;
 
 use crate::{
 	model::{
-		frame::PortOccupancy,
+		frame::{transpose, PortOccupancy},
 		game::Port,
 		slippi::Version,
 	},
@@ -37,6 +37,13 @@ impl Data {
 		self.pre.push_none(version);
 		self.post.push_none(version);
 	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Data {
+		transpose::Data {
+			pre: self.pre.transpose_one(i, version),
+			post: self.post.transpose_one(i, version),
+		}
+	}
 }
 
 pub struct PortData {
@@ -54,6 +61,14 @@ impl PortData {
 				true => Some(Data::with_capacity(capacity, version)),
 				_ => None,
 			},
+		}
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::PortData {
+		transpose::PortData {
+			port: self.port,
+			leader: self.leader.transpose_one(i, version),
+			follower: self.follower.as_ref().map(|f| f.transpose_one(i, version)),
 		}
 	}
 }
@@ -79,6 +94,15 @@ impl Frame {
 				.collect(),
 			item_offset: Offsets::<i32>::with_capacity(capacity),
 			item: Item::with_capacity(0, version),
+		}
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Frame {
+		transpose::Frame {
+			id: self.id.values()[i],
+			start: self.start.transpose_one(i, version),
+			end: self.end.transpose_one(i, version),
+			port: self.port.iter().map(|p| p.transpose_one(i, version)).collect(),
 		}
 	}
 }

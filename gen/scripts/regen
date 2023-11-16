@@ -5,9 +5,8 @@ cd "$(dirname "$0")/.."
 
 mkdir -p target/frame
 
-scripts/frame | rustfmt > target/frame.rs
+scripts/frame-immutable | rustfmt > target/frame/immutable.rs
 scripts/frame-mutable | rustfmt > target/frame/mutable.rs
 scripts/frame-transpose | rustfmt > target/frame/transpose.rs
 
-cp target/*.rs ../src/model/
 cp target/frame/*.rs ../src/model/frame/

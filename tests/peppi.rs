@@ -12,9 +12,10 @@ use peppi::{
 	model::{
 		frame::transpose,
 		game::{
-			Bytes, DashBack, End, EndMethod, Game, Language, Netplay, Player, PlayerType, Port,
+			Bytes, DashBack, End, EndMethod, Language, Netplay, Player, PlayerType, Port,
 			Scene, ShieldDrop, Start, Ucf,
 		},
+		game::immutable::Game,
 		shift_jis::MeleeString,
 		slippi::{Slippi, Version},
 	},

@@ -5,7 +5,7 @@ use std::{
 };
 
 use peppi::{
-	model::game::Game,
+	model::game::immutable::Game,
 	serde::de::{Debug, Opts},
 	ParseError,
 };

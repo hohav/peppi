@@ -1,0 +1,5 @@
+#!/bin/bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+clj -M -m peppi-codegen.frame.immutable resources/structs.json

@@ -70,11 +70,11 @@ impl<R: Read> Read for TrackingReader<R> {
 	}
 }
 
-/// Parse a Slippi replay from `r`, returning a `game::Game` object.
+/// Parse a Slippi replay from `r`, returning a `peppi::model::game::immutable::Game`.
 pub fn game<R: Read>(
 	r: &mut R,
 	opts: Option<&serde::de::Opts>,
-) -> std::result::Result<model::game::Game, ParseError> {
+) -> std::result::Result<model::game::immutable::Game, ParseError> {
 	let mut r = TrackingReader { pos: 0, reader: r };
 	serde::de::deserialize(&mut r, opts).map_err(|e| ParseError {
 		error: e,

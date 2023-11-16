@@ -4,8 +4,8 @@ use byteorder::WriteBytesExt;
 
 use crate::{
 	model::{
-		frame,
-		game::{self, Game, GeckoCodes},
+		frame::immutable::Frame,
+		game::{self, immutable::Game, GeckoCodes},
 		slippi::Version,
 	},
 	serde::de::{Event, PAYLOADS_EVENT_CODE},
@@ -127,7 +127,7 @@ struct FrameCounts {
 	items: u32,
 }
 
-fn frame_counts(frames: &frame::Frame) -> FrameCounts {
+fn frame_counts(frames: &Frame) -> FrameCounts {
 	let len = frames.id.len();
 	FrameCounts {
 		frames: len.try_into().unwrap(),
