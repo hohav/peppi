@@ -11,11 +11,11 @@ use xxhash_rust::xxh3::xxh3_64;
 use peppi::{
 	model::{
 		frame::transpose,
-		game::{
-			Bytes, DashBack, End, EndMethod, Language, Netplay, Player, PlayerType, Port,
-			Scene, ShieldDrop, Start, Ucf,
-		},
 		game::immutable::Game,
+		game::{
+			Bytes, DashBack, End, EndMethod, Language, Netplay, Player, PlayerType, Port, Scene,
+			ShieldDrop, Start, Ucf,
+		},
 		shift_jis::MeleeString,
 		slippi::{Slippi, Version},
 	},

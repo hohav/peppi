@@ -9,11 +9,7 @@ use serde::Serialize;
 use serde_json;
 
 use crate::{
-	model::{
-		frame::transpose,
-		shift_jis::MeleeString,
-		slippi,
-	},
+	model::{frame::transpose, shift_jis::MeleeString, slippi},
 	serde::de,
 };
 

@@ -98,7 +98,9 @@ impl game::Game for ParseState {
 	}
 
 	fn frame(&self, idx: usize) -> transpose::Frame {
-		self.game.frames.transpose_one(idx, self.game.start.slippi.version)
+		self.game
+			.frames
+			.transpose_one(idx, self.game.start.slippi.version)
 	}
 }
 
@@ -844,8 +846,8 @@ pub fn deserialize<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> 
 		0x55 => {
 			parse_metadata(r.by_ref(), &mut state)?;
 			expect_bytes(&mut r, &[0x7d])?;
-		},
-		0x7d => {}, // top-level closing brace ("}")
+		}
+		0x7d => {} // top-level closing brace ("}")
 		x => return Err(err!("expected: 0x55 or 0x7d, got: 0x{:x}", x)),
 	};
 
