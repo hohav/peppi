@@ -778,6 +778,22 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 	Ok(code)
 }
 
+/// Assumes you already consumed the `U`, because that's how you know if there's metadata.
+pub fn parse_metadata<R: Read>(mut r: R, state: &mut ParseState) -> Result<()> {
+	expect_bytes(
+		&mut r,
+		// `metadata` key & type ("U\x08metadata{", minus the `U`)
+		&[0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b],
+	)?;
+
+	// Since we already read the opening "{" from the `metadata` value,
+	// we know it's a map. `parse_map` will consume the corresponding "}".
+	let metadata = ubjson::de::to_map(&mut r)?;
+	info!("Metadata: {}", serde_json::to_string(&metadata)?);
+	state.game.metadata = Some(metadata);
+	Ok(())
+}
+
 /// Parses a Slippi replay from `r`.
 pub fn deserialize<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> {
 	let raw_len = parse_header(&mut r)? as usize;
@@ -824,21 +840,14 @@ pub fn deserialize<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> 
 		));
 	}
 
-	expect_bytes(
-		&mut r,
-		// `metadata` key & type ("U\x08metadata{")
-		&[
-			0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b,
-		],
-	)?;
-
-	// Since we already read the opening "{" from the `metadata` value,
-	// we know it's a map. `parse_map` will consume the corresponding "}".
-	let metadata = ubjson::de::to_map(&mut r)?;
-	info!("Raw metadata: {}", serde_json::to_string(&metadata)?);
-	state.game.metadata = Some(metadata);
-
-	expect_bytes(&mut r, &[0x7d])?; // top-level closing brace ("}")
+	match r.read_u8()? {
+		0x55 => {
+			parse_metadata(r.by_ref(), &mut state)?;
+			expect_bytes(&mut r, &[0x7d])?;
+		},
+		0x7d => {}, // top-level closing brace ("}")
+		x => return Err(err!("expected: 0x55 or 0x7d, got: 0x{:x}", x)),
+	};
 
 	Ok(state.game.into())
 }
