@@ -15,26 +15,70 @@ peppi = { git = "https://github.com/hohav/peppi.git", branch = "arrow-in-memory"
 
 ## Usage
 
+One-shot parsing just requires calling `peppi::game`:
+
 ```rust
 use std::{fs, io};
 
 fn main() {
-    let mut r = io::BufReader::new(
-        fs::File::open("game.slp").unwrap());
+    let mut r = io::BufReader::new(fs::File::open("game.slp").unwrap());
     let game = peppi::game(&mut r, None).unwrap();
 
-    // Print some general info about the game
-    println!("{:?}", game);
+    // print general info about the game
+    println!("{:#?}", game);
 
-    // Iterate over each frame and print percents for each player
-    for i in 0 .. game.frames.id.len() {
-        println!("Frame {}", game.frames.id.get(i).unwrap());
-        for (idx, p) in game.frames.port.iter().enumerate() {
-            println!("{}: {}%",
-                game.start.players[idx].port,
-                p.leader.post.percent.get(i).unwrap()
-            );
+    // find the frames on which each player died
+    let mut is_dead: Vec<_> = game.frames.ports.iter().map(|_| false).collect();
+    for frame_idx in 0..game.frames.id.len() {
+        for (port_idx, port_data) in game.frames.ports.iter().enumerate() {
+            match port_data.leader.post.state.get(frame_idx) {
+                Some(state) if state <= 10 => {
+                    if !is_dead[port_idx] {
+                        is_dead[port_idx] = true;
+                        println!(
+                            "{} died on frame {}",
+                            game.start.players[port_idx].port,
+                            game.frames.id.get(frame_idx).unwrap(),
+                        )
+                    }
+                }
+                _ => is_dead[port_idx] = false,
+            }
         }
+    }
+}
+```
+
+For real-time parsing, you can "drive" things yourself:
+
+```rust
+use std::fs;
+use std::io::{BufReader, Read};
+use byteorder::ReadBytesExt;
+use peppi::serde::de;
+
+fn main() {
+    let mut r = BufReader::new(fs::File::open("v3.12.slp").unwrap());
+
+    // UBJSON wrapper (skip if using spectator protocol)
+    let size = de::parse_header(&mut r).unwrap() as usize;
+
+    // payload sizes & game start
+    let mut state = de::parse_start(&mut r, None).unwrap();
+
+    // loop until we hit GameEnd or run out of bytes
+    while de::parse_event(&mut r, &mut state, None).unwrap() != de::Event::GameEnd as u8
+        && state.bytes_read() < size
+    {
+        println!(
+            "current frame number: {:?}",
+            state.frames().id.iter().last()
+        );
+    }
+
+    // `U` (0x55) means metadata next (skip if using spectator protocol)
+    if r.read_u8().unwrap() == 0x55 {
+        de::parse_metadata(r.by_ref(), &mut state).unwrap();
     }
 }
 ```
