@@ -36,8 +36,8 @@ fn button_seq(game: &Game) -> Vec<Buttons> {
 	let mut button_seq = vec![];
 	for idx in 0..game.frames.id.len() {
 		let b = Buttons {
-			logical: game.frames.port[0].leader.pre.buttons.values()[idx],
-			physical: game.frames.port[0].leader.pre.buttons_physical.values()[idx],
+			logical: game.frames.ports[0].leader.pre.buttons.values()[idx],
+			physical: game.frames.ports[0].leader.pre.buttons_physical.values()[idx],
 		};
 		if (b.physical > 0 || b.logical > 0) && Some(b) != last_buttons {
 			button_seq.push(b);
@@ -205,7 +205,7 @@ fn ics() {
 		})
 	);
 	assert_eq!(game.start.players[0].character, 14);
-	assert!(game.frames.port[0].follower.is_some());
+	assert!(game.frames.ports[0].follower.is_some());
 }
 
 #[test]
@@ -541,7 +541,7 @@ fn corrupt_replay() {
 fn zelda_sheik_transformation() {
 	let game = game("transform");
 	assert_eq!(
-		game.frames.port[1].leader.pre.state.values()[400],
+		game.frames.ports[1].leader.pre.state.values()[400],
 		355, // Zelda Transform (Ground)
 	);
 }

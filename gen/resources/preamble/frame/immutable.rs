@@ -275,7 +275,7 @@ pub struct Frame {
 	pub id: PrimitiveArray<i32>,
 	pub start: Start,
 	pub end: End,
-	pub port: Vec<PortData>,
+	pub ports: Vec<PortData>,
 	pub item_offset: OffsetsBuffer<i32>,
 	pub item: Item,
 }
@@ -335,7 +335,7 @@ impl Frame {
 		let end = self.end.into_struct_array(version).boxed();
 
 		let port = {
-			let values: Vec<_> = std::iter::zip(ports, self.port)
+			let values: Vec<_> = std::iter::zip(ports, self.ports)
 				.map(|(occupancy, data)| data.into_struct_array(version, *occupancy).boxed())
 				.collect();
 			StructArray::new(Self::port_data_type(version, ports), values, None).boxed()
@@ -391,7 +391,7 @@ impl Frame {
 					.clone(),
 				version,
 			),
-			port: Self::port_data_from_struct_array(
+			ports: Self::port_data_from_struct_array(
 				values[3]
 					.as_any()
 					.downcast_ref::<StructArray>()
@@ -414,7 +414,7 @@ impl Frame {
 				w.write_i32::<BE>(frame_id)?;
 				self.start.write(w, version, idx)?;
 			}
-			for port in &self.port {
+			for port in &self.ports {
 				port.write_pre(w, version, idx, frame_id)?;
 			}
 			if version.gte(3, 0) {
@@ -424,7 +424,7 @@ impl Frame {
 					self.item.write(w, version, item_idx)?;
 				}
 			}
-			for port in &self.port {
+			for port in &self.ports {
 				port.write_post(w, version, idx, frame_id)?;
 			}
 			if version.gte(3, 0) {
@@ -441,7 +441,7 @@ impl Frame {
 			id: self.id.values()[i],
 			start: self.start.transpose_one(i, version),
 			end: self.end.transpose_one(i, version),
-			port: self.port.iter().map(|p| p.transpose_one(i, version)).collect(),
+			ports: self.ports.iter().map(|p| p.transpose_one(i, version)).collect(),
 		}
 	}
 
@@ -475,7 +475,7 @@ impl From<mutable::Frame> for Frame {
 			id: f.id.into(),
 			start: f.start.into(),
 			end: f.end.into(),
-			port: f.port.into_iter().map(|p| p.into()).collect(),
+			ports: f.ports.into_iter().map(|p| p.into()).collect(),
 			item_offset: OffsetsBuffer::try_from(Buffer::from(f.item_offset.into_inner())).unwrap(),
 			item: f.item.into(),
 		}

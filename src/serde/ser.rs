@@ -132,7 +132,7 @@ fn frame_counts(frames: &Frame) -> FrameCounts {
 	FrameCounts {
 		frames: len.try_into().unwrap(),
 		frame_data: frames
-			.port
+			.ports
 			.iter()
 			.map(|p| {
 				len + p

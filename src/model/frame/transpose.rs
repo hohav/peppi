@@ -20,7 +20,7 @@ pub struct Frame {
 	pub id: i32,
 	pub start: Start,
 	pub end: End,
-	pub port: Vec<PortData>,
+	pub ports: Vec<PortData>,
 	//FIXME
 	//pub item_offset: OffsetsBuffer<i32>,
 	//pub item: Item,

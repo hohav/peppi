@@ -77,7 +77,7 @@ pub struct Frame {
 	pub id: MutablePrimitiveArray<i32>,
 	pub start: Start,
 	pub end: End,
-	pub port: Vec<PortData>,
+	pub ports: Vec<PortData>,
 	pub item_offset: Offsets<i32>,
 	pub item: Item,
 }
@@ -88,7 +88,7 @@ impl Frame {
 			id: MutablePrimitiveArray::<i32>::with_capacity(capacity),
 			start: Start::with_capacity(capacity, version),
 			end: End::with_capacity(capacity, version),
-			port: ports
+			ports: ports
 				.iter()
 				.map(|p| PortData::with_capacity(capacity, version, *p))
 				.collect(),
@@ -102,7 +102,7 @@ impl Frame {
 			id: self.id.values()[i],
 			start: self.start.transpose_one(i, version),
 			end: self.end.transpose_one(i, version),
-			port: self.port.iter().map(|p| p.transpose_one(i, version)).collect(),
+			ports: self.ports.iter().map(|p| p.transpose_one(i, version)).collect(),
 		}
 	}
 }

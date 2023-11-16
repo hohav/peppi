@@ -119,7 +119,7 @@ impl ParseState {
 		let len = self.game.frames.id.len();
 		self.game.frames.id.push(Some(id));
 		//FIXME: do this for leaders too? (multiplayer)
-		for p in &mut self.game.frames.port {
+		for p in &mut self.game.frames.ports {
 			if let Some(f) = &mut p.follower {
 				while f.pre.random_seed.len() < len {
 					f.push_none(self.game.start.slippi.version);
@@ -131,7 +131,7 @@ impl ParseState {
 	fn frame_close(&mut self) {
 		let len = self.game.frames.id.len();
 		//FIXME: do this for leaders too? (multiplayer)
-		for p in &mut self.game.frames.port {
+		for p in &mut self.game.frames.ports {
 			if let Some(f) = &mut p.follower {
 				while f.pre.random_seed.len() < len {
 					f.push_none(self.game.start.slippi.version);
@@ -711,13 +711,13 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 					}
 				}
 				match is_follower {
-					true => state.game.frames.port[state.port_indexes[port as usize]]
+					true => state.game.frames.ports[state.port_indexes[port as usize]]
 						.follower
 						.as_mut()
 						.unwrap()
 						.pre
 						.read_push(r, state.game.start.slippi.version)?,
-					_ => state.game.frames.port[state.port_indexes[port as usize]]
+					_ => state.game.frames.ports[state.port_indexes[port as usize]]
 						.leader
 						.pre
 						.read_push(r, state.game.start.slippi.version)?,
@@ -730,13 +730,13 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 				let is_follower = r.read_u8()? != 0;
 				assert_eq!(id, state.last_id().unwrap());
 				match is_follower {
-					true => state.game.frames.port[state.port_indexes[port as usize]]
+					true => state.game.frames.ports[state.port_indexes[port as usize]]
 						.follower
 						.as_mut()
 						.unwrap()
 						.post
 						.read_push(r, state.game.start.slippi.version)?,
-					_ => state.game.frames.port[state.port_indexes[port as usize]]
+					_ => state.game.frames.ports[state.port_indexes[port as usize]]
 						.leader
 						.post
 						.read_push(r, state.game.start.slippi.version)?,
