@@ -595,7 +595,7 @@ fn parse_game_start<R: Read>(
 	}
 }
 
-pub fn parse_header<R: Read>(mut r: R) -> Result<u32> {
+pub fn parse_header<R: Read>(mut r: R, _opts: Option<&Opts>) -> Result<u32> {
 	// For speed, assume the `raw` element comes first and handle it manually.
 	// The official JS parser does this too, so it should be reliable.
 	expect_bytes(&mut r, &crate::SLIPPI_FILE_SIGNATURE)?;
@@ -781,7 +781,11 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 }
 
 /// Assumes you already consumed the `U`, because that's how you know if there's metadata.
-pub fn parse_metadata<R: Read>(mut r: R, state: &mut ParseState) -> Result<()> {
+pub fn parse_metadata<R: Read>(
+	mut r: R,
+	state: &mut ParseState,
+	_opts: Option<&Opts>,
+) -> Result<()> {
 	expect_bytes(
 		&mut r,
 		// `metadata` key & type ("U\x08metadata{", minus the `U`)
@@ -798,7 +802,7 @@ pub fn parse_metadata<R: Read>(mut r: R, state: &mut ParseState) -> Result<()> {
 
 /// Parses a Slippi replay from `r`.
 pub fn deserialize<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> {
-	let raw_len = parse_header(&mut r)? as usize;
+	let raw_len = parse_header(&mut r, opts)? as usize;
 	info!("Raw length: {} bytes", raw_len);
 
 	let mut state = parse_start(&mut r, opts)?;
@@ -844,7 +848,7 @@ pub fn deserialize<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> 
 
 	match r.read_u8()? {
 		0x55 => {
-			parse_metadata(r.by_ref(), &mut state)?;
+			parse_metadata(r.by_ref(), &mut state, opts)?;
 			expect_bytes(&mut r, &[0x7d])?;
 		}
 		0x7d => {} // top-level closing brace ("}")

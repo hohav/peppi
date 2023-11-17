@@ -61,7 +61,7 @@ fn main() {
     let mut r = BufReader::new(fs::File::open("v3.12.slp").unwrap());
 
     // UBJSON wrapper (skip if using spectator protocol)
-    let size = de::parse_header(&mut r).unwrap() as usize;
+    let size = de::parse_header(&mut r, None).unwrap() as usize;
 
     // payload sizes & game start
     let mut state = de::parse_start(&mut r, None).unwrap();
@@ -78,7 +78,7 @@ fn main() {
 
     // `U` (0x55) means metadata next (skip if using spectator protocol)
     if r.read_u8().unwrap() == 0x55 {
-        de::parse_metadata(r.by_ref(), &mut state).unwrap();
+        de::parse_metadata(r.by_ref(), &mut state, None).unwrap();
     }
 }
 ```
