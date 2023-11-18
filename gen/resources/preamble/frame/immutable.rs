@@ -321,19 +321,23 @@ impl Frame {
 	}
 
 	pub fn data_type(version: Version, ports: &[PortOccupancy]) -> DataType {
-		DataType::Struct(vec![
+		let mut fields = vec![
 			Field::new("id", DataType::Int32, false),
-			Field::new("start", Start::data_type(version).clone(), false),
-			Field::new("end", End::data_type(version).clone(), false),
 			Field::new("port", Self::port_data_type(version, ports).clone(), false),
-			Field::new("item", Self::item_data_type(version).clone(), false),
-		])
+		];
+		if version.gte(2, 2) {
+			fields.push(Field::new("start", Start::data_type(version).clone(), false));
+			if version.gte(3, 0) {
+				fields.push(Field::new("item", Self::item_data_type(version).clone(), false));
+				if version.gte(3, 7) {
+					fields.push(Field::new("end", End::data_type(version).clone(), false));
+				}
+			}
+		}
+		DataType::Struct(fields)
 	}
 
 	pub fn into_struct_array(self, version: Version, ports: &[PortOccupancy]) -> StructArray {
-		let start = self.start.into_struct_array(version).boxed();
-		let end = self.end.into_struct_array(version).boxed();
-
 		let port = {
 			let values: Vec<_> = std::iter::zip(ports, self.ports)
 				.map(|(occupancy, data)| data.into_struct_array(version, *occupancy).boxed())
@@ -341,22 +345,25 @@ impl Frame {
 			StructArray::new(Self::port_data_type(version, ports), values, None).boxed()
 		};
 
-		let item = {
-			let values = self.item.into_struct_array(version).boxed();
-			ListArray::new(
-				Self::item_data_type(version),
-				self.item_offset,
-				values,
-				None,
-			)
-			.boxed()
-		};
+		let mut arrays = vec![self.id.boxed(), port];
 
-		StructArray::new(
-			Self::data_type(version, ports),
-			vec![self.id.boxed(), start, end, port, item],
-			None,
-		)
+		if version.gte(2, 2) {
+			arrays.push(self.start.into_struct_array(version).boxed());
+			if version.gte(3, 0) {
+				let item_values = self.item.into_struct_array(version).boxed();
+				arrays.push(ListArray::new(
+					Self::item_data_type(version),
+					self.item_offset,
+					item_values,
+					None,
+				).boxed());
+				if version.gte(3, 7) {
+					arrays.push(self.end.into_struct_array(version).boxed());
+				}
+			}
+		}
+
+		StructArray::new(Self::data_type(version, ports), arrays, None)
 	}
 
 	pub fn from_struct_array(array: StructArray, version: Version) -> Self {
