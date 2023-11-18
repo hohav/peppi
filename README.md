@@ -15,11 +15,13 @@ peppi = { git = "https://github.com/hohav/peppi.git", branch = "arrow-in-memory"
 
 ## Usage
 
-One-shot parsing just requires calling `peppi::game`:
+One-shot parsing just requires calling `peppi::game`.
 
 ```rust
-use ssbm_data::action_state::Common::{self, *};
 use std::{fs, io};
+
+// you can optionally use the `ssbm-data` crate for enums
+use ssbm_data::action_state::Common::{self, *};
 
 fn main() {
     let mut r = io::BufReader::new(fs::File::open("game.slp").unwrap());
