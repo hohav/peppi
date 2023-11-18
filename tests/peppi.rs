@@ -8,7 +8,7 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 use xxhash_rust::xxh3::xxh3_64;
 
-use ssbm_data::{action_state, character::External, item::Item, stage::Stage};
+use ssbm_data::{action_state, character::External, character::Internal, item::Item, stage::Stage};
 
 use peppi::{
 	model::{
@@ -203,7 +203,7 @@ fn basic_game() {
 					leader: transpose::Data {
 						pre: transpose::Pre {
 							random_seed: 1046068084,
-							state: 27,
+							state: action_state::Common::JumpAerialF as u16,
 							position: Position {
 								x: 56.81875,
 								y: -18.63733,
@@ -221,8 +221,8 @@ fn basic_game() {
 							..Default::default()
 						},
 						post: transpose::Post {
-							character: 18,
-							state: 27,
+							character: Internal::Marth as u8,
+							state: action_state::Common::JumpAerialF as u16,
 							position: Position {
 								x: 57.292168,
 								y: -17.290329,
@@ -245,7 +245,7 @@ fn basic_game() {
 					leader: transpose::Data {
 						pre: transpose::Pre {
 							random_seed: 1046068084,
-							state: 356,
+							state: action_state::Fox::FireFoxAir as u16,
 							position: Position {
 								x: 42.195168,
 								y: 9.287016,
@@ -266,8 +266,8 @@ fn basic_game() {
 							..Default::default()
 						},
 						post: transpose::Post {
-							character: 1,
-							state: 356,
+							character: Internal::Fox as u8,
+							state: action_state::Fox::FireFoxAir as u16,
 							position: Position {
 								x: 40.50478,
 								y: 10.990714,
