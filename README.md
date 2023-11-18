@@ -10,7 +10,7 @@ In your `Cargo.toml`:
 
 ```toml
 [dependencies]
-peppi = { git = "https://github.com/hohav/peppi.git", branch = "arrow-in-memory" }
+peppi = "2.0.0-alpha.1"
 ```
 
 ## Usage
