@@ -15,8 +15,8 @@ use peppi::{
 		frame::transpose::{self, Position},
 		game::immutable::Game,
 		game::{
-			Bytes, DashBack, End, EndMethod, Language, Netplay, Player, PlayerType, Port, Scene,
-			ShieldDrop, Start, Ucf,
+			Bytes, DashBack, End, EndMethod, Language, Netplay, Player, PlayerEnd, PlayerType,
+			Port, Scene, ShieldDrop, Start, Ucf,
 		},
 		shift_jis::MeleeString,
 		slippi::{Slippi, Version},
@@ -179,8 +179,9 @@ fn basic_game() {
 		game.end.unwrap(),
 		End {
 			method: EndMethod::Resolved,
-			lras_initiator: None,
 			bytes: Bytes(vec![3]),
+			lras_initiator: None,
+			players: None,
 		}
 	);
 
@@ -628,6 +629,29 @@ fn v3_12() {
 			scene: Some(Scene { minor: 2, major: 8 }),
 			language: Some(Language::English),
 		}
+	);
+}
+
+#[test]
+fn v3_13() {
+	let game = game("v3.13");
+	assert_eq!(
+		game.end,
+		Some(End {
+			method: EndMethod::Game,
+			bytes: Bytes(vec![2, 255, 1, 255, 0, 255]),
+			lras_initiator: Some(None),
+			players: Some(vec![
+				PlayerEnd {
+					port: Port::P1,
+					placement: 1
+				},
+				PlayerEnd {
+					port: Port::P3,
+					placement: 0
+				},
+			]),
+		})
 	);
 }
 

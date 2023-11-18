@@ -459,18 +459,44 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 	})
 }
 
+pub fn player_end(port: Port, placement: i8) -> Result<Option<game::PlayerEnd>> {
+	match placement {
+		-1 => Ok(None),
+		0..=3 => Ok(Some(game::PlayerEnd {
+			port,
+			placement: placement as u8,
+		})),
+		p => Err(err!("Invalid player placement {}", p)),
+	}
+}
+
 pub(crate) fn game_end(r: &mut &[u8]) -> Result<game::End> {
 	let bytes = game::Bytes(r.to_vec());
-	Ok(game::End {
-		method: game::EndMethod::try_from(r.read_u8()?).map_err(invalid_data)?,
-		bytes: bytes,
-		// v2.0
-		lras_initiator: if_more(r, |r| {
-			Ok(match r.read_u8()? {
-				255 => None,
-				x => Some(Port::try_from(x).map_err(invalid_data)?),
+	let method = game::EndMethod::try_from(r.read_u8()?).map_err(invalid_data)?;
+
+	// v2.0
+	let lras_initiator = if_more(r, |r| {
+		Ok(match r.read_u8()? {
+			255 => None,
+			x => Some(Port::try_from(x).map_err(invalid_data)?),
+		})
+	})?;
+
+	// v3.13
+	let players = if_more(r, |r| {
+		let placements = [r.read_i8()?, r.read_i8()?, r.read_i8()?, r.read_i8()?];
+		(0..NUM_PORTS)
+			.filter_map(|n| {
+				player_end(Port::try_from(n as u8).unwrap(), placements[n as usize]).transpose()
 			})
-		})?,
+			.collect()
+	})?;
+
+	Ok(game::End {
+		method,
+		bytes,
+		lras_initiator,
+		players,
 	})
 }
 
