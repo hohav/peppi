@@ -8,6 +8,8 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 use xxhash_rust::xxh3::xxh3_64;
 
+use ssbm_data::{action_state, character::External, item::Item, stage::Stage};
+
 use peppi::{
 	model::{
 		frame::transpose,
@@ -62,8 +64,8 @@ fn slippi_old_version() {
 	);
 
 	assert_eq!(players.len(), 2);
-	assert_eq!(players[0].character, 2); // Fox
-	assert_eq!(players[1].character, 25); // Ganondorf
+	assert_eq!(players[0].character, External::Fox as u8);
+	assert_eq!(players[1].character, External::Ganondorf as u8);
 }
 
 #[test]
@@ -102,14 +104,14 @@ fn basic_game() {
 			is_teams: false,
 			item_spawn_frequency: -1,
 			self_destruct_score: -1,
-			stage: 8,
+			stage: Stage::YoshisStory as u16,
 			timer: 480,
 			item_spawn_bitfield: [255, 255, 255, 255, 255],
 			damage_ratio: 1.0,
 			players: vec![
 				Player {
 					port: Port::P1,
-					character: 9, // Marth
+					character: External::Marth as u8,
 					r#type: PlayerType::Human,
 					stocks: 4,
 					costume: 3,
@@ -129,7 +131,7 @@ fn basic_game() {
 				},
 				Player {
 					port: Port::P2,
-					character: 2, // Fox
+					character: External::Fox as u8,
 					r#type: PlayerType::Cpu,
 					stocks: 4,
 					costume: 0,
@@ -431,14 +433,14 @@ fn v3_12() {
 			is_teams: false,
 			item_spawn_frequency: -1,
 			self_destruct_score: -1,
-			stage: 3,
+			stage: Stage::PokemonStadium as u16,
 			timer: 480,
 			item_spawn_bitfield: [255, 255, 255, 255, 255],
 			damage_ratio: 1.0,
 			players: vec![
 				Player {
 					port: Port::P1,
-					character: 9, // Marth
+					character: External::Marth as u8,
 					r#type: PlayerType::Human,
 					stocks: 4,
 					costume: 3,
@@ -462,7 +464,7 @@ fn v3_12() {
 				},
 				Player {
 					port: Port::P2,
-					character: 9, // Marth
+					character: External::Marth as u8,
 					r#type: PlayerType::Human,
 					stocks: 4,
 					costume: 0,
@@ -542,7 +544,7 @@ fn zelda_sheik_transformation() {
 	let game = game("transform");
 	assert_eq!(
 		game.frames.ports[1].leader.pre.state.values()[400],
-		355, // Zelda Transform (Ground)
+		action_state::Zelda::TransformGround as u16,
 	);
 }
 
@@ -563,7 +565,7 @@ fn items() {
 			},
 			state: 0,
 			timer: 140.0,
-			r#type: 99, // Peach Turnip
+			r#type: Item::PeachTurnip as u16,
 			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
 			misc: Some(transpose::ItemMisc(5, 5, 5, 5)),
 			owner: Some(0),
@@ -583,7 +585,7 @@ fn items() {
 			},
 			state: 0,
 			timer: 140.0,
-			r#type: 99, // Peach Turnip
+			r#type: Item::PeachTurnip as u16,
 			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
 			misc: Some(transpose::ItemMisc(5, 0, 5, 5)),
 			owner: Some(0),
@@ -603,7 +605,7 @@ fn items() {
 			},
 			state: 0,
 			timer: 140.0,
-			r#type: 99, // Peach Turnip
+			r#type: Item::PeachTurnip as u16,
 			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
 			misc: Some(transpose::ItemMisc(5, 0, 5, 5)),
 			owner: Some(0),
