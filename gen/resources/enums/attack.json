@@ -1,0 +1,277 @@
+{
+	"Attack": {
+		"type": "u8",
+		"known_values": {
+			"1": {
+				"ident": "NON_STALING"
+			},
+			"2": {
+				"ident": "JAB_1"
+			},
+			"3": {
+				"ident": "JAB_2"
+			},
+			"4": {
+				"ident": "JAB_3"
+			},
+			"5": {
+				"ident": "RAPID_JABS"
+			},
+			"6": {
+				"ident": "DASH_ATTACK"
+			},
+			"7": {
+				"ident": "SIDE_TILT"
+			},
+			"8": {
+				"ident": "UP_TILT"
+			},
+			"9": {
+				"ident": "DOWN_TILT"
+			},
+			"10": {
+				"ident": "SIDE_SMASH"
+			},
+			"11": {
+				"ident": "UP_SMASH"
+			},
+			"12": {
+				"ident": "DOWN_SMASH"
+			},
+			"13": {
+				"ident": "NAIR"
+			},
+			"14": {
+				"ident": "FAIR"
+			},
+			"15": {
+				"ident": "BAIR"
+			},
+			"16": {
+				"ident": "UAIR"
+			},
+			"17": {
+				"ident": "DAIR"
+			},
+			"18": {
+				"ident": "NEUTRAL_SPECIAL"
+			},
+			"19": {
+				"ident": "SIDE_SPECIAL"
+			},
+			"20": {
+				"ident": "UP_SPECIAL"
+			},
+			"21": {
+				"ident": "DOWN_SPECIAL"
+			},
+			"22": {
+				"ident": "KIRBY_HAT_MARIO_NEUTRAL_SPECIAL"
+			},
+			"23": {
+				"ident": "KIRBY_HAT_FOX_NEUTRAL_SPECIAL"
+			},
+			"24": {
+				"ident": "KIRBY_HAT_CFALCON_NEUTRAL_SPECIAL"
+			},
+			"25": {
+				"ident": "KIRBY_HAT_DKNEUTRAL_SPECIAL"
+			},
+			"26": {
+				"ident": "KIRBY_HAT_BOWSER_NEUTRAL_SPECIAL"
+			},
+			"27": {
+				"ident": "KIRBY_HAT_LINK_NEUTRAL_SPECIAL"
+			},
+			"28": {
+				"ident": "KIRBY_HAT_SHEIK_NEUTRAL_SPECIAL"
+			},
+			"29": {
+				"ident": "KIRBY_HAT_NESS_NEUTRAL_SPECIAL"
+			},
+			"30": {
+				"ident": "KIRBY_HAT_PEACH_NEUTRAL_SPECIAL"
+			},
+			"31": {
+				"ident": "KIRBY_HAT_ICE_CLIMBER_NEUTRAL_SPECIAL"
+			},
+			"32": {
+				"ident": "KIRBY_HAT_PIKACHU_NEUTRAL_SPECIAL"
+			},
+			"33": {
+				"ident": "KIRBY_HAT_SAMUS_NEUTRAL_SPECIAL"
+			},
+			"34": {
+				"ident": "KIRBY_HAT_YOSHI_NEUTRAL_SPECIAL"
+			},
+			"35": {
+				"ident": "KIRBY_HAT_JIGGLYPUFF_NEUTRAL_SPECIAL"
+			},
+			"36": {
+				"ident": "KIRBY_HAT_MEWTWO_NEUTRAL_SPECIAL"
+			},
+			"37": {
+				"ident": "KIRBY_HAT_LUIGI_NEUTRAL_SPECIAL"
+			},
+			"38": {
+				"ident": "KIRBY_HAT_MARTH_NEUTRAL_SPECIAL"
+			},
+			"39": {
+				"ident": "KIRBY_HAT_ZELDA_NEUTRAL_SPECIAL"
+			},
+			"40": {
+				"ident": "KIRBY_HAT_YOUNG_LINK_NEUTRAL_SPECIAL"
+			},
+			"41": {
+				"ident": "KIRBY_HAT_DOC_NEUTRAL_SPECIAL"
+			},
+			"42": {
+				"ident": "KIRBY_HAT_FALCO_NEUTRAL_SPECIAL"
+			},
+			"43": {
+				"ident": "KIRBY_HAT_PICHU_NEUTRAL_SPECIAL"
+			},
+			"44": {
+				"ident": "KIRBY_HAT_GAME_AND_WATCH_NEUTRAL_SPECIAL"
+			},
+			"45": {
+				"ident": "KIRBY_HAT_GANON_NEUTRAL_SPECIAL"
+			},
+			"46": {
+				"ident": "KIRBY_HAT_ROY_NEUTRAL_SPECIAL"
+			},
+			"50": {
+				"ident": "GET_UP_ATTACK_FROM_BACK"
+			},
+			"51": {
+				"ident": "GET_UP_ATTACK_FROM_FRONT"
+			},
+			"52": {
+				"ident": "PUMMEL"
+			},
+			"53": {
+				"ident": "FORWARD_THROW"
+			},
+			"54": {
+				"ident": "BACK_THROW"
+			},
+			"55": {
+				"ident": "UP_THROW"
+			},
+			"56": {
+				"ident": "DOWN_THROW"
+			},
+			"57": {
+				"ident": "CARGO_FORWARD_THROW"
+			},
+			"58": {
+				"ident": "CARGO_BACK_THROW"
+			},
+			"59": {
+				"ident": "CARGO_UP_THROW"
+			},
+			"60": {
+				"ident": "CARGO_DOWN_THROW"
+			},
+			"61": {
+				"ident": "LEDGE_GET_UP_ATTACK_100"
+			},
+			"62": {
+				"ident": "LEDGE_GET_UP_ATTACK"
+			},
+			"63": {
+				"ident": "BEAM_SWORD_JAB"
+			},
+			"64": {
+				"ident": "BEAM_SWORD_TILT_SWING"
+			},
+			"65": {
+				"ident": "BEAM_SWORD_SMASH_SWING"
+			},
+			"66": {
+				"ident": "BEAM_SWORD_DASH_SWING"
+			},
+			"67": {
+				"ident": "HOME_RUN_BAT_JAB"
+			},
+			"68": {
+				"ident": "HOME_RUN_BAT_TILT_SWING"
+			},
+			"69": {
+				"ident": "HOME_RUN_BAT_SMASH_SWING"
+			},
+			"70": {
+				"ident": "HOME_RUN_BAT_DASH_SWING"
+			},
+			"71": {
+				"ident": "PARASOL_JAB"
+			},
+			"72": {
+				"ident": "PARASOL_TILT_SWING"
+			},
+			"73": {
+				"ident": "PARASOL_SMASH_SWING"
+			},
+			"74": {
+				"ident": "PARASOL_DASH_SWING"
+			},
+			"75": {
+				"ident": "FAN_JAB"
+			},
+			"76": {
+				"ident": "FAN_TILT_SWING"
+			},
+			"77": {
+				"ident": "FAN_SMASH_SWING"
+			},
+			"78": {
+				"ident": "FAN_DASH_SWING"
+			},
+			"79": {
+				"ident": "STAR_ROD_JAB"
+			},
+			"80": {
+				"ident": "STAR_ROD_TILT_SWING"
+			},
+			"81": {
+				"ident": "STAR_ROD_SMASH_SWING"
+			},
+			"82": {
+				"ident": "STAR_ROD_DASH_SWING"
+			},
+			"83": {
+				"ident": "LIPS_STICK_JAB"
+			},
+			"84": {
+				"ident": "LIPS_STICK_TILT_SWING"
+			},
+			"85": {
+				"ident": "LIPS_STICK_SMASH_SWING"
+			},
+			"86": {
+				"ident": "LIPS_STICK_DASH_SWING"
+			},
+			"87": {
+				"ident": "OPEN_PARASOL"
+			},
+			"88": {
+				"ident": "RAY_GUN_SHOOT"
+			},
+			"89": {
+				"ident": "FIRE_FLOWER_SHOOT"
+			},
+			"90": {
+				"ident": "SCREW_ATTACK"
+			},
+			"91": {
+				"ident": "SUPER_SCOPE_RAPID"
+			},
+			"92": {
+				"ident": "SUPER_SCOPE_CHARGED"
+			},
+			"93": {
+				"ident": "HAMMER"
+			}
+		}
+	}
+}

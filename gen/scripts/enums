@@ -2,4 +2,8 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-clj -M -m peppi-codegen.enums resources/enums.json
+mkdir -p target/enums
+
+for e in action_state attack character item stage; do
+	clj -M -m peppi-codegen.enums "resources/enums/$e.json" | rustfmt > "target/enums/$e.rs"
+done

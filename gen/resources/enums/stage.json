@@ -1,0 +1,127 @@
+{
+	"Stage": {
+		"type": "u16",
+		"known_values": {
+			"2": {
+				"ident": "FOUNTAIN_OF_DREAMS",
+				"name": "Fountain of Dreams"
+			},
+			"3": {
+				"ident": "POKEMON_STADIUM",
+				"name": "Pokémon Stadium"
+			},
+			"4": {
+				"ident": "PRINCESS_PEACHS_CASTLE",
+				"name": "Princess Peach's Castle"
+			},
+			"5": {
+				"ident": "KONGO_JUNGLE",
+				"name": "Kongo Jungle"
+			},
+			"6": {
+				"ident": "BRINSTAR",
+				"name": "Brinstar"
+			},
+			"7": {
+				"ident": "CORNERIA",
+				"name": "Corneria"
+			},
+			"8": {
+				"ident": "YOSHIS_STORY",
+				"name": "Yoshi's Story"
+			},
+			"9": {
+				"ident": "ONETT",
+				"name": "Onett"
+			},
+			"10": {
+				"ident": "MUTE_CITY",
+				"name": "Mute City"
+			},
+			"11": {
+				"ident": "RAINBOW_CRUISE",
+				"name": "Rainbow Cruise"
+			},
+			"12": {
+				"ident": "JUNGLE_JAPES",
+				"name": "Jungle Japes"
+			},
+			"13": {
+				"ident": "GREAT_BAY",
+				"name": "Great Bay"
+			},
+			"14": {
+				"ident": "HYRULE_TEMPLE",
+				"name": "Hyrule Temple"
+			},
+			"15": {
+				"ident": "BRINSTAR_DEPTHS",
+				"name": "Brinstar Depths"
+			},
+			"16": {
+				"ident": "YOSHIS_ISLAND",
+				"name": "Yoshi's Island"
+			},
+			"17": {
+				"ident": "GREEN_GREENS",
+				"name": "Green Greens"
+			},
+			"18": {
+				"ident": "FOURSIDE",
+				"name": "Fourside"
+			},
+			"19": {
+				"ident": "MUSHROOM_KINGDOM_I",
+				"name": "Mushroom Kingdom I"
+			},
+			"20": {
+				"ident": "MUSHROOM_KINGDOM_II",
+				"name": "Mushroom Kingdom II"
+			},
+			"22": {
+				"ident": "VENOM",
+				"name": "Venom"
+			},
+			"23": {
+				"ident": "POKE_FLOATS",
+				"name": "Poké Floats"
+			},
+			"24": {
+				"ident": "BIG_BLUE",
+				"name": "Big Blue"
+			},
+			"25": {
+				"ident": "ICICLE_MOUNTAIN",
+				"name": "Icicle Mountain"
+			},
+			"26": {
+				"ident": "ICETOP",
+				"name": "Icetop"
+			},
+			"27": {
+				"ident": "FLAT_ZONE",
+				"name": "Flat Zone"
+			},
+			"28": {
+				"ident": "DREAM_LAND_N64",
+				"name": "Dream Land N64"
+			},
+			"29": {
+				"ident": "YOSHIS_ISLAND_N64",
+				"name": "Yoshi's Island N64"
+			},
+			"30": {
+				"ident": "KONGO_JUNGLE_N64",
+				"name": "Kongo Jungle N64"
+			},
+			"31": {
+				"ident": "BATTLEFIELD",
+				"name": "Battlefield"
+			},
+			"32": {
+				"ident": "FINAL_DESTINATION",
+				"name": "Final Destination"
+			}
+		}
+	}
+}

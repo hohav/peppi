@@ -1,0 +1,658 @@
+{
+	"Item": {
+		"type": "u16",
+		"known_values": {
+			"0": {
+				"ident": "CAPSULE"
+			},
+			"1": {
+				"ident": "BOX"
+			},
+			"2": {
+				"ident": "BARREL"
+			},
+			"3": {
+				"ident": "EGG"
+			},
+			"4": {
+				"ident": "PARTY_BALL"
+			},
+			"5": {
+				"ident": "BARREL_CANNON"
+			},
+			"6": {
+				"ident": "BOB_OMB"
+			},
+			"7": {
+				"ident": "MR_SATURN"
+			},
+			"8": {
+				"ident": "HEART_CONTAINER"
+			},
+			"9": {
+				"ident": "MAXIM_TOMATO"
+			},
+			"10": {
+				"ident": "STARMAN"
+			},
+			"11": {
+				"ident": "HOME_RUN_BAT"
+			},
+			"12": {
+				"ident": "BEAM_SWORD"
+			},
+			"13": {
+				"ident": "PARASOL"
+			},
+			"14": {
+				"ident": "GREEN_SHELL_1"
+			},
+			"15": {
+				"ident": "RED_SHELL_1"
+			},
+			"16": {
+				"ident": "RAY_GUN"
+			},
+			"17": {
+				"ident": "FREEZIE"
+			},
+			"18": {
+				"ident": "FOOD"
+			},
+			"19": {
+				"ident": "PROXIMITY_MINE"
+			},
+			"20": {
+				"ident": "FLIPPER"
+			},
+			"21": {
+				"ident": "SUPER_SCOPE"
+			},
+			"22": {
+				"ident": "STAR_ROD"
+			},
+			"23": {
+				"ident": "LIP_STICK"
+			},
+			"24": {
+				"ident": "FAN"
+			},
+			"25": {
+				"ident": "FIRE_FLOWER"
+			},
+			"26": {
+				"ident": "SUPER_MUSHROOM"
+			},
+			"29": {
+				"ident": "WARP_STAR"
+			},
+			"30": {
+				"ident": "SCREW_ATTACK"
+			},
+			"31": {
+				"ident": "BUNNY_HOOD"
+			},
+			"32": {
+				"ident": "METAL_BOX"
+			},
+			"33": {
+				"ident": "CLOAKING_DEVICE"
+			},
+			"34": {
+				"ident": "POKE_BALL"
+			},
+			"35": {
+				"ident": "RAY_GUN_RECOIL"
+			},
+			"36": {
+				"ident": "STAR_ROD_STAR"
+			},
+			"37": {
+				"ident": "LIP_STICK_DUST"
+			},
+			"38": {
+				"ident": "SUPER_SCOPE_BEAM"
+			},
+			"39": {
+				"ident": "RAY_GUN_BEAM"
+			},
+			"40": {
+				"ident": "HAMMER_HEAD"
+			},
+			"41": {
+				"ident": "FLOWER"
+			},
+			"42": {
+				"ident": "YOSHI_EGG_1"
+			},
+			"43": {
+				"ident": "GOOMBA"
+			},
+			"44": {
+				"ident": "REDEAD"
+			},
+			"45": {
+				"ident": "OCTAROK"
+			},
+			"46": {
+				"ident": "OTTOSEA"
+			},
+			"47": {
+				"ident": "STONE"
+			},
+			"48": {
+				"ident": "MARIO_FIRE"
+			},
+			"49": {
+				"ident": "DR_MARIO_PILL"
+			},
+			"50": {
+				"ident": "KIRBY_CUTTER_BEAM"
+			},
+			"51": {
+				"ident": "KIRBY_HAMMER"
+			},
+			"54": {
+				"ident": "FOX_LASER"
+			},
+			"55": {
+				"ident": "FALCO_LASER"
+			},
+			"56": {
+				"ident": "FOX_SHADOW"
+			},
+			"57": {
+				"ident": "FALCO_SHADOW"
+			},
+			"58": {
+				"ident": "LINK_BOMB"
+			},
+			"59": {
+				"ident": "YOUNG_LINK_BOMB"
+			},
+			"60": {
+				"ident": "LINK_BOOMERANG"
+			},
+			"61": {
+				"ident": "YOUNG_LINK_BOOMERANG"
+			},
+			"62": {
+				"ident": "LINK_HOOKSHOT"
+			},
+			"63": {
+				"ident": "YOUNG_LINK_HOOKSHOT"
+			},
+			"64": {
+				"ident": "LINK_ARROW_1"
+			},
+			"65": {
+				"ident": "YOUNG_LINK_FIRE_ARROW"
+			},
+			"66": {
+				"ident": "NESS_PK_FIRE"
+			},
+			"67": {
+				"ident": "NESS_PK_FLASH_1"
+			},
+			"68": {
+				"ident": "NESS_PK_FLASH_2"
+			},
+			"69": {
+				"ident": "NESS_PK_THUNDER_1"
+			},
+			"70": {
+				"ident": "NESS_PK_THUNDER_2"
+			},
+			"71": {
+				"ident": "NESS_PK_THUNDER_3"
+			},
+			"72": {
+				"ident": "NESS_PK_THUNDER_4"
+			},
+			"73": {
+				"ident": "NESS_PK_THUNDER_5"
+			},
+			"74": {
+				"ident": "FOX_BLASTER"
+			},
+			"75": {
+				"ident": "FALCO_BLASTER"
+			},
+			"76": {
+				"ident": "LINK_ARROW_2"
+			},
+			"77": {
+				"ident": "YOUNG_LINK_ARROW"
+			},
+			"78": {
+				"ident": "NESS_PK_FLASH_3"
+			},
+			"79": {
+				"ident": "SHEIK_NEEDLE_1"
+			},
+			"80": {
+				"ident": "SHEIK_NEEDLE_2"
+			},
+			"81": {
+				"ident": "PIKACHU_THUNDER_1"
+			},
+			"82": {
+				"ident": "PICHU_THUNDER_1"
+			},
+			"83": {
+				"ident": "MARIO_CAPE"
+			},
+			"84": {
+				"ident": "DR_MARIO_CAPE"
+			},
+			"85": {
+				"ident": "SHEIK_SMOKE"
+			},
+			"86": {
+				"ident": "YOSHI_EGG_2"
+			},
+			"87": {
+				"ident": "YOSHI_TONGUE_1"
+			},
+			"88": {
+				"ident": "YOSHI_STAR"
+			},
+			"89": {
+				"ident": "PIKACHU_THUNDER_2"
+			},
+			"90": {
+				"ident": "PIKACHU_THUNDER_3"
+			},
+			"91": {
+				"ident": "PICHU_THUNDER_2"
+			},
+			"92": {
+				"ident": "PICHU_THUNDER_3"
+			},
+			"93": {
+				"ident": "SAMUS_BOMB"
+			},
+			"94": {
+				"ident": "SAMUS_CHARGE_SHOT"
+			},
+			"95": {
+				"ident": "SAMUS_MISSILE"
+			},
+			"96": {
+				"ident": "SAMUS_GRAPPLE_BEAM"
+			},
+			"97": {
+				"ident": "SHEIK_CHAIN"
+			},
+			"99": {
+				"ident": "PEACH_TURNIP"
+			},
+			"100": {
+				"ident": "BOWSER_FLAME"
+			},
+			"101": {
+				"ident": "NESS_BAT"
+			},
+			"102": {
+				"ident": "NESS_YOYO"
+			},
+			"103": {
+				"ident": "PEACH_PARASOL"
+			},
+			"104": {
+				"ident": "PEACH_TOAD"
+			},
+			"105": {
+				"ident": "LUIGI_FIRE"
+			},
+			"106": {
+				"ident": "ICE_CLIMBERS_ICE"
+			},
+			"107": {
+				"ident": "ICE_CLIMBERS_BLIZZARD"
+			},
+			"108": {
+				"ident": "ZELDA_FIRE_1"
+			},
+			"109": {
+				"ident": "ZELDA_FIRE_2"
+			},
+			"111": {
+				"ident": "PEACH_TOAD_SPORE"
+			},
+			"112": {
+				"ident": "MEWTWO_SHADOW_BALL"
+			},
+			"113": {
+				"ident": "ICE_CLIMBERS_UP_B"
+			},
+			"114": {
+				"ident": "GAME_AND_WATCH_PESTICIDE"
+			},
+			"115": {
+				"ident": "GAME_AND_WATCH_MANHOLE"
+			},
+			"116": {
+				"ident": "GAME_AND_WATCH_FIRE"
+			},
+			"117": {
+				"ident": "GAME_AND_WATCH_PARACHUTE"
+			},
+			"118": {
+				"ident": "GAME_AND_WATCH_TURTLE"
+			},
+			"119": {
+				"ident": "GAME_AND_WATCH_SPERKY"
+			},
+			"120": {
+				"ident": "GAME_AND_WATCH_JUDGE"
+			},
+			"122": {
+				"ident": "GAME_AND_WATCH_SAUSAGE"
+			},
+			"123": {
+				"ident": "GAME_AND_WATCH_MILK"
+			},
+			"124": {
+				"ident": "GAME_AND_WATCH_FIREFIGHTER"
+			},
+			"125": {
+				"ident": "MASTER_HAND_LASER"
+			},
+			"126": {
+				"ident": "MASTER_HAND_BULLET"
+			},
+			"127": {
+				"ident": "CRAZY_HAND_LASER"
+			},
+			"128": {
+				"ident": "CRAZY_HAND_BULLET"
+			},
+			"129": {
+				"ident": "CRAZY_HAND_BOMB"
+			},
+			"130": {
+				"ident": "KIRBY_COPY_MARIO_FIRE"
+			},
+			"131": {
+				"ident": "KIRBY_COPY_DR_MARIO_PILL"
+			},
+			"132": {
+				"ident": "KIRBY_COPY_LUIGI_FIRE"
+			},
+			"133": {
+				"ident": "KIRBY_COPY_ICE_CLIMBERS_ICE"
+			},
+			"134": {
+				"ident": "KIRBY_COPY_PEACH_TOAD"
+			},
+			"135": {
+				"ident": "KIRBY_COPY_TOAD_SPORE"
+			},
+			"136": {
+				"ident": "KIRBY_COPY_FOX_LASER"
+			},
+			"137": {
+				"ident": "KIRBY_COPY_FALCO_LASER"
+			},
+			"138": {
+				"ident": "KIRBY_COPY_FOX_BLASTER"
+			},
+			"139": {
+				"ident": "KIRBY_COPY_FALCO_BLASTER"
+			},
+			"140": {
+				"ident": "KIRBY_COPY_LINK_ARROW_1"
+			},
+			"141": {
+				"ident": "KIRBY_COPY_YOUNG_LINK_ARROW_1"
+			},
+			"142": {
+				"ident": "KIRBY_COPY_LINK_ARROW_2"
+			},
+			"143": {
+				"ident": "KIRBY_COPY_YOUNG_LINK_ARROW_2"
+			},
+			"144": {
+				"ident": "KIRBY_COPY_MEWTWO_SHADOW_BALL"
+			},
+			"145": {
+				"ident": "KIRBY_COPY_PK_FLASH"
+			},
+			"146": {
+				"ident": "KIRBY_COPY_PK_FLASH_EXPLOSION"
+			},
+			"147": {
+				"ident": "KIRBY_COPY_PIKACHU_THUNDER_1"
+			},
+			"148": {
+				"ident": "KIRBY_COPY_PIKACHU_THUNDER_2"
+			},
+			"149": {
+				"ident": "KIRBY_COPY_PICHU_THUNDER_1"
+			},
+			"150": {
+				"ident": "KIRBY_COPY_PICHU_THUNDER_2"
+			},
+			"151": {
+				"ident": "KIRBY_COPY_SAMUS_CHARGE_SHOT"
+			},
+			"152": {
+				"ident": "KIRBY_COPY_SHEIK_NEEDLE_1"
+			},
+			"153": {
+				"ident": "KIRBY_COPY_SHEIK_NEEDLE_2"
+			},
+			"154": {
+				"ident": "KIRBY_COPY_BOWSER_FLAME"
+			},
+			"155": {
+				"ident": "KIRBY_COPY_GAME_AND_WATCH_SAUSAGE"
+			},
+			"157": {
+				"ident": "YOSHI_TONGUE_2"
+			},
+			"159": {
+				"ident": "MARIO_LUIGI_COIN"
+			},
+			"160": {
+				"ident": "RANDOM_POKEMON"
+			},
+			"161": {
+				"ident": "GOLDEEN"
+			},
+			"162": {
+				"ident": "CHICORITA"
+			},
+			"163": {
+				"ident": "SNORLAX"
+			},
+			"164": {
+				"ident": "BLASTOISE"
+			},
+			"165": {
+				"ident": "WEEZING"
+			},
+			"166": {
+				"ident": "CHARIZARD"
+			},
+			"167": {
+				"ident": "MOLTRES"
+			},
+			"168": {
+				"ident": "ZAPDOS"
+			},
+			"169": {
+				"ident": "ARTICUNO"
+			},
+			"170": {
+				"ident": "WOBBUFFET"
+			},
+			"171": {
+				"ident": "SCIZOR"
+			},
+			"172": {
+				"ident": "UNOWN"
+			},
+			"173": {
+				"ident": "ENTEI"
+			},
+			"174": {
+				"ident": "RAIKOU"
+			},
+			"175": {
+				"ident": "SUICUNE"
+			},
+			"176": {
+				"ident": "BELLOSSOM"
+			},
+			"177": {
+				"ident": "ELECTRODE"
+			},
+			"178": {
+				"ident": "LUGIA"
+			},
+			"179": {
+				"ident": "HO_OH"
+			},
+			"180": {
+				"ident": "DITTO"
+			},
+			"181": {
+				"ident": "CLEFAIRY"
+			},
+			"182": {
+				"ident": "TOGEPI"
+			},
+			"183": {
+				"ident": "MEW"
+			},
+			"184": {
+				"ident": "CELEBI"
+			},
+			"185": {
+				"ident": "STARYU"
+			},
+			"186": {
+				"ident": "CHANSEY"
+			},
+			"187": {
+				"ident": "PORYGON"
+			},
+			"188": {
+				"ident": "CYNDAQUIL"
+			},
+			"189": {
+				"ident": "MARILL"
+			},
+			"190": {
+				"ident": "VENUSAUR"
+			},
+			"191": {
+				"ident": "CHICORITA_LEAF"
+			},
+			"192": {
+				"ident": "BLASTOISE_WATER"
+			},
+			"193": {
+				"ident": "WEEZING_GAS_1"
+			},
+			"194": {
+				"ident": "WEEZING_GAS_2"
+			},
+			"195": {
+				"ident": "CHARIZARD_BREATH_1"
+			},
+			"196": {
+				"ident": "CHARIZARD_BREATH_2"
+			},
+			"197": {
+				"ident": "CHARIZARD_BREATH_3"
+			},
+			"198": {
+				"ident": "CHARIZARD_BREATH_4"
+			},
+			"199": {
+				"ident": "MINI_UNOWNS"
+			},
+			"200": {
+				"ident": "LUGIA_AEROBLAST_1"
+			},
+			"201": {
+				"ident": "LUGIA_AEROBLAST_2"
+			},
+			"202": {
+				"ident": "LUGIA_AEROBLAST_3"
+			},
+			"203": {
+				"ident": "HO_OH_FLAME"
+			},
+			"204": {
+				"ident": "STARYU_STAR"
+			},
+			"205": {
+				"ident": "HEALING_EGG"
+			},
+			"206": {
+				"ident": "CYNDAQUIL_FIRE"
+			},
+			"208": {
+				"ident": "OLD_GOOMBA"
+			},
+			"209": {
+				"ident": "TARGET"
+			},
+			"210": {
+				"ident": "SHYGUY"
+			},
+			"211": {
+				"ident": "KOOPA_1"
+			},
+			"212": {
+				"ident": "KOOPA_2"
+			},
+			"213": {
+				"ident": "LIKE_LIKE"
+			},
+			"216": {
+				"ident": "OLD_OTTOSEA"
+			},
+			"217": {
+				"ident": "WHITE_BEAR"
+			},
+			"218": {
+				"ident": "KLAP"
+			},
+			"219": {
+				"ident": "GREEN_SHELL_2"
+			},
+			"220": {
+				"ident": "RED_SHELL_2"
+			},
+			"221": {
+				"ident": "TINGLE"
+			},
+			"225": {
+				"ident": "APPLE"
+			},
+			"226": {
+				"ident": "HEALING_APPLE"
+			},
+			"230": {
+				"ident": "TOOL"
+			},
+			"233": {
+				"ident": "BIRDO"
+			},
+			"234": {
+				"ident": "ARWING_LASER"
+			},
+			"235": {
+				"ident": "GREAT_FOX_LASER"
+			},
+			"236": {
+				"ident": "BIRDO_EGG"
+			}
+		}
+	}
+}

@@ -20,7 +20,6 @@
 (defn -main [path]
   (let [json (read-json path)
         decls (mapv enum json)]
-    (println do-not-edit)
     (println (slurp (io/resource "preamble/enums.rs")))
     (doseq [decl decls]
       (println (emit-expr decl) "\n"))))

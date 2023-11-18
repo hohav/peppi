@@ -1,0 +1,276 @@
+{
+	"Internal": {
+		"type": "u8",
+		"known_values": {
+			"0": {
+				"ident": "MARIO",
+				"name": "Mario"
+			},
+			"1": {
+				"ident": "FOX",
+				"name": "Fox"
+			},
+			"2": {
+				"ident": "CAPTAIN_FALCON",
+				"name": "Captain Falcon"
+			},
+			"3": {
+				"ident": "DONKEY_KONG",
+				"name": "Donkey Kong"
+			},
+			"4": {
+				"ident": "KIRBY",
+				"name": "Kirby"
+			},
+			"5": {
+				"ident": "BOWSER",
+				"name": "Bowser"
+			},
+			"6": {
+				"ident": "LINK",
+				"name": "Link"
+			},
+			"7": {
+				"ident": "SHEIK",
+				"name": "Sheik"
+			},
+			"8": {
+				"ident": "NESS",
+				"name": "Ness"
+			},
+			"9": {
+				"ident": "PEACH",
+				"name": "Peach"
+			},
+			"10": {
+				"ident": "POPO",
+				"name": "Popo"
+			},
+			"11": {
+				"ident": "NANA",
+				"name": "Nana"
+			},
+			"12": {
+				"ident": "PIKACHU",
+				"name": "Pikachu"
+			},
+			"13": {
+				"ident": "SAMUS",
+				"name": "Samus"
+			},
+			"14": {
+				"ident": "YOSHI",
+				"name": "Yoshi"
+			},
+			"15": {
+				"ident": "JIGGLYPUFF",
+				"name": "Jigglypuff"
+			},
+			"16": {
+				"ident": "MEWTWO",
+				"name": "Mewtwo"
+			},
+			"17": {
+				"ident": "LUIGI",
+				"name": "Luigi"
+			},
+			"18": {
+				"ident": "MARTH",
+				"name": "Marth"
+			},
+			"19": {
+				"ident": "ZELDA",
+				"name": "Zelda"
+			},
+			"20": {
+				"ident": "YOUNG_LINK",
+				"name": "Young Link"
+			},
+			"21": {
+				"ident": "DR_MARIO",
+				"name": "Dr. Mario"
+			},
+			"22": {
+				"ident": "FALCO",
+				"name": "Falco"
+			},
+			"23": {
+				"ident": "PICHU",
+				"name": "Pichu"
+			},
+			"24": {
+				"ident": "GAME_AND_WATCH",
+				"name": "Mr. Game & Watch"
+			},
+			"25": {
+				"ident": "GANONDORF",
+				"name": "Ganondorft"
+			},
+			"26": {
+				"ident": "ROY",
+				"name": "Roy"
+			},
+			"27": {
+				"ident": "MASTER_HAND",
+				"name": "Master Hand"
+			},
+			"28": {
+				"ident": "CRAZY_HAND",
+				"name": "Crazy Hand"
+			},
+			"29": {
+				"ident": "WIRE_FRAME_MALE",
+				"name": "Wire Frame (Male)"
+			},
+			"30": {
+				"ident": "WIRE_FRAME_FEMALE",
+				"name": "Wire Frame (Female)"
+			},
+			"31": {
+				"ident": "GIGA_BOWSER",
+				"name": "Giga Bowser"
+			},
+			"32": {
+				"ident": "SANDBAG",
+				"name": "Sandbag"
+			}
+		}
+	},
+	"External": {
+		"type": "u8",
+		"known_values": {
+			"0": {
+				"ident": "CAPTAIN_FALCON",
+				"name": "Captain Falcon"
+			},
+			"1": {
+				"ident": "DONKEY_KONG",
+				"name": "Donkey Kong"
+			},
+			"2": {
+				"ident": "FOX",
+				"name": "Fox"
+			},
+			"3": {
+				"ident": "GAME_AND_WATCH",
+				"name": "Mr. Game & Watch"
+			},
+			"4": {
+				"ident": "KIRBY",
+				"name": "Kirby"
+			},
+			"5": {
+				"ident": "BOWSER",
+				"name": "Bowser"
+			},
+			"6": {
+				"ident": "LINK",
+				"name": "Link"
+			},
+			"7": {
+				"ident": "LUIGI",
+				"name": "Luigi"
+			},
+			"8": {
+				"ident": "MARIO",
+				"name": "Mario"
+			},
+			"9": {
+				"ident": "MARTH",
+				"name": "Marth"
+			},
+			"10": {
+				"ident": "MEWTWO",
+				"name": "Mewtwo"
+			},
+			"11": {
+				"ident": "NESS",
+				"name": "Ness"
+			},
+			"12": {
+				"ident": "PEACH",
+				"name": "Peach"
+			},
+			"13": {
+				"ident": "PIKACHU",
+				"name": "Pikachu"
+			},
+			"14": {
+				"ident": "ICE_CLIMBERS",
+				"name": "Ice Climbers"
+			},
+			"15": {
+				"ident": "JIGGLYPUFF",
+				"name": "Jigglypuff"
+			},
+			"16": {
+				"ident": "SAMUS",
+				"name": "Samus"
+			},
+			"17": {
+				"ident": "YOSHI",
+				"name": "Yoshi"
+			},
+			"18": {
+				"ident": "ZELDA",
+				"name": "Zelda"
+			},
+			"19": {
+				"ident": "SHEIK",
+				"name": "Sheik"
+			},
+			"20": {
+				"ident": "FALCO",
+				"name": "Falco"
+			},
+			"21": {
+				"ident": "YOUNG_LINK",
+				"name": "Young Link"
+			},
+			"22": {
+				"ident": "DR_MARIO",
+				"name": "Dr. Mario"
+			},
+			"23": {
+				"ident": "ROY",
+				"name": "Roy"
+			},
+			"24": {
+				"ident": "PICHU",
+				"name": "Pichu"
+			},
+			"25": {
+				"ident": "GANONDORF",
+				"name": "Ganondorf"
+			},
+			"26": {
+				"ident": "MASTER_HAND",
+				"name": "Master Hand"
+			},
+			"27": {
+				"ident": "WIRE_FRAME_MALE",
+				"name": "Wire Frame (Male)"
+			},
+			"28": {
+				"ident": "WIRE_FRAME_FEMALE",
+				"name": "Wire Frame (Female)"
+			},
+			"29": {
+				"ident": "GIGA_BOWSER",
+				"name": "Giga Bowser"
+			},
+			"30": {
+				"ident": "CRAZY_HAND",
+				"name": "Crazy Hand"
+			},
+			"31": {
+				"ident": "SANDBAG",
+				"name": "Sandbag"
+			},
+			"32": {
+				"ident": "POPO",
+				"name": "Popo"
+			}
+		}
+	}
+}
