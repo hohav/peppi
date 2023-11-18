@@ -70,7 +70,7 @@ For real-time parsing, you can "drive" things yourself:
 
 ```rust
 use std::fs;
-use std::io::{BufReader, Read};
+use std::io::BufReader;
 use byteorder::ReadBytesExt;
 use peppi::serde::de;
 
@@ -95,7 +95,7 @@ fn main() {
 
     // `U` (0x55) means metadata next (skip if using spectator protocol)
     if r.read_u8().unwrap() == 0x55 {
-        de::parse_metadata(r.by_ref(), &mut state, None).unwrap();
+        de::parse_metadata(&mut r, &mut state, None).unwrap();
     }
 }
 ```
