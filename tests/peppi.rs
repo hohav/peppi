@@ -12,7 +12,7 @@ use ssbm_data::{action_state, character::External, item::Item, stage::Stage};
 
 use peppi::{
 	model::{
-		frame::transpose,
+		frame::transpose::{self, Position},
 		game::immutable::Game,
 		game::{
 			Bytes, DashBack, End, EndMethod, Language, Netplay, Player, PlayerType, Port, Scene,
@@ -185,6 +185,130 @@ fn basic_game() {
 	);
 
 	assert_eq!(game.frames.id.len(), 5209);
+
+	assert_eq!(
+		game.frames.transpose_one(1000, game.start.slippi.version),
+		transpose::Frame {
+			id: 877,
+			start: transpose::Start {
+				random_seed: None,
+				scene_frame_counter: None,
+			},
+			end: transpose::End {
+				latest_finalized_frame: None,
+			},
+			ports: vec![
+				transpose::PortData {
+					port: Port::P1,
+					leader: transpose::Data {
+						pre: transpose::Pre {
+							random_seed: 1046068084,
+							state: 27,
+							position: Position {
+								x: 56.81875,
+								y: -18.63733,
+							},
+							direction: -1.0,
+							joystick: Position { x: 0.0, y: 0.0 },
+							cstick: Position { x: 0.0, y: 0.0 },
+							triggers: 0.0,
+							buttons: 0,
+							buttons_physical: 0,
+							triggers_physical: transpose::TriggersPhysical {
+								l: 0.0,
+								r: 3.7793343e22,
+							},
+							raw_analog_x: None,
+							percent: None,
+						},
+						post: transpose::Post {
+							character: 18,
+							state: 27,
+							position: Position {
+								x: 57.292168,
+								y: -17.290329,
+							},
+							direction: -1.0,
+							percent: 0.0,
+							shield: 60.0,
+							last_attack_landed: 15,
+							combo_count: 1,
+							last_hit_by: 6,
+							stocks: 4,
+							state_age: Some(8.0,),
+							state_flags: None,
+							misc_as: None,
+							airborne: None,
+							ground: None,
+							jumps: None,
+							l_cancel: None,
+							hurtbox_state: None,
+							velocities: None,
+							hitlag: None,
+							animation_index: None,
+						},
+					},
+					follower: None,
+				},
+				transpose::PortData {
+					port: Port::P2,
+					leader: transpose::Data {
+						pre: transpose::Pre {
+							random_seed: 1046068084,
+							state: 356,
+							position: Position {
+								x: 42.195168,
+								y: 9.287016,
+							},
+							direction: -1.0,
+							joystick: Position {
+								x: -0.6875,
+								y: 0.6929134,
+							},
+							cstick: Position { x: 0.0, y: 0.0 },
+							triggers: 0.0,
+							buttons: 0,
+							buttons_physical: 0,
+							triggers_physical: transpose::TriggersPhysical {
+								l: 0.0,
+								r: 3.7793343e22,
+							},
+							raw_analog_x: None,
+							percent: None,
+						},
+						post: transpose::Post {
+							character: 1,
+							state: 356,
+							position: Position {
+								x: 40.50478,
+								y: 10.990714,
+							},
+							direction: -1.0,
+							percent: 85.6,
+							shield: 60.0,
+							last_attack_landed: 0,
+							combo_count: 0,
+							last_hit_by: 0,
+							stocks: 4,
+							state_age: Some(18.0,),
+							state_flags: None,
+							misc_as: None,
+							airborne: None,
+							ground: None,
+							jumps: None,
+							l_cancel: None,
+							hurtbox_state: None,
+							velocities: None,
+							hitlag: None,
+							animation_index: None,
+						},
+					},
+					follower: None,
+				},
+			],
+			items: vec![],
+		}
+	);
 }
 
 #[test]
