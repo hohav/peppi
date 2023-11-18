@@ -21,9 +21,7 @@ pub struct Frame {
 	pub start: Start,
 	pub end: End,
 	pub ports: Vec<PortData>,
-	//FIXME
-	//pub item_offset: OffsetsBuffer<i32>,
-	//pub item: Item,
+	pub items: Vec<Item>,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]

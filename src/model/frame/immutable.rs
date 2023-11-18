@@ -458,6 +458,14 @@ impl Frame {
 				.iter()
 				.map(|p| p.transpose_one(i, version))
 				.collect(),
+			items: if version.gte(3, 0) {
+				let (start, end) = self.item_offset.start_end(i);
+				(start..end)
+					.map(|i| self.item.transpose_one(i, version))
+					.collect()
+			} else {
+				vec![]
+			},
 		}
 	}
 

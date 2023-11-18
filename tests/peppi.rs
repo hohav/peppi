@@ -550,8 +550,10 @@ fn zelda_sheik_transformation() {
 fn items() {
 	let game = game("items");
 	assert_eq!(
-		game.frames.item.transpose_one(0, game.start.slippi.version),
-		transpose::Item {
+		game.frames
+			.transpose_one(121, game.start.slippi.version)
+			.items,
+		vec![transpose::Item {
 			id: 0,
 			damage: 0,
 			direction: 1.0,
@@ -565,13 +567,13 @@ fn items() {
 			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
 			misc: Some(transpose::ItemMisc(5, 5, 5, 5)),
 			owner: Some(0),
-		}
+		}]
 	);
 	assert_eq!(
 		game.frames
-			.item
-			.transpose_one(102, game.start.slippi.version),
-		transpose::Item {
+			.transpose_one(275, game.start.slippi.version)
+			.items,
+		vec![transpose::Item {
 			id: 1,
 			damage: 0,
 			direction: -1.0,
@@ -585,13 +587,13 @@ fn items() {
 			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
 			misc: Some(transpose::ItemMisc(5, 0, 5, 5)),
 			owner: Some(0),
-		}
+		}]
 	);
 	assert_eq!(
 		game.frames
-			.item
-			.transpose_one(290, game.start.slippi.version),
-		transpose::Item {
+			.transpose_one(503, game.start.slippi.version)
+			.items,
+		vec![transpose::Item {
 			id: 2,
 			damage: 0,
 			direction: 1.0,
@@ -605,7 +607,7 @@ fn items() {
 			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
 			misc: Some(transpose::ItemMisc(5, 0, 5, 5)),
 			owner: Some(0),
-		}
+		}]
 	);
 }
 
