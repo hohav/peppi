@@ -18,6 +18,7 @@ peppi = { git = "https://github.com/hohav/peppi.git", branch = "arrow-in-memory"
 One-shot parsing just requires calling `peppi::game`:
 
 ```rust
+use ssbm_data::action_state::Common::{self, *};
 use std::{fs, io};
 
 fn main() {
@@ -31,8 +32,24 @@ fn main() {
     let mut is_dead: Vec<_> = game.frames.ports.iter().map(|_| false).collect();
     for frame_idx in 0..game.frames.id.len() {
         for (port_idx, port_data) in game.frames.ports.iter().enumerate() {
-            match port_data.leader.post.state.get(frame_idx) {
-                Some(state) if state <= 10 => {
+            match port_data
+                .leader
+                .post
+                .state
+                .get(frame_idx)
+                .and_then(|s| Common::try_from(s).ok())
+            {
+                Some(DeadDown)
+                | Some(DeadLeft)
+                | Some(DeadRight)
+                | Some(DeadUp)
+                | Some(DeadUpStar)
+                | Some(DeadUpStarIce)
+                | Some(DeadUpFall)
+                | Some(DeadUpFallHitCamera)
+                | Some(DeadUpFallHitCameraFlat)
+                | Some(DeadUpFallIce)
+                | Some(DeadUpFallHitCameraIce) => {
                     if !is_dead[port_idx] {
                         is_dead[port_idx] = true;
                         println!(
