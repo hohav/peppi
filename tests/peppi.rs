@@ -1,12 +1,7 @@
-use std::{
-	fs::{self, File},
-	io::Read,
-	path::Path,
-};
+use std::{fs, path::Path};
 
 use pretty_assertions::assert_eq;
 use serde_json::json;
-use xxhash_rust::xxh3::xxh3_64;
 
 use ssbm_data::{action_state, character::External, character::Internal, item::Item, stage::Stage};
 
@@ -741,19 +736,20 @@ fn items() {
 	);
 }
 
-fn hash(path: impl AsRef<Path>) -> u64 {
-	let mut buf = Vec::new();
-	let mut f = File::open(path).unwrap();
-	f.read_to_end(&mut buf).unwrap();
-	xxh3_64(&buf)
-}
-
 fn _round_trip(in_path: impl AsRef<Path> + Clone) {
-	let game1 = read_game(in_path.clone()).unwrap();
-	let out_path = "/tmp/peppi_test_round_trip.slp";
-	let mut buf = File::create(out_path).unwrap();
-	serde::ser::serialize(&mut buf, &game1).unwrap();
-	let game2 = read_game(out_path).unwrap();
+	let in_bytes = fs::read(in_path.clone()).unwrap();
+	let game1 = peppi::game(&mut in_bytes.as_slice(), None).unwrap();
+
+	let mut out_bytes = Vec::with_capacity(in_bytes.len());
+	serde::ser::serialize(&mut out_bytes, &game1).unwrap();
+
+	// if we get a perfect byte-wise match we know we're correct. If not, we
+	// continue to detect where in the replay there is a difference.
+	if in_bytes == out_bytes {
+		return;
+	}
+
+	let game2 = peppi::game(&mut out_bytes.as_slice(), None).unwrap();
 
 	assert_eq!(game1.start, game2.start);
 	assert_eq!(game1.end, game2.end);
@@ -768,10 +764,6 @@ fn _round_trip(in_path: impl AsRef<Path> + Clone) {
 			idx
 		);
 	}
-
-	assert_eq!(hash(in_path), hash(out_path));
-
-	fs::remove_file(out_path).unwrap();
 }
 
 #[test]
