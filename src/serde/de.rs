@@ -8,7 +8,7 @@ use std::{
 
 use arrow2::array::MutableArray;
 use byteorder::ReadBytesExt;
-use log::{debug, info};
+use log::{debug, info, warn};
 
 type BE = byteorder::BigEndian;
 
@@ -862,14 +862,19 @@ pub fn deserialize<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> 
 		state.frame_close();
 	}
 
-	info!("frames: {}", state.game.frames.id.len());
+	info!("Frames: {}", state.game.frames.id.len());
 
-	if raw_len != 0 && state.bytes_read != raw_len {
-		return Err(err!(
-			"failed to consume expected number of bytes: {}, {}",
-			raw_len,
-			state.bytes_read
-		));
+	// Some replays have duplicated Game End events, which are safe to ignore.
+	if state.bytes_read < raw_len {
+		let len = raw_len - state.bytes_read;
+		warn!("Extra content after Game End ({} bytes)", len);
+		let mut buf = vec![0; len];
+		r.read_exact(&mut buf)?;
+	} else if raw_len > 0 && state.bytes_read > raw_len {
+		warn!(
+			"Consumed more than expected ({} bytes)",
+			state.bytes_read - raw_len
+		);
 	}
 
 	match r.read_u8()? {
