@@ -3,6 +3,7 @@ use std::{
 	error,
 	fs::{self, File},
 	io::{self, Read, Result, Write},
+	num::NonZeroU16,
 	path::PathBuf,
 };
 
@@ -26,7 +27,7 @@ pub(crate) const PAYLOADS_EVENT_CODE: u8 = 0x35;
 const MAX_PLAYERS: usize = 6;
 const ICE_CLIMBERS: u8 = 14;
 
-type PayloadSizes = [Option<u16>; 256];
+type PayloadSizes = [Option<NonZeroU16>; 256];
 
 #[derive(Clone, Debug)]
 pub struct Debug {
@@ -574,11 +575,12 @@ fn parse_payloads<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<(usize, Payl
 		debug_write_event(&buf, code, None, d)?;
 	}
 
-	let mut sizes = [None; 256];
+	let mut sizes: PayloadSizes = [None; 256];
 	for _ in (0..size - 1).step_by(3) {
 		let code = buf.read_u8()?;
 		let size = buf.read_u16::<BE>()?;
-		sizes[code as usize] = Some(size);
+		sizes[code as usize] =
+			Some(NonZeroU16::new(size).ok_or_else(|| err!("zero-size event payload"))?);
 	}
 
 	debug!(
@@ -608,7 +610,8 @@ fn parse_game_start<R: Read>(
 	debug!("Event: {:#x}", code);
 
 	let size = payload_sizes[code as usize]
-		.ok_or_else(|| err!("unknown event: {:#02x}", code))? as usize;
+		.ok_or_else(|| err!("unknown event: {:#02x}", code))?
+		.get() as usize;
 	let mut buf = vec![0; size];
 	r.read_exact(&mut buf)?;
 
@@ -678,9 +681,9 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 	let mut code = r.read_u8()?;
 	debug!("Event: {:#x}", code);
 
-	let size = state
-		.payload_sizes[code as usize]
-		.ok_or_else(|| err!("unknown event: {:#02x}", code))? as usize;
+	let size = state.payload_sizes[code as usize]
+		.ok_or_else(|| err!("unknown event: {:#02x}", code))?
+		.get() as usize;
 	let mut buf = vec![0; size];
 	r.read_exact(&mut buf)?;
 
@@ -836,7 +839,7 @@ pub fn deserialize<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> 
 
 	if opts.map(|o| o.skip_frames).unwrap_or(false) {
 		// Skip to GameEnd, which we assume is the last event in the stream!
-		let end_offset = 1 + state.payload_sizes[Event::GameEnd as usize].unwrap() as usize;
+		let end_offset = 1 + state.payload_sizes[Event::GameEnd as usize].unwrap().get() as usize;
 		if raw_len == 0 || raw_len - state.bytes_read < end_offset {
 			return Err(err!(
 				"Cannot skip to game end. Replay in-progress or corrupted."
