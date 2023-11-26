@@ -583,6 +583,10 @@ fn parse_payloads<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<(usize, Payl
 			Some(NonZeroU16::new(size).ok_or_else(|| err!("zero-size event payload"))?);
 	}
 
+	sizes[Event::GameStart as usize].ok_or_else(|| err!("missing Game Start in payload sizes"))?;
+
+	sizes[Event::GameEnd as usize].ok_or_else(|| err!("missing Game End in payload sizes"))?;
+
 	debug!(
 		"Event payload sizes: {{{}}}",
 		sizes
