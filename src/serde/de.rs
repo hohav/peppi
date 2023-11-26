@@ -26,6 +26,8 @@ pub(crate) const PAYLOADS_EVENT_CODE: u8 = 0x35;
 const MAX_PLAYERS: usize = 6;
 const ICE_CLIMBERS: u8 = 14;
 
+type PayloadSizes = [Option<u16>; 256];
+
 #[derive(Clone, Debug)]
 pub struct Debug {
 	pub dir: PathBuf,
@@ -40,7 +42,7 @@ pub struct Opts {
 	pub debug: Option<Debug>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, num_enum::TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, num_enum::TryFromPrimitive)]
 #[repr(u8)]
 pub enum Event {
 	GameStart = 0x36,
@@ -68,7 +70,7 @@ pub struct PartialGame {
 }
 
 pub struct ParseState {
-	payload_sizes: HashMap<u8, u16>,
+	payload_sizes: PayloadSizes,
 	bytes_read: usize,
 	event_counts: HashMap<u8, usize>,
 	split_accumulator: SplitAccumulator,
@@ -550,7 +552,7 @@ fn debug_write_event(
 /// Returns the number of bytes read, and a map of event codes to payload sizes.
 /// This map uses raw event codes as keys (as opposed to `Event` enum values)
 /// for forwards compatibility, to allow skipping unknown events.
-fn parse_payloads<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<(usize, HashMap<u8, u16>)> {
+fn parse_payloads<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<(usize, PayloadSizes)> {
 	let code = r.read_u8()?;
 	if code != PAYLOADS_EVENT_CODE {
 		return Err(err!("expected event payloads, but got: {:#02x}", code));
@@ -572,18 +574,19 @@ fn parse_payloads<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<(usize, Hash
 		debug_write_event(&buf, code, None, d)?;
 	}
 
-	let mut sizes = HashMap::new();
+	let mut sizes = [None; 256];
 	for _ in (0..size - 1).step_by(3) {
 		let code = buf.read_u8()?;
 		let size = buf.read_u16::<BE>()?;
-		sizes.insert(code, size);
+		sizes[code as usize] = Some(size);
 	}
 
 	debug!(
 		"Event payload sizes: {{{}}}",
 		sizes
 			.iter()
-			.map(|(k, v)| format!("0x{:x}: {}", k, v))
+			.enumerate()
+			.filter_map(|(c, s)| s.map(|s| format!("0x{:x}: {}", c, s)))
 			.collect::<Vec<_>>()
 			.join(", ")
 	);
@@ -598,14 +601,13 @@ fn parse_payloads<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<(usize, Hash
 /// (or Err if the event wasn't a Game Start).
 fn parse_game_start<R: Read>(
 	mut r: R,
-	payload_sizes: &HashMap<u8, u16>,
+	payload_sizes: &PayloadSizes,
 	opts: Option<&Opts>,
 ) -> Result<(usize, game::Start)> {
 	let code = r.read_u8()?;
 	debug!("Event: {:#x}", code);
 
-	let size = *payload_sizes
-		.get(&code)
+	let size = payload_sizes[code as usize]
 		.ok_or_else(|| err!("unknown event: {:#02x}", code))? as usize;
 	let mut buf = vec![0; size];
 	r.read_exact(&mut buf)?;
@@ -676,9 +678,8 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 	let mut code = r.read_u8()?;
 	debug!("Event: {:#x}", code);
 
-	let size = *state
-		.payload_sizes
-		.get(&code)
+	let size = state
+		.payload_sizes[code as usize]
 		.ok_or_else(|| err!("unknown event: {:#02x}", code))? as usize;
 	let mut buf = vec![0; size];
 	r.read_exact(&mut buf)?;
@@ -835,7 +836,7 @@ pub fn deserialize<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> 
 
 	if opts.map(|o| o.skip_frames).unwrap_or(false) {
 		// Skip to GameEnd, which we assume is the last event in the stream!
-		let end_offset: usize = state.payload_sizes[&(Event::GameEnd as u8)] as usize + 1;
+		let end_offset = 1 + state.payload_sizes[Event::GameEnd as usize].unwrap() as usize;
 		if raw_len == 0 || raw_len - state.bytes_read < end_offset {
 			return Err(err!(
 				"Cannot skip to game end. Replay in-progress or corrupted."
