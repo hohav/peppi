@@ -186,13 +186,6 @@ fn basic_game() {
 		game.frames.transpose_one(1000, game.start.slippi.version),
 		transpose::Frame {
 			id: 877,
-			start: transpose::Start {
-				random_seed: None,
-				scene_frame_counter: None,
-			},
-			end: transpose::End {
-				latest_finalized_frame: None,
-			},
 			ports: vec![
 				transpose::PortData {
 					port: Port::P1,
@@ -282,7 +275,9 @@ fn basic_game() {
 					follower: None,
 				},
 			],
-			items: vec![],
+			start: None,
+			end: None,
+			items: None,
 		}
 	);
 }
@@ -678,7 +673,7 @@ fn items() {
 		game.frames
 			.transpose_one(121, game.start.slippi.version)
 			.items,
-		vec![transpose::Item {
+		Some(vec![transpose::Item {
 			id: 0,
 			damage: 0,
 			direction: 1.0,
@@ -692,13 +687,13 @@ fn items() {
 			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
 			misc: Some(transpose::ItemMisc(5, 5, 5, 5)),
 			owner: Some(0),
-		}]
+		}])
 	);
 	assert_eq!(
 		game.frames
 			.transpose_one(275, game.start.slippi.version)
 			.items,
-		vec![transpose::Item {
+		Some(vec![transpose::Item {
 			id: 1,
 			damage: 0,
 			direction: -1.0,
@@ -712,13 +707,13 @@ fn items() {
 			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
 			misc: Some(transpose::ItemMisc(5, 0, 5, 5)),
 			owner: Some(0),
-		}]
+		}])
 	);
 	assert_eq!(
 		game.frames
 			.transpose_one(503, game.start.slippi.version)
 			.items,
-		vec![transpose::Item {
+		Some(vec![transpose::Item {
 			id: 2,
 			damage: 0,
 			direction: 1.0,
@@ -732,7 +727,7 @@ fn items() {
 			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
 			misc: Some(transpose::ItemMisc(5, 0, 5, 5)),
 			owner: Some(0),
-		}]
+		}])
 	);
 }
 

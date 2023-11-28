@@ -6,22 +6,23 @@
    [clojure.pprint :refer [pprint]]
    [peppi-codegen.common :refer :all]))
 
-(defn immutable-array-type
+(defn array-type
   [ty]
-  (if (types ty)
-    ["PrimitiveArray" ty]
-    ty))
+  (cond
+    (primitive-types ty) ["PrimitiveArray" ty]
+    (nil? ty)            "NullArray"
+    :else                ty))
 
-(defn immutable-struct-field
+(defn struct-field
   [{nm :name, ty :type, ver :version}]
-  [nm (cond->> (immutable-array-type ty)
+  [nm (cond->> (array-type ty)
         ver (conj ["Option"]))])
 
 (defn write-field-primitive
   [target {ty :type}]
   [:method-call
    {:unwrap true
-    :generics (when-not (#{"u8" "i8" "bool"} ty) ["BE"])}
+    :generics (when-not (#{"u8" "i8"} ty) ["BE"])}
    "w"
    (str "write_" ty)
    [[:method-call
@@ -41,9 +42,9 @@
   [{idx :index, nm :name, ty :type, ver :version, :as field}]
   (let [target (cond-> [:field-get "self" (or nm idx)]
                  ver ((comp unwrap as-ref)))]
-    (if (types ty)
-      (write-field-primitive target field)
-      (write-field-composite target field))))
+    (cond
+      (primitive-types ty) (write-field-primitive target field)
+      ty                   (write-field-composite target field))))
 
 (defn write-fn
   [fields]
@@ -82,41 +83,36 @@
        "boxed"
        []])))
 
+(defn push-call
+  [field]
+  [:method-call
+   "values"
+   "push"
+   [(arrow-values field)]])
+
 (defn into-struct-array-fn
   [fields]
-  [:fn
-   {:ret "StructArray"}
-   "into_struct_array"
-   [["self"]
-    ["version" "Version"]]
-   [:block
-    [:let
-     {:mutable true}
-     "values"
-     [:vec! []]]
-    (->> fields
-         (nested-version-ifs
-          (fn [field]
-            [:method-call
-             "values"
-             "push"
-             [(arrow-values field)]]))
-         (into [:block]))
-    [:fn-call
-     "StructArray"
-     "new"
-     [[:fn-call
-       "Self"
-       "data_type"
-       ["version"]]
-      "values"
-      "None"]]]])
+  (let [let-values [:let {:mutable true} "values" [:vec! []]]
+        struct-init [:fn-call
+                     "StructArray"
+                     "new"
+                     [[:fn-call "Self" "data_type" ["version"]]
+                      "values"
+                      (if (named? fields) "self.validity" "None")]]]
+    [:fn
+     {:ret "StructArray"}
+     "into_struct_array"
+     [["self"]
+      ["version" "Version"]]
+     (->> (nested-version-ifs push-call fields)
+          (into [:block let-values])
+          (append struct-init))]))
 
 (defn transpose-one-field-init
   [{idx :index, nm :name, ty :type, ver :version}]
   (let [real-target [:field-get "self" (or nm idx)]
         target (if ver "x" real-target)
-        value (if (types ty)
+        value (if (primitive-types ty)
                 [:subscript [:method-call target "values"] "i"]
                 [:method-call target "transpose_one" ["i" "version"]])]
     (if ver
@@ -134,7 +130,9 @@
       ["i" "usize"]
       ["version" "Version"]]
      [:block
-      [:struct-init ctype (mapv (juxt :name transpose-one-field-init) fields)]]]))
+      [:struct-init ctype (->> fields
+                               (filterv :type)
+                               (mapv (juxt :name transpose-one-field-init)))]]]))
 
 (defn downcast-clone
   [target as]
@@ -154,12 +152,19 @@
   (let [target (if ver
                  [:method-call "values" "get" [idx]]
                  [:subscript "values" idx])
-        body (if (types ty)
-               (downcast-clone (if ver "x" target) ["PrimitiveArray" ty])
+        ver-target (if ver "x" target)
+        body (cond
+               (primitive-types ty)
+               (downcast-clone ver-target ["PrimitiveArray" ty])
+
+               (nil? ty)
+               (downcast-clone ver-target "NullArray")
+
+               :else
                [:fn-call
                 ty
                 "from_struct_array"
-                [(downcast-clone (if ver "x" target) "StructArray")
+                [(downcast-clone ver-target "StructArray")
                  "version"]])]
     (cond->> body
       ver (wrap-map target "x"))))
@@ -173,11 +178,12 @@
     ["version" "Version"]]
    [:block
     [:let
-     ["_" "values" "_"]
+     ["_" "values" "validity"]
      [:method-call "array" "into_data"]]
      [:struct-init
       "Self"
-      (mapv (juxt :name from-struct-array) fields)]]])
+      (cond->> (mapv (juxt :name from-struct-array) fields)
+        (named? fields) (append ["validity" "validity"]))]]])
 
 (defn data-type-fn
   [fields]
@@ -213,26 +219,40 @@
   [ty]
   (list "mutable" ty))
 
-(defn immutable-struct
+(defn struct-decl
   [[nm fields]]
-  [[:struct
-    {:attrs {:derive ["Debug"]}}
-    nm
-    (mapv immutable-struct-field fields)]
-   [:impl nm [(data-type-fn fields)
-              (into-struct-array-fn fields)
-              (from-struct-array-fn fields)
-              (write-fn fields)
-              (transpose-one-fn nm fields)]]
-   [:impl
-    {:for nm}
-    ["From" (mutable nm)]
-    [[:fn
-      {:ret "Self"}
-      "from"
-      [["x" (mutable nm)]]
-      [:block
-       [:struct-init "Self" (mapv (juxt :name into-immutable) fields)]]]]]])
+  [:struct
+   {:attrs {:derive ["Debug"]}}
+   nm
+   (cond->> (mapv struct-field fields)
+     (named? fields) (append ["validity" ["Option" "Bitmap"]]))])
+
+(defn struct-impl
+  [[nm fields]]
+  [:impl nm [(data-type-fn fields)
+             (into-struct-array-fn fields)
+             (from-struct-array-fn fields)
+             (write-fn fields)
+             (transpose-one-fn nm fields)]])
+
+(defn struct-from-impl
+  [[nm fields]]
+  [:impl
+   {:for nm}
+   ["From" (mutable nm)]
+   [[:fn
+     {:ret "Self"}
+     "from"
+     [["x" (mutable nm)]]
+     [:block
+      [:struct-init "Self" (cond->> (mapv (juxt :name into-immutable) fields)
+                             (named? fields) (append ["validity"
+                                                      [:method-call
+                                                       [:field-get "x" "validity"]
+                                                       "map"
+                                                       [[:closure
+                                                         [["v"]]
+                                                         [[:method-call "v" "into" []]]]]]]))]]]]])
 
 (defn normalize-field
   [idx field]
@@ -244,8 +264,9 @@
 
 (defn -main [path]
   (let [json (-> (read-json path)
-                 (update-vals #(map-indexed normalize-field %)))
-        decls (mapcat immutable-struct json)]
+                 (update-vals #(map-indexed normalize-field %))
+                 (->> (sort-by key)))
+        decls (mapcat (juxt struct-decl struct-impl struct-from-impl) json)]
     (println do-not-edit)
     (println (slurp (io/resource "preamble/frame/immutable.rs")))
     (println)

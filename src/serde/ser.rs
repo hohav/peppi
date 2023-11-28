@@ -8,7 +8,7 @@ use crate::{
 		game::{self, immutable::Game, GeckoCodes},
 		slippi::Version,
 	},
-	serde::de::{Event, PAYLOADS_EVENT_CODE},
+	serde::de::Event,
 	ubjson,
 };
 
@@ -144,30 +144,22 @@ struct FrameCounts {
 }
 
 fn frame_counts(frames: &Frame) -> FrameCounts {
-	let len = frames.id.len();
+	let len = frames.len();
 	FrameCounts {
 		frames: len.try_into().unwrap(),
 		frame_data: frames
 			.ports
 			.iter()
 			.map(|p| {
-				len + p
-					.follower
-					.as_ref()
-					.map(|f| {
-						len - f
-							.pre
-							.random_seed
-							.validity()
-							.map(|v| v.unset_bits())
-							.unwrap_or(0)
+				len - p.leader.validity.as_ref().map_or(0, |v| v.unset_bits())
+					+ p.follower.as_ref().map_or(0, |f| {
+						len - f.validity.as_ref().map_or(0, |v| v.unset_bits())
 					})
-					.unwrap_or(0)
 			})
 			.sum::<usize>()
 			.try_into()
 			.unwrap(),
-		items: frames.item.id.len() as u32,
+		items: frames.item.as_ref().map(|i| i.id.len() as u32).unwrap_or(0),
 	}
 }
 
@@ -203,7 +195,7 @@ pub fn serialize<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 	])?;
 	w.write_u32::<BE>(raw_size)?;
 
-	w.write_u8(PAYLOADS_EVENT_CODE)?;
+	w.write_u8(Event::Payloads as u8)?;
 	w.write_u8((payload_sizes.len() * 3 + 1).try_into().unwrap())?; // see note in `parse::payload_sizes`
 	for (event, size) in payload_sizes {
 		w.write_u8(event)?;

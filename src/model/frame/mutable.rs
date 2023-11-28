@@ -4,7 +4,11 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-use arrow2::{array::MutablePrimitiveArray, offset::Offsets};
+use arrow2::{
+	array::{MutableArray, MutablePrimitiveArray},
+	bitmap::MutableBitmap,
+	offset::Offsets,
+};
 
 use byteorder::ReadBytesExt;
 use std::io::Result;
@@ -20,6 +24,7 @@ type BE = byteorder::BigEndian;
 pub struct Data {
 	pub pre: Pre,
 	pub post: Post,
+	pub validity: Option<MutableBitmap>,
 }
 
 impl Data {
@@ -27,12 +32,21 @@ impl Data {
 		Self {
 			pre: Pre::with_capacity(capacity, version),
 			post: Post::with_capacity(capacity, version),
+			validity: None,
 		}
 	}
 
-	pub fn push_none(&mut self, version: Version) {
-		self.pre.push_none(version);
-		self.post.push_none(version);
+	pub fn len(&self) -> usize {
+		self.pre.len()
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		let len = self.len();
+		self.validity
+			.get_or_insert_with(|| MutableBitmap::from_len_set(len))
+			.push(false);
+		self.pre.push_null(version);
+		self.post.push_null(version);
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Data {
@@ -61,6 +75,10 @@ impl PortData {
 		}
 	}
 
+	pub fn len(&self) -> usize {
+		self.leader.len()
+	}
+
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::PortData {
 		transpose::PortData {
 			port: self.port,
@@ -72,46 +90,293 @@ impl PortData {
 
 pub struct Frame {
 	pub id: MutablePrimitiveArray<i32>,
-	pub start: Start,
-	pub end: End,
 	pub ports: Vec<PortData>,
-	pub item_offset: Offsets<i32>,
-	pub item: Item,
+	pub start: Option<Start>,
+	pub end: Option<End>,
+	pub item_offset: Option<Offsets<i32>>,
+	pub item: Option<Item>,
 }
 
 impl Frame {
 	pub fn with_capacity(capacity: usize, version: Version, ports: &[PortOccupancy]) -> Self {
 		Self {
 			id: MutablePrimitiveArray::<i32>::with_capacity(capacity),
-			start: Start::with_capacity(capacity, version),
-			end: End::with_capacity(capacity, version),
 			ports: ports
 				.iter()
 				.map(|p| PortData::with_capacity(capacity, version, *p))
 				.collect(),
-			item_offset: Offsets::<i32>::with_capacity(capacity),
-			item: Item::with_capacity(0, version),
+			start: version
+				.gte(2, 2)
+				.then(|| Start::with_capacity(capacity, version)),
+			end: version
+				.gte(3, 0)
+				.then(|| End::with_capacity(capacity, version)),
+			item_offset: version
+				.gte(3, 0)
+				.then(|| Offsets::<i32>::with_capacity(capacity)),
+			item: version.gte(3, 0).then(|| Item::with_capacity(0, version)),
 		}
+	}
+
+	pub fn len(&self) -> usize {
+		self.id.len()
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Frame {
 		transpose::Frame {
 			id: self.id.values()[i],
-			start: self.start.transpose_one(i, version),
-			end: self.end.transpose_one(i, version),
 			ports: self
 				.ports
 				.iter()
 				.map(|p| p.transpose_one(i, version))
 				.collect(),
-			items: if version.gte(3, 0) {
-				let (start, end) = self.item_offset.start_end(i);
+			start: version
+				.gte(2, 2)
+				.then(|| self.start.as_ref().unwrap().transpose_one(i, version)),
+			end: version
+				.gte(3, 0)
+				.then(|| self.end.as_ref().unwrap().transpose_one(i, version)),
+			items: version.gte(3, 0).then(|| {
+				let (start, end) = self.item_offset.as_ref().unwrap().start_end(i);
 				(start..end)
-					.map(|i| self.item.transpose_one(i, version))
+					.map(|i| self.item.as_ref().unwrap().transpose_one(i, version))
 					.collect()
-			} else {
-				vec![]
-			},
+			}),
+		}
+	}
+}
+
+pub struct End {
+	pub latest_finalized_frame: Option<MutablePrimitiveArray<i32>>,
+	pub validity: Option<MutableBitmap>,
+}
+
+impl End {
+	fn with_capacity(capacity: usize, version: Version) -> Self {
+		Self {
+			latest_finalized_frame: version
+				.gte(3, 7)
+				.then(|| MutablePrimitiveArray::<i32>::with_capacity(capacity)),
+			validity: version
+				.lt(3, 7)
+				.then(|| MutableBitmap::with_capacity(capacity)),
+		}
+	}
+
+	pub fn len(&self) -> usize {
+		self.validity
+			.as_ref()
+			.map(|v| v.len())
+			.unwrap_or_else(|| self.latest_finalized_frame.as_ref().unwrap().len())
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		let len = self.len();
+		self.validity
+			.get_or_insert_with(|| MutableBitmap::from_len_set(len))
+			.push(false);
+		if version.gte(3, 7) {
+			self.latest_finalized_frame.as_mut().unwrap().push_null()
+		}
+	}
+
+	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		if version.gte(3, 7) {
+			r.read_i32::<BE>()
+				.map(|x| self.latest_finalized_frame.as_mut().unwrap().push(Some(x)))?
+		};
+		self.validity.as_mut().map(|v| v.push(true));
+		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::End {
+		transpose::End {
+			latest_finalized_frame: self.latest_finalized_frame.as_ref().map(|x| x.values()[i]),
+		}
+	}
+}
+
+pub struct Item {
+	pub r#type: MutablePrimitiveArray<u16>,
+	pub state: MutablePrimitiveArray<u8>,
+	pub direction: MutablePrimitiveArray<f32>,
+	pub velocity: Velocity,
+	pub position: Position,
+	pub damage: MutablePrimitiveArray<u16>,
+	pub timer: MutablePrimitiveArray<f32>,
+	pub id: MutablePrimitiveArray<u32>,
+	pub misc: Option<ItemMisc>,
+	pub owner: Option<MutablePrimitiveArray<i8>>,
+	pub validity: Option<MutableBitmap>,
+}
+
+impl Item {
+	fn with_capacity(capacity: usize, version: Version) -> Self {
+		Self {
+			r#type: MutablePrimitiveArray::<u16>::with_capacity(capacity),
+			state: MutablePrimitiveArray::<u8>::with_capacity(capacity),
+			direction: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			velocity: Velocity::with_capacity(capacity, version),
+			position: Position::with_capacity(capacity, version),
+			damage: MutablePrimitiveArray::<u16>::with_capacity(capacity),
+			timer: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			id: MutablePrimitiveArray::<u32>::with_capacity(capacity),
+			misc: version
+				.gte(3, 2)
+				.then(|| ItemMisc::with_capacity(capacity, version)),
+			owner: version
+				.gte(3, 6)
+				.then(|| MutablePrimitiveArray::<i8>::with_capacity(capacity)),
+			validity: None,
+		}
+	}
+
+	pub fn len(&self) -> usize {
+		self.r#type.len()
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		let len = self.len();
+		self.validity
+			.get_or_insert_with(|| MutableBitmap::from_len_set(len))
+			.push(false);
+		self.r#type.push_null();
+		self.state.push_null();
+		self.direction.push_null();
+		self.velocity.push_null(version);
+		self.position.push_null(version);
+		self.damage.push_null();
+		self.timer.push_null();
+		self.id.push_null();
+		if version.gte(3, 2) {
+			self.misc.as_mut().unwrap().push_null(version);
+			if version.gte(3, 6) {
+				self.owner.as_mut().unwrap().push_null()
+			}
+		}
+	}
+
+	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u16::<BE>().map(|x| self.r#type.push(Some(x)))?;
+		r.read_u8().map(|x| self.state.push(Some(x)))?;
+		r.read_f32::<BE>().map(|x| self.direction.push(Some(x)))?;
+		self.velocity.read_push(r, version)?;
+		self.position.read_push(r, version)?;
+		r.read_u16::<BE>().map(|x| self.damage.push(Some(x)))?;
+		r.read_f32::<BE>().map(|x| self.timer.push(Some(x)))?;
+		r.read_u32::<BE>().map(|x| self.id.push(Some(x)))?;
+		if version.gte(3, 2) {
+			self.misc.as_mut().unwrap().read_push(r, version)?;
+			if version.gte(3, 6) {
+				r.read_i8()
+					.map(|x| self.owner.as_mut().unwrap().push(Some(x)))?
+			}
+		};
+		self.validity.as_mut().map(|v| v.push(true));
+		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Item {
+		transpose::Item {
+			r#type: self.r#type.values()[i],
+			state: self.state.values()[i],
+			direction: self.direction.values()[i],
+			velocity: self.velocity.transpose_one(i, version),
+			position: self.position.transpose_one(i, version),
+			damage: self.damage.values()[i],
+			timer: self.timer.values()[i],
+			id: self.id.values()[i],
+			misc: self.misc.as_ref().map(|x| x.transpose_one(i, version)),
+			owner: self.owner.as_ref().map(|x| x.values()[i]),
+		}
+	}
+}
+
+pub struct ItemMisc(
+	pub MutablePrimitiveArray<u8>,
+	pub MutablePrimitiveArray<u8>,
+	pub MutablePrimitiveArray<u8>,
+	pub MutablePrimitiveArray<u8>,
+);
+
+impl ItemMisc {
+	fn with_capacity(capacity: usize, version: Version) -> Self {
+		Self(
+			MutablePrimitiveArray::<u8>::with_capacity(capacity),
+			MutablePrimitiveArray::<u8>::with_capacity(capacity),
+			MutablePrimitiveArray::<u8>::with_capacity(capacity),
+			MutablePrimitiveArray::<u8>::with_capacity(capacity),
+		)
+	}
+
+	pub fn len(&self) -> usize {
+		self.0.len()
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		self.0.push_null();
+		self.1.push_null();
+		self.2.push_null();
+		self.3.push_null()
+	}
+
+	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u8().map(|x| self.0.push(Some(x)))?;
+		r.read_u8().map(|x| self.1.push(Some(x)))?;
+		r.read_u8().map(|x| self.2.push(Some(x)))?;
+		r.read_u8().map(|x| self.3.push(Some(x)))?;
+		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::ItemMisc {
+		transpose::ItemMisc(
+			self.0.values()[i],
+			self.1.values()[i],
+			self.2.values()[i],
+			self.3.values()[i],
+		)
+	}
+}
+
+pub struct Position {
+	pub x: MutablePrimitiveArray<f32>,
+	pub y: MutablePrimitiveArray<f32>,
+	pub validity: Option<MutableBitmap>,
+}
+
+impl Position {
+	fn with_capacity(capacity: usize, version: Version) -> Self {
+		Self {
+			x: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			y: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			validity: None,
+		}
+	}
+
+	pub fn len(&self) -> usize {
+		self.x.len()
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		let len = self.len();
+		self.validity
+			.get_or_insert_with(|| MutableBitmap::from_len_set(len))
+			.push(false);
+		self.x.push_null();
+		self.y.push_null()
+	}
+
+	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_f32::<BE>().map(|x| self.x.push(Some(x)))?;
+		r.read_f32::<BE>().map(|x| self.y.push(Some(x)))?;
+		self.validity.as_mut().map(|v| v.push(true));
+		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Position {
+		transpose::Position {
+			x: self.x.values()[i],
+			y: self.y.values()[i],
 		}
 	}
 }
@@ -138,6 +403,7 @@ pub struct Post {
 	pub velocities: Option<Velocities>,
 	pub hitlag: Option<MutablePrimitiveArray<f32>>,
 	pub animation_index: Option<MutablePrimitiveArray<u32>>,
+	pub validity: Option<MutableBitmap>,
 }
 
 impl Post {
@@ -186,37 +452,46 @@ impl Post {
 			animation_index: version
 				.gte(3, 11)
 				.then(|| MutablePrimitiveArray::<u32>::with_capacity(capacity)),
+			validity: None,
 		}
 	}
 
-	pub fn push_none(&mut self, version: Version) {
-		self.character.push(None);
-		self.state.push(None);
-		self.position.push_none(version);
-		self.direction.push(None);
-		self.percent.push(None);
-		self.shield.push(None);
-		self.last_attack_landed.push(None);
-		self.combo_count.push(None);
-		self.last_hit_by.push(None);
-		self.stocks.push(None);
+	pub fn len(&self) -> usize {
+		self.character.len()
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		let len = self.len();
+		self.validity
+			.get_or_insert_with(|| MutableBitmap::from_len_set(len))
+			.push(false);
+		self.character.push_null();
+		self.state.push_null();
+		self.position.push_null(version);
+		self.direction.push_null();
+		self.percent.push_null();
+		self.shield.push_null();
+		self.last_attack_landed.push_null();
+		self.combo_count.push_null();
+		self.last_hit_by.push_null();
+		self.stocks.push_null();
 		if version.gte(0, 2) {
-			self.state_age.as_mut().unwrap().push(None);
+			self.state_age.as_mut().unwrap().push_null();
 			if version.gte(2, 0) {
-				self.state_flags.as_mut().unwrap().push_none(version);
-				self.misc_as.as_mut().unwrap().push(None);
-				self.airborne.as_mut().unwrap().push(None);
-				self.ground.as_mut().unwrap().push(None);
-				self.jumps.as_mut().unwrap().push(None);
-				self.l_cancel.as_mut().unwrap().push(None);
+				self.state_flags.as_mut().unwrap().push_null(version);
+				self.misc_as.as_mut().unwrap().push_null();
+				self.airborne.as_mut().unwrap().push_null();
+				self.ground.as_mut().unwrap().push_null();
+				self.jumps.as_mut().unwrap().push_null();
+				self.l_cancel.as_mut().unwrap().push_null();
 				if version.gte(2, 1) {
-					self.hurtbox_state.as_mut().unwrap().push(None);
+					self.hurtbox_state.as_mut().unwrap().push_null();
 					if version.gte(3, 5) {
-						self.velocities.as_mut().unwrap().push_none(version);
+						self.velocities.as_mut().unwrap().push_null(version);
 						if version.gte(3, 8) {
-							self.hitlag.as_mut().unwrap().push(None);
+							self.hitlag.as_mut().unwrap().push_null();
 							if version.gte(3, 11) {
-								self.animation_index.as_mut().unwrap().push(None)
+								self.animation_index.as_mut().unwrap().push_null()
 							}
 						}
 					}
@@ -268,6 +543,7 @@ impl Post {
 				}
 			}
 		};
+		self.validity.as_mut().map(|v| v.push(true));
 		Ok(())
 	}
 
@@ -304,133 +580,6 @@ impl Post {
 	}
 }
 
-pub struct Start {
-	pub random_seed: Option<MutablePrimitiveArray<u32>>,
-	pub scene_frame_counter: Option<MutablePrimitiveArray<u32>>,
-}
-
-impl Start {
-	fn with_capacity(capacity: usize, version: Version) -> Self {
-		Self {
-			random_seed: version
-				.gte(2, 2)
-				.then(|| MutablePrimitiveArray::<u32>::with_capacity(capacity)),
-			scene_frame_counter: version
-				.gte(3, 10)
-				.then(|| MutablePrimitiveArray::<u32>::with_capacity(capacity)),
-		}
-	}
-
-	pub fn push_none(&mut self, version: Version) {
-		if version.gte(2, 2) {
-			self.random_seed.as_mut().unwrap().push(None);
-			if version.gte(3, 10) {
-				self.scene_frame_counter.as_mut().unwrap().push(None)
-			}
-		}
-	}
-
-	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		if version.gte(2, 2) {
-			r.read_u32::<BE>()
-				.map(|x| self.random_seed.as_mut().unwrap().push(Some(x)))?;
-			if version.gte(3, 10) {
-				r.read_u32::<BE>()
-					.map(|x| self.scene_frame_counter.as_mut().unwrap().push(Some(x)))?
-			}
-		};
-		Ok(())
-	}
-
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Start {
-		transpose::Start {
-			random_seed: self.random_seed.as_ref().map(|x| x.values()[i]),
-			scene_frame_counter: self.scene_frame_counter.as_ref().map(|x| x.values()[i]),
-		}
-	}
-}
-
-pub struct End {
-	pub latest_finalized_frame: Option<MutablePrimitiveArray<i32>>,
-}
-
-impl End {
-	fn with_capacity(capacity: usize, version: Version) -> Self {
-		Self {
-			latest_finalized_frame: version
-				.gte(3, 7)
-				.then(|| MutablePrimitiveArray::<i32>::with_capacity(capacity)),
-		}
-	}
-
-	pub fn push_none(&mut self, version: Version) {
-		if version.gte(3, 7) {
-			self.latest_finalized_frame.as_mut().unwrap().push(None)
-		}
-	}
-
-	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		if version.gte(3, 7) {
-			r.read_i32::<BE>()
-				.map(|x| self.latest_finalized_frame.as_mut().unwrap().push(Some(x)))?
-		};
-		Ok(())
-	}
-
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::End {
-		transpose::End {
-			latest_finalized_frame: self.latest_finalized_frame.as_ref().map(|x| x.values()[i]),
-		}
-	}
-}
-
-pub struct StateFlags(
-	pub MutablePrimitiveArray<u8>,
-	pub MutablePrimitiveArray<u8>,
-	pub MutablePrimitiveArray<u8>,
-	pub MutablePrimitiveArray<u8>,
-	pub MutablePrimitiveArray<u8>,
-);
-
-impl StateFlags {
-	fn with_capacity(capacity: usize, version: Version) -> Self {
-		Self(
-			MutablePrimitiveArray::<u8>::with_capacity(capacity),
-			MutablePrimitiveArray::<u8>::with_capacity(capacity),
-			MutablePrimitiveArray::<u8>::with_capacity(capacity),
-			MutablePrimitiveArray::<u8>::with_capacity(capacity),
-			MutablePrimitiveArray::<u8>::with_capacity(capacity),
-		)
-	}
-
-	pub fn push_none(&mut self, version: Version) {
-		self.0.push(None);
-		self.1.push(None);
-		self.2.push(None);
-		self.3.push(None);
-		self.4.push(None)
-	}
-
-	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.0.push(Some(x)))?;
-		r.read_u8().map(|x| self.1.push(Some(x)))?;
-		r.read_u8().map(|x| self.2.push(Some(x)))?;
-		r.read_u8().map(|x| self.3.push(Some(x)))?;
-		r.read_u8().map(|x| self.4.push(Some(x)))?;
-		Ok(())
-	}
-
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::StateFlags {
-		transpose::StateFlags(
-			self.0.values()[i],
-			self.1.values()[i],
-			self.2.values()[i],
-			self.3.values()[i],
-			self.4.values()[i],
-		)
-	}
-}
-
 pub struct Pre {
 	pub random_seed: MutablePrimitiveArray<u32>,
 	pub state: MutablePrimitiveArray<u16>,
@@ -444,6 +593,7 @@ pub struct Pre {
 	pub triggers_physical: TriggersPhysical,
 	pub raw_analog_x: Option<MutablePrimitiveArray<i8>>,
 	pub percent: Option<MutablePrimitiveArray<f32>>,
+	pub validity: Option<MutableBitmap>,
 }
 
 impl Pre {
@@ -465,24 +615,33 @@ impl Pre {
 			percent: version
 				.gte(1, 4)
 				.then(|| MutablePrimitiveArray::<f32>::with_capacity(capacity)),
+			validity: None,
 		}
 	}
 
-	pub fn push_none(&mut self, version: Version) {
-		self.random_seed.push(None);
-		self.state.push(None);
-		self.position.push_none(version);
-		self.direction.push(None);
-		self.joystick.push_none(version);
-		self.cstick.push_none(version);
-		self.triggers.push(None);
-		self.buttons.push(None);
-		self.buttons_physical.push(None);
-		self.triggers_physical.push_none(version);
+	pub fn len(&self) -> usize {
+		self.random_seed.len()
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		let len = self.len();
+		self.validity
+			.get_or_insert_with(|| MutableBitmap::from_len_set(len))
+			.push(false);
+		self.random_seed.push_null();
+		self.state.push_null();
+		self.position.push_null(version);
+		self.direction.push_null();
+		self.joystick.push_null(version);
+		self.cstick.push_null(version);
+		self.triggers.push_null();
+		self.buttons.push_null();
+		self.buttons_physical.push_null();
+		self.triggers_physical.push_null(version);
 		if version.gte(1, 2) {
-			self.raw_analog_x.as_mut().unwrap().push(None);
+			self.raw_analog_x.as_mut().unwrap().push_null();
 			if version.gte(1, 4) {
-				self.percent.as_mut().unwrap().push(None)
+				self.percent.as_mut().unwrap().push_null()
 			}
 		}
 	}
@@ -507,6 +666,7 @@ impl Pre {
 					.map(|x| self.percent.as_mut().unwrap().push(Some(x)))?
 			}
 		};
+		self.validity.as_mut().map(|v| v.push(true));
 		Ok(())
 	}
 
@@ -528,16 +688,68 @@ impl Pre {
 	}
 }
 
-pub struct ItemMisc(
+pub struct Start {
+	pub random_seed: MutablePrimitiveArray<u32>,
+	pub scene_frame_counter: Option<MutablePrimitiveArray<u32>>,
+	pub validity: Option<MutableBitmap>,
+}
+
+impl Start {
+	fn with_capacity(capacity: usize, version: Version) -> Self {
+		Self {
+			random_seed: MutablePrimitiveArray::<u32>::with_capacity(capacity),
+			scene_frame_counter: version
+				.gte(3, 10)
+				.then(|| MutablePrimitiveArray::<u32>::with_capacity(capacity)),
+			validity: None,
+		}
+	}
+
+	pub fn len(&self) -> usize {
+		self.random_seed.len()
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		let len = self.len();
+		self.validity
+			.get_or_insert_with(|| MutableBitmap::from_len_set(len))
+			.push(false);
+		self.random_seed.push_null();
+		if version.gte(3, 10) {
+			self.scene_frame_counter.as_mut().unwrap().push_null()
+		}
+	}
+
+	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u32::<BE>().map(|x| self.random_seed.push(Some(x)))?;
+		if version.gte(3, 10) {
+			r.read_u32::<BE>()
+				.map(|x| self.scene_frame_counter.as_mut().unwrap().push(Some(x)))?
+		};
+		self.validity.as_mut().map(|v| v.push(true));
+		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Start {
+		transpose::Start {
+			random_seed: self.random_seed.values()[i],
+			scene_frame_counter: self.scene_frame_counter.as_ref().map(|x| x.values()[i]),
+		}
+	}
+}
+
+pub struct StateFlags(
+	pub MutablePrimitiveArray<u8>,
 	pub MutablePrimitiveArray<u8>,
 	pub MutablePrimitiveArray<u8>,
 	pub MutablePrimitiveArray<u8>,
 	pub MutablePrimitiveArray<u8>,
 );
 
-impl ItemMisc {
+impl StateFlags {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self(
+			MutablePrimitiveArray::<u8>::with_capacity(capacity),
 			MutablePrimitiveArray::<u8>::with_capacity(capacity),
 			MutablePrimitiveArray::<u8>::with_capacity(capacity),
 			MutablePrimitiveArray::<u8>::with_capacity(capacity),
@@ -545,11 +757,16 @@ impl ItemMisc {
 		)
 	}
 
-	pub fn push_none(&mut self, version: Version) {
-		self.0.push(None);
-		self.1.push(None);
-		self.2.push(None);
-		self.3.push(None)
+	pub fn len(&self) -> usize {
+		self.0.len()
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		self.0.push_null();
+		self.1.push_null();
+		self.2.push_null();
+		self.3.push_null();
+		self.4.push_null()
 	}
 
 	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
@@ -557,47 +774,60 @@ impl ItemMisc {
 		r.read_u8().map(|x| self.1.push(Some(x)))?;
 		r.read_u8().map(|x| self.2.push(Some(x)))?;
 		r.read_u8().map(|x| self.3.push(Some(x)))?;
+		r.read_u8().map(|x| self.4.push(Some(x)))?;
 		Ok(())
 	}
 
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::ItemMisc {
-		transpose::ItemMisc(
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::StateFlags {
+		transpose::StateFlags(
 			self.0.values()[i],
 			self.1.values()[i],
 			self.2.values()[i],
 			self.3.values()[i],
+			self.4.values()[i],
 		)
 	}
 }
 
-pub struct Position {
-	pub x: MutablePrimitiveArray<f32>,
-	pub y: MutablePrimitiveArray<f32>,
+pub struct TriggersPhysical {
+	pub l: MutablePrimitiveArray<f32>,
+	pub r: MutablePrimitiveArray<f32>,
+	pub validity: Option<MutableBitmap>,
 }
 
-impl Position {
+impl TriggersPhysical {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self {
-			x: MutablePrimitiveArray::<f32>::with_capacity(capacity),
-			y: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			l: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			r: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			validity: None,
 		}
 	}
 
-	pub fn push_none(&mut self, version: Version) {
-		self.x.push(None);
-		self.y.push(None)
+	pub fn len(&self) -> usize {
+		self.l.len()
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		let len = self.len();
+		self.validity
+			.get_or_insert_with(|| MutableBitmap::from_len_set(len))
+			.push(false);
+		self.l.push_null();
+		self.r.push_null()
 	}
 
 	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>().map(|x| self.x.push(Some(x)))?;
-		r.read_f32::<BE>().map(|x| self.y.push(Some(x)))?;
+		r.read_f32::<BE>().map(|x| self.l.push(Some(x)))?;
+		r.read_f32::<BE>().map(|x| self.r.push(Some(x)))?;
+		self.validity.as_mut().map(|v| v.push(true));
 		Ok(())
 	}
 
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Position {
-		transpose::Position {
-			x: self.x.values()[i],
-			y: self.y.values()[i],
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::TriggersPhysical {
+		transpose::TriggersPhysical {
+			l: self.l.values()[i],
+			r: self.r.values()[i],
 		}
 	}
 }
@@ -608,6 +838,7 @@ pub struct Velocities {
 	pub knockback_x: MutablePrimitiveArray<f32>,
 	pub knockback_y: MutablePrimitiveArray<f32>,
 	pub self_x_ground: MutablePrimitiveArray<f32>,
+	pub validity: Option<MutableBitmap>,
 }
 
 impl Velocities {
@@ -618,15 +849,24 @@ impl Velocities {
 			knockback_x: MutablePrimitiveArray::<f32>::with_capacity(capacity),
 			knockback_y: MutablePrimitiveArray::<f32>::with_capacity(capacity),
 			self_x_ground: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			validity: None,
 		}
 	}
 
-	pub fn push_none(&mut self, version: Version) {
-		self.self_x_air.push(None);
-		self.self_y.push(None);
-		self.knockback_x.push(None);
-		self.knockback_y.push(None);
-		self.self_x_ground.push(None)
+	pub fn len(&self) -> usize {
+		self.self_x_air.len()
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		let len = self.len();
+		self.validity
+			.get_or_insert_with(|| MutableBitmap::from_len_set(len))
+			.push(false);
+		self.self_x_air.push_null();
+		self.self_y.push_null();
+		self.knockback_x.push_null();
+		self.knockback_y.push_null();
+		self.self_x_ground.push_null()
 	}
 
 	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
@@ -636,6 +876,7 @@ impl Velocities {
 		r.read_f32::<BE>().map(|x| self.knockback_y.push(Some(x)))?;
 		r.read_f32::<BE>()
 			.map(|x| self.self_x_ground.push(Some(x)))?;
+		self.validity.as_mut().map(|v| v.push(true));
 		Ok(())
 	}
 
@@ -650,41 +891,10 @@ impl Velocities {
 	}
 }
 
-pub struct TriggersPhysical {
-	pub l: MutablePrimitiveArray<f32>,
-	pub r: MutablePrimitiveArray<f32>,
-}
-
-impl TriggersPhysical {
-	fn with_capacity(capacity: usize, version: Version) -> Self {
-		Self {
-			l: MutablePrimitiveArray::<f32>::with_capacity(capacity),
-			r: MutablePrimitiveArray::<f32>::with_capacity(capacity),
-		}
-	}
-
-	pub fn push_none(&mut self, version: Version) {
-		self.l.push(None);
-		self.r.push(None)
-	}
-
-	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>().map(|x| self.l.push(Some(x)))?;
-		r.read_f32::<BE>().map(|x| self.r.push(Some(x)))?;
-		Ok(())
-	}
-
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::TriggersPhysical {
-		transpose::TriggersPhysical {
-			l: self.l.values()[i],
-			r: self.r.values()[i],
-		}
-	}
-}
-
 pub struct Velocity {
 	pub x: MutablePrimitiveArray<f32>,
 	pub y: MutablePrimitiveArray<f32>,
+	pub validity: Option<MutableBitmap>,
 }
 
 impl Velocity {
@@ -692,17 +902,27 @@ impl Velocity {
 		Self {
 			x: MutablePrimitiveArray::<f32>::with_capacity(capacity),
 			y: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			validity: None,
 		}
 	}
 
-	pub fn push_none(&mut self, version: Version) {
-		self.x.push(None);
-		self.y.push(None)
+	pub fn len(&self) -> usize {
+		self.x.len()
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		let len = self.len();
+		self.validity
+			.get_or_insert_with(|| MutableBitmap::from_len_set(len))
+			.push(false);
+		self.x.push_null();
+		self.y.push_null()
 	}
 
 	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
 		r.read_f32::<BE>().map(|x| self.x.push(Some(x)))?;
 		r.read_f32::<BE>().map(|x| self.y.push(Some(x)))?;
+		self.validity.as_mut().map(|v| v.push(true));
 		Ok(())
 	}
 
@@ -710,91 +930,6 @@ impl Velocity {
 		transpose::Velocity {
 			x: self.x.values()[i],
 			y: self.y.values()[i],
-		}
-	}
-}
-
-pub struct Item {
-	pub r#type: MutablePrimitiveArray<u16>,
-	pub state: MutablePrimitiveArray<u8>,
-	pub direction: MutablePrimitiveArray<f32>,
-	pub velocity: Velocity,
-	pub position: Position,
-	pub damage: MutablePrimitiveArray<u16>,
-	pub timer: MutablePrimitiveArray<f32>,
-	pub id: MutablePrimitiveArray<u32>,
-	pub misc: Option<ItemMisc>,
-	pub owner: Option<MutablePrimitiveArray<i8>>,
-}
-
-impl Item {
-	fn with_capacity(capacity: usize, version: Version) -> Self {
-		Self {
-			r#type: MutablePrimitiveArray::<u16>::with_capacity(capacity),
-			state: MutablePrimitiveArray::<u8>::with_capacity(capacity),
-			direction: MutablePrimitiveArray::<f32>::with_capacity(capacity),
-			velocity: Velocity::with_capacity(capacity, version),
-			position: Position::with_capacity(capacity, version),
-			damage: MutablePrimitiveArray::<u16>::with_capacity(capacity),
-			timer: MutablePrimitiveArray::<f32>::with_capacity(capacity),
-			id: MutablePrimitiveArray::<u32>::with_capacity(capacity),
-			misc: version
-				.gte(3, 2)
-				.then(|| ItemMisc::with_capacity(capacity, version)),
-			owner: version
-				.gte(3, 6)
-				.then(|| MutablePrimitiveArray::<i8>::with_capacity(capacity)),
-		}
-	}
-
-	pub fn push_none(&mut self, version: Version) {
-		self.r#type.push(None);
-		self.state.push(None);
-		self.direction.push(None);
-		self.velocity.push_none(version);
-		self.position.push_none(version);
-		self.damage.push(None);
-		self.timer.push(None);
-		self.id.push(None);
-		if version.gte(3, 2) {
-			self.misc.as_mut().unwrap().push_none(version);
-			if version.gte(3, 6) {
-				self.owner.as_mut().unwrap().push(None)
-			}
-		}
-	}
-
-	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u16::<BE>().map(|x| self.r#type.push(Some(x)))?;
-		r.read_u8().map(|x| self.state.push(Some(x)))?;
-		r.read_f32::<BE>().map(|x| self.direction.push(Some(x)))?;
-		self.velocity.read_push(r, version)?;
-		self.position.read_push(r, version)?;
-		r.read_u16::<BE>().map(|x| self.damage.push(Some(x)))?;
-		r.read_f32::<BE>().map(|x| self.timer.push(Some(x)))?;
-		r.read_u32::<BE>().map(|x| self.id.push(Some(x)))?;
-		if version.gte(3, 2) {
-			self.misc.as_mut().unwrap().read_push(r, version)?;
-			if version.gte(3, 6) {
-				r.read_i8()
-					.map(|x| self.owner.as_mut().unwrap().push(Some(x)))?
-			}
-		};
-		Ok(())
-	}
-
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Item {
-		transpose::Item {
-			r#type: self.r#type.values()[i],
-			state: self.state.values()[i],
-			direction: self.direction.values()[i],
-			velocity: self.velocity.transpose_one(i, version),
-			position: self.position.transpose_one(i, version),
-			damage: self.damage.values()[i],
-			timer: self.timer.values()[i],
-			id: self.id.values()[i],
-			misc: self.misc.as_ref().map(|x| x.transpose_one(i, version)),
-			owner: self.owner.as_ref().map(|x| x.values()[i]),
 		}
 	}
 }

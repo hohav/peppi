@@ -39,13 +39,6 @@ fn into_struct_array() {
 			serde_json::from_slice::<serde_json::Value>(&buf.into_inner().unwrap()).unwrap(),
 			json!([{
 				"id": -123,
-				"start": {
-					"random_seed": 39656,
-					"scene_frame_counter":0
-				},
-				"end": {
-					"latest_finalized_frame": -123
-				},
 				"port": {
 					"0": {
 						"leader": {
@@ -181,6 +174,13 @@ fn into_struct_array() {
 							}
 						}
 					}
+				},
+				"start": {
+					"random_seed": 39656,
+					"scene_frame_counter":0
+				},
+				"end": {
+					"latest_finalized_frame": -123
 				},
 				"item": []
 			}]),

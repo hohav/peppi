@@ -18,10 +18,10 @@ pub struct PortData {
 #[derive(PartialEq, Debug)]
 pub struct Frame {
 	pub id: i32,
-	pub start: Start,
-	pub end: End,
 	pub ports: Vec<PortData>,
-	pub items: Vec<Item>,
+	pub start: Option<Start>,
+	pub end: Option<End>,
+	pub items: Option<Vec<Item>>,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
@@ -95,7 +95,7 @@ pub struct Pre {
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 pub struct Start {
-	pub random_seed: Option<u32>,
+	pub random_seed: u32,
 	pub scene_frame_counter: Option<u32>,
 }
 

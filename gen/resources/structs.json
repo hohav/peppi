@@ -76,8 +76,7 @@
 			"version": "3.11" }
 	],
 	"Start": [
-		{ "name": "random_seed", "type": "u32",
-			"version": "2.2" },
+		{ "name": "random_seed", "type": "u32" },
 		{ "name": "scene_frame_counter", "type": "u32",
 			"version": "3.10" }
 	],

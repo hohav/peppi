@@ -9,6 +9,7 @@ use std::{
 
 use arrow2::{
 	array::{ListArray, PrimitiveArray, StructArray},
+	bitmap::Bitmap,
 	buffer::Buffer,
 	datatypes::{DataType, Field},
 	offset::OffsetsBuffer,
@@ -30,6 +31,7 @@ type BE = byteorder::BigEndian;
 pub struct Data {
 	pub pre: Pre,
 	pub post: Post,
+	pub validity: Option<Bitmap>,
 }
 
 impl Data {
@@ -45,11 +47,11 @@ impl Data {
 			self.pre.into_struct_array(version).boxed(),
 			self.post.into_struct_array(version).boxed(),
 		];
-		StructArray::new(Self::data_type(version), values, None)
+		StructArray::new(Self::data_type(version), values, self.validity)
 	}
 
 	pub fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
+		let (_, values, validity) = array.into_data();
 		Self {
 			pre: Pre::from_struct_array(
 				values[0]
@@ -67,6 +69,7 @@ impl Data {
 					.clone(),
 				version,
 			),
+			validity: validity,
 		}
 	}
 
@@ -78,14 +81,21 @@ impl Data {
 		frame_id: i32,
 		port: PortOccupancy,
 	) -> Result<()> {
-		w.write_u8(Event::FramePre as u8)?;
-		w.write_i32::<BE>(frame_id)?;
-		w.write_u8(port.port as u8)?;
-		w.write_u8(match port.follower {
-			true => 1,
-			_ => 0,
-		})?;
-		self.pre.write(w, version, idx)?;
+		if self
+			.validity
+			.as_ref()
+			.map(|v| v.get_bit(idx))
+			.unwrap_or(true)
+		{
+			w.write_u8(Event::FramePre as u8)?;
+			w.write_i32::<BE>(frame_id)?;
+			w.write_u8(port.port as u8)?;
+			w.write_u8(match port.follower {
+				true => 1,
+				_ => 0,
+			})?;
+			self.pre.write(w, version, idx)?;
+		}
 		Ok(())
 	}
 
@@ -97,14 +107,21 @@ impl Data {
 		frame_id: i32,
 		port: PortOccupancy,
 	) -> Result<()> {
-		w.write_u8(Event::FramePost as u8)?;
-		w.write_i32::<BE>(frame_id)?;
-		w.write_u8(port.port as u8)?;
-		w.write_u8(match port.follower {
-			true => 1,
-			_ => 0,
-		})?;
-		self.post.write(w, version, idx)?;
+		if self
+			.validity
+			.as_ref()
+			.map(|v| v.get_bit(idx))
+			.unwrap_or(true)
+		{
+			w.write_u8(Event::FramePost as u8)?;
+			w.write_i32::<BE>(frame_id)?;
+			w.write_u8(port.port as u8)?;
+			w.write_u8(match port.follower {
+				true => 1,
+				_ => 0,
+			})?;
+			self.post.write(w, version, idx)?;
+		}
 		Ok(())
 	}
 
@@ -121,6 +138,7 @@ impl From<mutable::Data> for Data {
 		Self {
 			pre: d.pre.into(),
 			post: d.post.into(),
+			validity: d.validity.map(|v| v.into()),
 		}
 	}
 }
@@ -158,7 +176,9 @@ impl PortData {
 	}
 
 	pub fn from_struct_array(array: StructArray, version: Version, port: Port) -> Self {
-		let (_, values, _) = array.into_data();
+		let (fields, values, _) = array.into_data();
+		assert_eq!("leader", fields[0].name);
+		fields.get(1).map(|f| assert_eq!("follower", f.name));
 		Self {
 			port: port,
 			leader: Data::from_struct_array(
@@ -285,14 +305,18 @@ impl From<mutable::PortData> for PortData {
 
 pub struct Frame {
 	pub id: PrimitiveArray<i32>,
-	pub start: Start,
-	pub end: End,
 	pub ports: Vec<PortData>,
-	pub item_offset: OffsetsBuffer<i32>,
-	pub item: Item,
+	pub start: Option<Start>,
+	pub end: Option<End>,
+	pub item_offset: Option<OffsetsBuffer<i32>>,
+	pub item: Option<Item>,
 }
 
 impl Frame {
+	pub fn len(&self) -> usize {
+		self.id.len()
+	}
+
 	pub fn port_data_type(version: Version, ports: &[PortOccupancy]) -> DataType {
 		DataType::Struct(
 			ports
@@ -344,14 +368,12 @@ impl Frame {
 				false,
 			));
 			if version.gte(3, 0) {
+				fields.push(Field::new("end", End::data_type(version).clone(), false));
 				fields.push(Field::new(
 					"item",
 					Self::item_data_type(version).clone(),
 					false,
 				));
-				if version.gte(3, 7) {
-					fields.push(Field::new("end", End::data_type(version).clone(), false));
-				}
 			}
 		}
 		DataType::Struct(fields)
@@ -368,21 +390,19 @@ impl Frame {
 		let mut arrays = vec![self.id.boxed(), port];
 
 		if version.gte(2, 2) {
-			arrays.push(self.start.into_struct_array(version).boxed());
+			arrays.push(self.start.unwrap().into_struct_array(version).boxed());
 			if version.gte(3, 0) {
-				let item_values = self.item.into_struct_array(version).boxed();
+				arrays.push(self.end.unwrap().into_struct_array(version).boxed());
+				let item_values = self.item.unwrap().into_struct_array(version).boxed();
 				arrays.push(
 					ListArray::new(
 						Self::item_data_type(version),
-						self.item_offset,
+						self.item_offset.unwrap(),
 						item_values,
 						None,
 					)
 					.boxed(),
 				);
-				if version.gte(3, 7) {
-					arrays.push(self.end.into_struct_array(version).boxed());
-				}
 			}
 		}
 
@@ -390,14 +410,34 @@ impl Frame {
 	}
 
 	pub fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
-		let item_arrays = values[4]
-			.as_any()
-			.downcast_ref::<ListArray<i32>>()
-			.unwrap()
-			.clone();
-		let item = item_arrays.values();
-		let item_offset = item_arrays.offsets();
+		let (fields, values, _) = array.into_data();
+		assert_eq!("id", fields[0].name);
+		assert_eq!("port", fields[1].name);
+		if version.gte(2, 2) {
+			assert_eq!("start", fields[2].name);
+			if version.gte(3, 0) {
+				assert_eq!("end", fields[3].name);
+				assert_eq!("item", fields[4].name);
+			}
+		}
+
+		let (item, item_offset) = values
+			.get(4)
+			.map(|v| {
+				let arrays = v.as_any().downcast_ref::<ListArray<i32>>().unwrap().clone();
+				let item_offset = arrays.offsets().clone();
+				let item = Item::from_struct_array(
+					arrays
+						.values()
+						.as_any()
+						.downcast_ref::<StructArray>()
+						.unwrap()
+						.clone(),
+					version,
+				);
+				(Some(item), Some(item_offset))
+			})
+			.unwrap_or((None, None));
 
 		Self {
 			id: values[0]
@@ -405,7 +445,7 @@ impl Frame {
 				.downcast_ref::<PrimitiveArray<i32>>()
 				.unwrap()
 				.clone(),
-			start: Start::from_struct_array(
+			ports: Self::port_data_from_struct_array(
 				values[1]
 					.as_any()
 					.downcast_ref::<StructArray>()
@@ -413,27 +453,20 @@ impl Frame {
 					.clone(),
 				version,
 			),
-			end: End::from_struct_array(
-				values[2]
-					.as_any()
-					.downcast_ref::<StructArray>()
-					.unwrap()
-					.clone(),
-				version,
-			),
-			ports: Self::port_data_from_struct_array(
-				values[3]
-					.as_any()
-					.downcast_ref::<StructArray>()
-					.unwrap()
-					.clone(),
-				version,
-			),
-			item_offset: item_offset.clone(),
-			item: Item::from_struct_array(
-				item.as_any().downcast_ref::<StructArray>().unwrap().clone(),
-				version,
-			),
+			start: values.get(2).map(|v| {
+				Start::from_struct_array(
+					v.as_any().downcast_ref::<StructArray>().unwrap().clone(),
+					version,
+				)
+			}),
+			end: values.get(3).map(|v| {
+				End::from_struct_array(
+					v.as_any().downcast_ref::<StructArray>().unwrap().clone(),
+					version,
+				)
+			}),
+			item_offset: item_offset,
+			item: item,
 		}
 	}
 
@@ -442,16 +475,17 @@ impl Frame {
 			if version.gte(2, 2) {
 				w.write_u8(Event::FrameStart as u8)?;
 				w.write_i32::<BE>(frame_id)?;
-				self.start.write(w, version, idx)?;
+				self.start.as_ref().unwrap().write(w, version, idx)?;
 			}
 			for port in &self.ports {
 				port.write_pre(w, version, idx, frame_id)?;
 			}
 			if version.gte(3, 0) {
-				for item_idx in self.item_offset[idx] as usize..self.item_offset[idx + 1] as usize {
+				let offset = self.item_offset.as_ref().unwrap();
+				for item_idx in (offset[idx] as usize)..(offset[idx + 1] as usize) {
 					w.write_u8(Event::Item as u8)?;
 					w.write_i32::<BE>(frame_id)?;
-					self.item.write(w, version, item_idx)?;
+					self.item.as_ref().unwrap().write(w, version, item_idx)?;
 				}
 			}
 			for port in &self.ports {
@@ -460,7 +494,7 @@ impl Frame {
 			if version.gte(3, 0) {
 				w.write_u8(Event::FrameEnd as u8)?;
 				w.write_i32::<BE>(frame_id)?;
-				self.end.write(w, version, idx)?;
+				self.end.as_ref().unwrap().write(w, version, idx)?;
 			}
 		}
 		Ok(())
@@ -469,21 +503,23 @@ impl Frame {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Frame {
 		transpose::Frame {
 			id: self.id.values()[i],
-			start: self.start.transpose_one(i, version),
-			end: self.end.transpose_one(i, version),
 			ports: self
 				.ports
 				.iter()
 				.map(|p| p.transpose_one(i, version))
 				.collect(),
-			items: if version.gte(3, 0) {
-				let (start, end) = self.item_offset.start_end(i);
+			start: version
+				.gte(2, 2)
+				.then(|| self.start.as_ref().unwrap().transpose_one(i, version)),
+			end: version
+				.gte(3, 0)
+				.then(|| self.end.as_ref().unwrap().transpose_one(i, version)),
+			items: version.gte(3, 0).then(|| {
+				let (start, end) = self.item_offset.as_ref().unwrap().start_end(i);
 				(start..end)
-					.map(|i| self.item.transpose_one(i, version))
+					.map(|i| self.item.as_ref().unwrap().transpose_one(i, version))
 					.collect()
-			} else {
-				vec![]
-			},
+			}),
 		}
 	}
 
@@ -516,11 +552,13 @@ impl From<mutable::Frame> for Frame {
 	fn from(f: mutable::Frame) -> Self {
 		Self {
 			id: f.id.into(),
-			start: f.start.into(),
-			end: f.end.into(),
 			ports: f.ports.into_iter().map(|p| p.into()).collect(),
-			item_offset: OffsetsBuffer::try_from(Buffer::from(f.item_offset.into_inner())).unwrap(),
-			item: f.item.into(),
+			start: f.start.map(|x| x.into()),
+			end: f.end.map(|x| x.into()),
+			item_offset: f
+				.item_offset
+				.map(|x| OffsetsBuffer::try_from(Buffer::from(x.into_inner())).unwrap()),
+			item: f.item.map(|x| x.into()),
 		}
 	}
 }
@@ -528,6 +566,384 @@ impl From<mutable::Frame> for Frame {
 impl fmt::Debug for Frame {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
 		write!(f, "Frame {{ len: {} }}", self.id.len())
+	}
+}
+
+#[derive(Debug)]
+pub struct End {
+	pub latest_finalized_frame: Option<PrimitiveArray<i32>>,
+	pub validity: Option<Bitmap>,
+}
+
+impl End {
+	fn data_type(version: Version) -> DataType {
+		let mut fields = vec![];
+		{
+			if version.gte(3, 7) {
+				fields.push(Field::new("latest_finalized_frame", DataType::Int32, false))
+			}
+		};
+		DataType::Struct(fields)
+	}
+
+	fn into_struct_array(self, version: Version) -> StructArray {
+		let mut values = vec![];
+		if version.gte(3, 7) {
+			values.push(self.latest_finalized_frame.unwrap().boxed())
+		};
+		StructArray::new(Self::data_type(version), values, self.validity)
+	}
+
+	fn from_struct_array(array: StructArray, version: Version) -> Self {
+		let (_, values, validity) = array.into_data();
+		Self {
+			latest_finalized_frame: values.get(0).map(|x| {
+				x.as_any()
+					.downcast_ref::<PrimitiveArray<i32>>()
+					.unwrap()
+					.clone()
+			}),
+			validity: validity,
+		}
+	}
+
+	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
+		if version.gte(3, 7) {
+			w.write_i32::<BE>(self.latest_finalized_frame.as_ref().unwrap().value(i))?
+		};
+		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::End {
+		transpose::End {
+			latest_finalized_frame: self.latest_finalized_frame.as_ref().map(|x| x.values()[i]),
+		}
+	}
+}
+
+impl From<mutable::End> for End {
+	fn from(x: mutable::End) -> Self {
+		Self {
+			latest_finalized_frame: x.latest_finalized_frame.map(|x| x.into()),
+			validity: x.validity.map(|v| v.into()),
+		}
+	}
+}
+
+#[derive(Debug)]
+pub struct Item {
+	pub r#type: PrimitiveArray<u16>,
+	pub state: PrimitiveArray<u8>,
+	pub direction: PrimitiveArray<f32>,
+	pub velocity: Velocity,
+	pub position: Position,
+	pub damage: PrimitiveArray<u16>,
+	pub timer: PrimitiveArray<f32>,
+	pub id: PrimitiveArray<u32>,
+	pub misc: Option<ItemMisc>,
+	pub owner: Option<PrimitiveArray<i8>>,
+	pub validity: Option<Bitmap>,
+}
+
+impl Item {
+	fn data_type(version: Version) -> DataType {
+		let mut fields = vec![];
+		{
+			fields.push(Field::new("type", DataType::UInt16, false));
+			fields.push(Field::new("state", DataType::UInt8, false));
+			fields.push(Field::new("direction", DataType::Float32, false));
+			fields.push(Field::new("velocity", Velocity::data_type(version), false));
+			fields.push(Field::new("position", Position::data_type(version), false));
+			fields.push(Field::new("damage", DataType::UInt16, false));
+			fields.push(Field::new("timer", DataType::Float32, false));
+			fields.push(Field::new("id", DataType::UInt32, false));
+			if version.gte(3, 2) {
+				fields.push(Field::new("misc", ItemMisc::data_type(version), false));
+				if version.gte(3, 6) {
+					fields.push(Field::new("owner", DataType::Int8, false))
+				}
+			}
+		};
+		DataType::Struct(fields)
+	}
+
+	fn into_struct_array(self, version: Version) -> StructArray {
+		let mut values = vec![];
+		values.push(self.r#type.boxed());
+		values.push(self.state.boxed());
+		values.push(self.direction.boxed());
+		values.push(self.velocity.into_struct_array(version).boxed());
+		values.push(self.position.into_struct_array(version).boxed());
+		values.push(self.damage.boxed());
+		values.push(self.timer.boxed());
+		values.push(self.id.boxed());
+		if version.gte(3, 2) {
+			values.push(self.misc.unwrap().into_struct_array(version).boxed());
+			if version.gte(3, 6) {
+				values.push(self.owner.unwrap().boxed())
+			}
+		};
+		StructArray::new(Self::data_type(version), values, self.validity)
+	}
+
+	fn from_struct_array(array: StructArray, version: Version) -> Self {
+		let (_, values, validity) = array.into_data();
+		Self {
+			r#type: values[0]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u16>>()
+				.unwrap()
+				.clone(),
+			state: values[1]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u8>>()
+				.unwrap()
+				.clone(),
+			direction: values[2]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<f32>>()
+				.unwrap()
+				.clone(),
+			velocity: Velocity::from_struct_array(
+				values[3]
+					.as_any()
+					.downcast_ref::<StructArray>()
+					.unwrap()
+					.clone(),
+				version,
+			),
+			position: Position::from_struct_array(
+				values[4]
+					.as_any()
+					.downcast_ref::<StructArray>()
+					.unwrap()
+					.clone(),
+				version,
+			),
+			damage: values[5]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u16>>()
+				.unwrap()
+				.clone(),
+			timer: values[6]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<f32>>()
+				.unwrap()
+				.clone(),
+			id: values[7]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u32>>()
+				.unwrap()
+				.clone(),
+			misc: values.get(8).map(|x| {
+				ItemMisc::from_struct_array(
+					x.as_any().downcast_ref::<StructArray>().unwrap().clone(),
+					version,
+				)
+			}),
+			owner: values.get(9).map(|x| {
+				x.as_any()
+					.downcast_ref::<PrimitiveArray<i8>>()
+					.unwrap()
+					.clone()
+			}),
+			validity: validity,
+		}
+	}
+
+	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
+		w.write_u16::<BE>(self.r#type.value(i))?;
+		w.write_u8(self.state.value(i))?;
+		w.write_f32::<BE>(self.direction.value(i))?;
+		self.velocity.write(w, version, i)?;
+		self.position.write(w, version, i)?;
+		w.write_u16::<BE>(self.damage.value(i))?;
+		w.write_f32::<BE>(self.timer.value(i))?;
+		w.write_u32::<BE>(self.id.value(i))?;
+		if version.gte(3, 2) {
+			self.misc.as_ref().unwrap().write(w, version, i)?;
+			if version.gte(3, 6) {
+				w.write_i8(self.owner.as_ref().unwrap().value(i))?
+			}
+		};
+		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Item {
+		transpose::Item {
+			r#type: self.r#type.values()[i],
+			state: self.state.values()[i],
+			direction: self.direction.values()[i],
+			velocity: self.velocity.transpose_one(i, version),
+			position: self.position.transpose_one(i, version),
+			damage: self.damage.values()[i],
+			timer: self.timer.values()[i],
+			id: self.id.values()[i],
+			misc: self.misc.as_ref().map(|x| x.transpose_one(i, version)),
+			owner: self.owner.as_ref().map(|x| x.values()[i]),
+		}
+	}
+}
+
+impl From<mutable::Item> for Item {
+	fn from(x: mutable::Item) -> Self {
+		Self {
+			r#type: x.r#type.into(),
+			state: x.state.into(),
+			direction: x.direction.into(),
+			velocity: x.velocity.into(),
+			position: x.position.into(),
+			damage: x.damage.into(),
+			timer: x.timer.into(),
+			id: x.id.into(),
+			misc: x.misc.map(|x| x.into()),
+			owner: x.owner.map(|x| x.into()),
+			validity: x.validity.map(|v| v.into()),
+		}
+	}
+}
+
+#[derive(Debug)]
+pub struct ItemMisc(
+	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
+);
+
+impl ItemMisc {
+	fn data_type(version: Version) -> DataType {
+		let mut fields = vec![];
+		{
+			fields.push(Field::new("0", DataType::UInt8, false));
+			fields.push(Field::new("1", DataType::UInt8, false));
+			fields.push(Field::new("2", DataType::UInt8, false));
+			fields.push(Field::new("3", DataType::UInt8, false))
+		};
+		DataType::Struct(fields)
+	}
+
+	fn into_struct_array(self, version: Version) -> StructArray {
+		let mut values = vec![];
+		values.push(self.0.boxed());
+		values.push(self.1.boxed());
+		values.push(self.2.boxed());
+		values.push(self.3.boxed());
+		StructArray::new(Self::data_type(version), values, None)
+	}
+
+	fn from_struct_array(array: StructArray, version: Version) -> Self {
+		let (_, values, validity) = array.into_data();
+		Self(
+			values[0]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u8>>()
+				.unwrap()
+				.clone(),
+			values[1]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u8>>()
+				.unwrap()
+				.clone(),
+			values[2]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u8>>()
+				.unwrap()
+				.clone(),
+			values[3]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u8>>()
+				.unwrap()
+				.clone(),
+		)
+	}
+
+	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
+		w.write_u8(self.0.value(i))?;
+		w.write_u8(self.1.value(i))?;
+		w.write_u8(self.2.value(i))?;
+		w.write_u8(self.3.value(i))?;
+		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::ItemMisc {
+		transpose::ItemMisc(
+			self.0.values()[i],
+			self.1.values()[i],
+			self.2.values()[i],
+			self.3.values()[i],
+		)
+	}
+}
+
+impl From<mutable::ItemMisc> for ItemMisc {
+	fn from(x: mutable::ItemMisc) -> Self {
+		Self(x.0.into(), x.1.into(), x.2.into(), x.3.into())
+	}
+}
+
+#[derive(Debug)]
+pub struct Position {
+	pub x: PrimitiveArray<f32>,
+	pub y: PrimitiveArray<f32>,
+	pub validity: Option<Bitmap>,
+}
+
+impl Position {
+	fn data_type(version: Version) -> DataType {
+		let mut fields = vec![];
+		{
+			fields.push(Field::new("x", DataType::Float32, false));
+			fields.push(Field::new("y", DataType::Float32, false))
+		};
+		DataType::Struct(fields)
+	}
+
+	fn into_struct_array(self, version: Version) -> StructArray {
+		let mut values = vec![];
+		values.push(self.x.boxed());
+		values.push(self.y.boxed());
+		StructArray::new(Self::data_type(version), values, self.validity)
+	}
+
+	fn from_struct_array(array: StructArray, version: Version) -> Self {
+		let (_, values, validity) = array.into_data();
+		Self {
+			x: values[0]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<f32>>()
+				.unwrap()
+				.clone(),
+			y: values[1]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<f32>>()
+				.unwrap()
+				.clone(),
+			validity: validity,
+		}
+	}
+
+	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
+		w.write_f32::<BE>(self.x.value(i))?;
+		w.write_f32::<BE>(self.y.value(i))?;
+		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Position {
+		transpose::Position {
+			x: self.x.values()[i],
+			y: self.y.values()[i],
+		}
+	}
+}
+
+impl From<mutable::Position> for Position {
+	fn from(x: mutable::Position) -> Self {
+		Self {
+			x: x.x.into(),
+			y: x.y.into(),
+			validity: x.validity.map(|v| v.into()),
+		}
 	}
 }
 
@@ -554,6 +970,7 @@ pub struct Post {
 	pub velocities: Option<Velocities>,
 	pub hitlag: Option<PrimitiveArray<f32>>,
 	pub animation_index: Option<PrimitiveArray<u32>>,
+	pub validity: Option<Bitmap>,
 }
 
 impl Post {
@@ -611,47 +1028,44 @@ impl Post {
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		{
-			values.push(self.character.boxed());
-			values.push(self.state.boxed());
-			values.push(self.position.into_struct_array(version).boxed());
-			values.push(self.direction.boxed());
-			values.push(self.percent.boxed());
-			values.push(self.shield.boxed());
-			values.push(self.last_attack_landed.boxed());
-			values.push(self.combo_count.boxed());
-			values.push(self.last_hit_by.boxed());
-			values.push(self.stocks.boxed());
-			if version.gte(0, 2) {
-				values.push(self.state_age.unwrap().boxed());
-				if version.gte(2, 0) {
-					values.push(self.state_flags.unwrap().into_struct_array(version).boxed());
-					values.push(self.misc_as.unwrap().boxed());
-					values.push(self.airborne.unwrap().boxed());
-					values.push(self.ground.unwrap().boxed());
-					values.push(self.jumps.unwrap().boxed());
-					values.push(self.l_cancel.unwrap().boxed());
-					if version.gte(2, 1) {
-						values.push(self.hurtbox_state.unwrap().boxed());
-						if version.gte(3, 5) {
-							values
-								.push(self.velocities.unwrap().into_struct_array(version).boxed());
-							if version.gte(3, 8) {
-								values.push(self.hitlag.unwrap().boxed());
-								if version.gte(3, 11) {
-									values.push(self.animation_index.unwrap().boxed())
-								}
+		values.push(self.character.boxed());
+		values.push(self.state.boxed());
+		values.push(self.position.into_struct_array(version).boxed());
+		values.push(self.direction.boxed());
+		values.push(self.percent.boxed());
+		values.push(self.shield.boxed());
+		values.push(self.last_attack_landed.boxed());
+		values.push(self.combo_count.boxed());
+		values.push(self.last_hit_by.boxed());
+		values.push(self.stocks.boxed());
+		if version.gte(0, 2) {
+			values.push(self.state_age.unwrap().boxed());
+			if version.gte(2, 0) {
+				values.push(self.state_flags.unwrap().into_struct_array(version).boxed());
+				values.push(self.misc_as.unwrap().boxed());
+				values.push(self.airborne.unwrap().boxed());
+				values.push(self.ground.unwrap().boxed());
+				values.push(self.jumps.unwrap().boxed());
+				values.push(self.l_cancel.unwrap().boxed());
+				if version.gte(2, 1) {
+					values.push(self.hurtbox_state.unwrap().boxed());
+					if version.gte(3, 5) {
+						values.push(self.velocities.unwrap().into_struct_array(version).boxed());
+						if version.gte(3, 8) {
+							values.push(self.hitlag.unwrap().boxed());
+							if version.gte(3, 11) {
+								values.push(self.animation_index.unwrap().boxed())
 							}
 						}
 					}
 				}
 			}
 		};
-		StructArray::new(Self::data_type(version), values, None)
+		StructArray::new(Self::data_type(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
+		let (_, values, validity) = array.into_data();
 		Self {
 			character: values[0]
 				.as_any()
@@ -772,6 +1186,7 @@ impl Post {
 					.unwrap()
 					.clone()
 			}),
+			validity: validity,
 		}
 	}
 
@@ -869,236 +1284,8 @@ impl From<mutable::Post> for Post {
 			velocities: x.velocities.map(|x| x.into()),
 			hitlag: x.hitlag.map(|x| x.into()),
 			animation_index: x.animation_index.map(|x| x.into()),
+			validity: x.validity.map(|v| v.into()),
 		}
-	}
-}
-
-#[derive(Debug)]
-pub struct Start {
-	pub random_seed: Option<PrimitiveArray<u32>>,
-	pub scene_frame_counter: Option<PrimitiveArray<u32>>,
-}
-
-impl Start {
-	fn data_type(version: Version) -> DataType {
-		let mut fields = vec![];
-		{
-			if version.gte(2, 2) {
-				fields.push(Field::new("random_seed", DataType::UInt32, false));
-				if version.gte(3, 10) {
-					fields.push(Field::new("scene_frame_counter", DataType::UInt32, false))
-				}
-			}
-		};
-		DataType::Struct(fields)
-	}
-
-	fn into_struct_array(self, version: Version) -> StructArray {
-		let mut values = vec![];
-		{
-			if version.gte(2, 2) {
-				values.push(self.random_seed.unwrap().boxed());
-				if version.gte(3, 10) {
-					values.push(self.scene_frame_counter.unwrap().boxed())
-				}
-			}
-		};
-		StructArray::new(Self::data_type(version), values, None)
-	}
-
-	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
-		Self {
-			random_seed: values.get(0).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<u32>>()
-					.unwrap()
-					.clone()
-			}),
-			scene_frame_counter: values.get(1).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<u32>>()
-					.unwrap()
-					.clone()
-			}),
-		}
-	}
-
-	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		if version.gte(2, 2) {
-			w.write_u32::<BE>(self.random_seed.as_ref().unwrap().value(i))?;
-			if version.gte(3, 10) {
-				w.write_u32::<BE>(self.scene_frame_counter.as_ref().unwrap().value(i))?
-			}
-		};
-		Ok(())
-	}
-
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Start {
-		transpose::Start {
-			random_seed: self.random_seed.as_ref().map(|x| x.values()[i]),
-			scene_frame_counter: self.scene_frame_counter.as_ref().map(|x| x.values()[i]),
-		}
-	}
-}
-
-impl From<mutable::Start> for Start {
-	fn from(x: mutable::Start) -> Self {
-		Self {
-			random_seed: x.random_seed.map(|x| x.into()),
-			scene_frame_counter: x.scene_frame_counter.map(|x| x.into()),
-		}
-	}
-}
-
-#[derive(Debug)]
-pub struct End {
-	pub latest_finalized_frame: Option<PrimitiveArray<i32>>,
-}
-
-impl End {
-	fn data_type(version: Version) -> DataType {
-		let mut fields = vec![];
-		{
-			if version.gte(3, 7) {
-				fields.push(Field::new("latest_finalized_frame", DataType::Int32, false))
-			}
-		};
-		DataType::Struct(fields)
-	}
-
-	fn into_struct_array(self, version: Version) -> StructArray {
-		let mut values = vec![];
-		{
-			if version.gte(3, 7) {
-				values.push(self.latest_finalized_frame.unwrap().boxed())
-			}
-		};
-		StructArray::new(Self::data_type(version), values, None)
-	}
-
-	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
-		Self {
-			latest_finalized_frame: values.get(0).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<i32>>()
-					.unwrap()
-					.clone()
-			}),
-		}
-	}
-
-	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		if version.gte(3, 7) {
-			w.write_i32::<BE>(self.latest_finalized_frame.as_ref().unwrap().value(i))?
-		};
-		Ok(())
-	}
-
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::End {
-		transpose::End {
-			latest_finalized_frame: self.latest_finalized_frame.as_ref().map(|x| x.values()[i]),
-		}
-	}
-}
-
-impl From<mutable::End> for End {
-	fn from(x: mutable::End) -> Self {
-		Self {
-			latest_finalized_frame: x.latest_finalized_frame.map(|x| x.into()),
-		}
-	}
-}
-
-#[derive(Debug)]
-pub struct StateFlags(
-	pub PrimitiveArray<u8>,
-	pub PrimitiveArray<u8>,
-	pub PrimitiveArray<u8>,
-	pub PrimitiveArray<u8>,
-	pub PrimitiveArray<u8>,
-);
-
-impl StateFlags {
-	fn data_type(version: Version) -> DataType {
-		let mut fields = vec![];
-		{
-			fields.push(Field::new("0", DataType::UInt8, false));
-			fields.push(Field::new("1", DataType::UInt8, false));
-			fields.push(Field::new("2", DataType::UInt8, false));
-			fields.push(Field::new("3", DataType::UInt8, false));
-			fields.push(Field::new("4", DataType::UInt8, false))
-		};
-		DataType::Struct(fields)
-	}
-
-	fn into_struct_array(self, version: Version) -> StructArray {
-		let mut values = vec![];
-		{
-			values.push(self.0.boxed());
-			values.push(self.1.boxed());
-			values.push(self.2.boxed());
-			values.push(self.3.boxed());
-			values.push(self.4.boxed())
-		};
-		StructArray::new(Self::data_type(version), values, None)
-	}
-
-	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
-		Self(
-			values[0]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
-				.unwrap()
-				.clone(),
-			values[1]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
-				.unwrap()
-				.clone(),
-			values[2]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
-				.unwrap()
-				.clone(),
-			values[3]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
-				.unwrap()
-				.clone(),
-			values[4]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
-				.unwrap()
-				.clone(),
-		)
-	}
-
-	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_u8(self.0.value(i))?;
-		w.write_u8(self.1.value(i))?;
-		w.write_u8(self.2.value(i))?;
-		w.write_u8(self.3.value(i))?;
-		w.write_u8(self.4.value(i))?;
-		Ok(())
-	}
-
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::StateFlags {
-		transpose::StateFlags(
-			self.0.values()[i],
-			self.1.values()[i],
-			self.2.values()[i],
-			self.3.values()[i],
-			self.4.values()[i],
-		)
-	}
-}
-
-impl From<mutable::StateFlags> for StateFlags {
-	fn from(x: mutable::StateFlags) -> Self {
-		Self(x.0.into(), x.1.into(), x.2.into(), x.3.into(), x.4.into())
 	}
 }
 
@@ -1116,6 +1303,7 @@ pub struct Pre {
 	pub triggers_physical: TriggersPhysical,
 	pub raw_analog_x: Option<PrimitiveArray<i8>>,
 	pub percent: Option<PrimitiveArray<f32>>,
+	pub validity: Option<Bitmap>,
 }
 
 impl Pre {
@@ -1148,29 +1336,27 @@ impl Pre {
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		{
-			values.push(self.random_seed.boxed());
-			values.push(self.state.boxed());
-			values.push(self.position.into_struct_array(version).boxed());
-			values.push(self.direction.boxed());
-			values.push(self.joystick.into_struct_array(version).boxed());
-			values.push(self.cstick.into_struct_array(version).boxed());
-			values.push(self.triggers.boxed());
-			values.push(self.buttons.boxed());
-			values.push(self.buttons_physical.boxed());
-			values.push(self.triggers_physical.into_struct_array(version).boxed());
-			if version.gte(1, 2) {
-				values.push(self.raw_analog_x.unwrap().boxed());
-				if version.gte(1, 4) {
-					values.push(self.percent.unwrap().boxed())
-				}
+		values.push(self.random_seed.boxed());
+		values.push(self.state.boxed());
+		values.push(self.position.into_struct_array(version).boxed());
+		values.push(self.direction.boxed());
+		values.push(self.joystick.into_struct_array(version).boxed());
+		values.push(self.cstick.into_struct_array(version).boxed());
+		values.push(self.triggers.boxed());
+		values.push(self.buttons.boxed());
+		values.push(self.buttons_physical.boxed());
+		values.push(self.triggers_physical.into_struct_array(version).boxed());
+		if version.gte(1, 2) {
+			values.push(self.raw_analog_x.unwrap().boxed());
+			if version.gte(1, 4) {
+				values.push(self.percent.unwrap().boxed())
 			}
 		};
-		StructArray::new(Self::data_type(version), values, None)
+		StructArray::new(Self::data_type(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
+		let (_, values, validity) = array.into_data();
 		Self {
 			random_seed: values[0]
 				.as_any()
@@ -1246,6 +1432,7 @@ impl Pre {
 					.unwrap()
 					.clone()
 			}),
+			validity: validity,
 		}
 	}
 
@@ -1302,43 +1489,117 @@ impl From<mutable::Pre> for Pre {
 			triggers_physical: x.triggers_physical.into(),
 			raw_analog_x: x.raw_analog_x.map(|x| x.into()),
 			percent: x.percent.map(|x| x.into()),
+			validity: x.validity.map(|v| v.into()),
 		}
 	}
 }
 
 #[derive(Debug)]
-pub struct ItemMisc(
-	pub PrimitiveArray<u8>,
-	pub PrimitiveArray<u8>,
-	pub PrimitiveArray<u8>,
-	pub PrimitiveArray<u8>,
-);
+pub struct Start {
+	pub random_seed: PrimitiveArray<u32>,
+	pub scene_frame_counter: Option<PrimitiveArray<u32>>,
+	pub validity: Option<Bitmap>,
+}
 
-impl ItemMisc {
+impl Start {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
-			fields.push(Field::new("0", DataType::UInt8, false));
-			fields.push(Field::new("1", DataType::UInt8, false));
-			fields.push(Field::new("2", DataType::UInt8, false));
-			fields.push(Field::new("3", DataType::UInt8, false))
+			fields.push(Field::new("random_seed", DataType::UInt32, false));
+			if version.gte(3, 10) {
+				fields.push(Field::new("scene_frame_counter", DataType::UInt32, false))
+			}
 		};
 		DataType::Struct(fields)
 	}
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		{
-			values.push(self.0.boxed());
-			values.push(self.1.boxed());
-			values.push(self.2.boxed());
-			values.push(self.3.boxed())
+		values.push(self.random_seed.boxed());
+		if version.gte(3, 10) {
+			values.push(self.scene_frame_counter.unwrap().boxed())
 		};
+		StructArray::new(Self::data_type(version), values, self.validity)
+	}
+
+	fn from_struct_array(array: StructArray, version: Version) -> Self {
+		let (_, values, validity) = array.into_data();
+		Self {
+			random_seed: values[0]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u32>>()
+				.unwrap()
+				.clone(),
+			scene_frame_counter: values.get(1).map(|x| {
+				x.as_any()
+					.downcast_ref::<PrimitiveArray<u32>>()
+					.unwrap()
+					.clone()
+			}),
+			validity: validity,
+		}
+	}
+
+	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
+		w.write_u32::<BE>(self.random_seed.value(i))?;
+		if version.gte(3, 10) {
+			w.write_u32::<BE>(self.scene_frame_counter.as_ref().unwrap().value(i))?
+		};
+		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Start {
+		transpose::Start {
+			random_seed: self.random_seed.values()[i],
+			scene_frame_counter: self.scene_frame_counter.as_ref().map(|x| x.values()[i]),
+		}
+	}
+}
+
+impl From<mutable::Start> for Start {
+	fn from(x: mutable::Start) -> Self {
+		Self {
+			random_seed: x.random_seed.into(),
+			scene_frame_counter: x.scene_frame_counter.map(|x| x.into()),
+			validity: x.validity.map(|v| v.into()),
+		}
+	}
+}
+
+#[derive(Debug)]
+pub struct StateFlags(
+	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<u8>,
+);
+
+impl StateFlags {
+	fn data_type(version: Version) -> DataType {
+		let mut fields = vec![];
+		{
+			fields.push(Field::new("0", DataType::UInt8, false));
+			fields.push(Field::new("1", DataType::UInt8, false));
+			fields.push(Field::new("2", DataType::UInt8, false));
+			fields.push(Field::new("3", DataType::UInt8, false));
+			fields.push(Field::new("4", DataType::UInt8, false))
+		};
+		DataType::Struct(fields)
+	}
+
+	fn into_struct_array(self, version: Version) -> StructArray {
+		let mut values = vec![];
+		values.push(self.0.boxed());
+		values.push(self.1.boxed());
+		values.push(self.2.boxed());
+		values.push(self.3.boxed());
+		values.push(self.4.boxed());
 		StructArray::new(Self::data_type(version), values, None)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
+		let (_, values, validity) = array.into_data();
 		Self(
 			values[0]
 				.as_any()
@@ -1360,6 +1621,11 @@ impl ItemMisc {
 				.downcast_ref::<PrimitiveArray<u8>>()
 				.unwrap()
 				.clone(),
+			values[4]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u8>>()
+				.unwrap()
+				.clone(),
 		)
 	}
 
@@ -1368,85 +1634,88 @@ impl ItemMisc {
 		w.write_u8(self.1.value(i))?;
 		w.write_u8(self.2.value(i))?;
 		w.write_u8(self.3.value(i))?;
+		w.write_u8(self.4.value(i))?;
 		Ok(())
 	}
 
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::ItemMisc {
-		transpose::ItemMisc(
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::StateFlags {
+		transpose::StateFlags(
 			self.0.values()[i],
 			self.1.values()[i],
 			self.2.values()[i],
 			self.3.values()[i],
+			self.4.values()[i],
 		)
 	}
 }
 
-impl From<mutable::ItemMisc> for ItemMisc {
-	fn from(x: mutable::ItemMisc) -> Self {
-		Self(x.0.into(), x.1.into(), x.2.into(), x.3.into())
+impl From<mutable::StateFlags> for StateFlags {
+	fn from(x: mutable::StateFlags) -> Self {
+		Self(x.0.into(), x.1.into(), x.2.into(), x.3.into(), x.4.into())
 	}
 }
 
 #[derive(Debug)]
-pub struct Position {
-	pub x: PrimitiveArray<f32>,
-	pub y: PrimitiveArray<f32>,
+pub struct TriggersPhysical {
+	pub l: PrimitiveArray<f32>,
+	pub r: PrimitiveArray<f32>,
+	pub validity: Option<Bitmap>,
 }
 
-impl Position {
+impl TriggersPhysical {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
-			fields.push(Field::new("x", DataType::Float32, false));
-			fields.push(Field::new("y", DataType::Float32, false))
+			fields.push(Field::new("l", DataType::Float32, false));
+			fields.push(Field::new("r", DataType::Float32, false))
 		};
 		DataType::Struct(fields)
 	}
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		{
-			values.push(self.x.boxed());
-			values.push(self.y.boxed())
-		};
-		StructArray::new(Self::data_type(version), values, None)
+		values.push(self.l.boxed());
+		values.push(self.r.boxed());
+		StructArray::new(Self::data_type(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
+		let (_, values, validity) = array.into_data();
 		Self {
-			x: values[0]
+			l: values[0]
 				.as_any()
 				.downcast_ref::<PrimitiveArray<f32>>()
 				.unwrap()
 				.clone(),
-			y: values[1]
+			r: values[1]
 				.as_any()
 				.downcast_ref::<PrimitiveArray<f32>>()
 				.unwrap()
 				.clone(),
+			validity: validity,
 		}
 	}
 
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_f32::<BE>(self.x.value(i))?;
-		w.write_f32::<BE>(self.y.value(i))?;
+		w.write_f32::<BE>(self.l.value(i))?;
+		w.write_f32::<BE>(self.r.value(i))?;
 		Ok(())
 	}
 
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Position {
-		transpose::Position {
-			x: self.x.values()[i],
-			y: self.y.values()[i],
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::TriggersPhysical {
+		transpose::TriggersPhysical {
+			l: self.l.values()[i],
+			r: self.r.values()[i],
 		}
 	}
 }
 
-impl From<mutable::Position> for Position {
-	fn from(x: mutable::Position) -> Self {
+impl From<mutable::TriggersPhysical> for TriggersPhysical {
+	fn from(x: mutable::TriggersPhysical) -> Self {
 		Self {
-			x: x.x.into(),
-			y: x.y.into(),
+			l: x.l.into(),
+			r: x.r.into(),
+			validity: x.validity.map(|v| v.into()),
 		}
 	}
 }
@@ -1458,6 +1727,7 @@ pub struct Velocities {
 	pub knockback_x: PrimitiveArray<f32>,
 	pub knockback_y: PrimitiveArray<f32>,
 	pub self_x_ground: PrimitiveArray<f32>,
+	pub validity: Option<Bitmap>,
 }
 
 impl Velocities {
@@ -1475,18 +1745,16 @@ impl Velocities {
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		{
-			values.push(self.self_x_air.boxed());
-			values.push(self.self_y.boxed());
-			values.push(self.knockback_x.boxed());
-			values.push(self.knockback_y.boxed());
-			values.push(self.self_x_ground.boxed())
-		};
-		StructArray::new(Self::data_type(version), values, None)
+		values.push(self.self_x_air.boxed());
+		values.push(self.self_y.boxed());
+		values.push(self.knockback_x.boxed());
+		values.push(self.knockback_y.boxed());
+		values.push(self.self_x_ground.boxed());
+		StructArray::new(Self::data_type(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
+		let (_, values, validity) = array.into_data();
 		Self {
 			self_x_air: values[0]
 				.as_any()
@@ -1513,6 +1781,7 @@ impl Velocities {
 				.downcast_ref::<PrimitiveArray<f32>>()
 				.unwrap()
 				.clone(),
+			validity: validity,
 		}
 	}
 
@@ -1544,70 +1813,7 @@ impl From<mutable::Velocities> for Velocities {
 			knockback_x: x.knockback_x.into(),
 			knockback_y: x.knockback_y.into(),
 			self_x_ground: x.self_x_ground.into(),
-		}
-	}
-}
-
-#[derive(Debug)]
-pub struct TriggersPhysical {
-	pub l: PrimitiveArray<f32>,
-	pub r: PrimitiveArray<f32>,
-}
-
-impl TriggersPhysical {
-	fn data_type(version: Version) -> DataType {
-		let mut fields = vec![];
-		{
-			fields.push(Field::new("l", DataType::Float32, false));
-			fields.push(Field::new("r", DataType::Float32, false))
-		};
-		DataType::Struct(fields)
-	}
-
-	fn into_struct_array(self, version: Version) -> StructArray {
-		let mut values = vec![];
-		{
-			values.push(self.l.boxed());
-			values.push(self.r.boxed())
-		};
-		StructArray::new(Self::data_type(version), values, None)
-	}
-
-	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
-		Self {
-			l: values[0]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
-				.unwrap()
-				.clone(),
-			r: values[1]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
-				.unwrap()
-				.clone(),
-		}
-	}
-
-	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_f32::<BE>(self.l.value(i))?;
-		w.write_f32::<BE>(self.r.value(i))?;
-		Ok(())
-	}
-
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::TriggersPhysical {
-		transpose::TriggersPhysical {
-			l: self.l.values()[i],
-			r: self.r.values()[i],
-		}
-	}
-}
-
-impl From<mutable::TriggersPhysical> for TriggersPhysical {
-	fn from(x: mutable::TriggersPhysical) -> Self {
-		Self {
-			l: x.l.into(),
-			r: x.r.into(),
+			validity: x.validity.map(|v| v.into()),
 		}
 	}
 }
@@ -1616,6 +1822,7 @@ impl From<mutable::TriggersPhysical> for TriggersPhysical {
 pub struct Velocity {
 	pub x: PrimitiveArray<f32>,
 	pub y: PrimitiveArray<f32>,
+	pub validity: Option<Bitmap>,
 }
 
 impl Velocity {
@@ -1630,15 +1837,13 @@ impl Velocity {
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		{
-			values.push(self.x.boxed());
-			values.push(self.y.boxed())
-		};
-		StructArray::new(Self::data_type(version), values, None)
+		values.push(self.x.boxed());
+		values.push(self.y.boxed());
+		StructArray::new(Self::data_type(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
+		let (_, values, validity) = array.into_data();
 		Self {
 			x: values[0]
 				.as_any()
@@ -1650,6 +1855,7 @@ impl Velocity {
 				.downcast_ref::<PrimitiveArray<f32>>()
 				.unwrap()
 				.clone(),
+			validity: validity,
 		}
 	}
 
@@ -1672,178 +1878,7 @@ impl From<mutable::Velocity> for Velocity {
 		Self {
 			x: x.x.into(),
 			y: x.y.into(),
-		}
-	}
-}
-
-#[derive(Debug)]
-pub struct Item {
-	pub r#type: PrimitiveArray<u16>,
-	pub state: PrimitiveArray<u8>,
-	pub direction: PrimitiveArray<f32>,
-	pub velocity: Velocity,
-	pub position: Position,
-	pub damage: PrimitiveArray<u16>,
-	pub timer: PrimitiveArray<f32>,
-	pub id: PrimitiveArray<u32>,
-	pub misc: Option<ItemMisc>,
-	pub owner: Option<PrimitiveArray<i8>>,
-}
-
-impl Item {
-	fn data_type(version: Version) -> DataType {
-		let mut fields = vec![];
-		{
-			fields.push(Field::new("type", DataType::UInt16, false));
-			fields.push(Field::new("state", DataType::UInt8, false));
-			fields.push(Field::new("direction", DataType::Float32, false));
-			fields.push(Field::new("velocity", Velocity::data_type(version), false));
-			fields.push(Field::new("position", Position::data_type(version), false));
-			fields.push(Field::new("damage", DataType::UInt16, false));
-			fields.push(Field::new("timer", DataType::Float32, false));
-			fields.push(Field::new("id", DataType::UInt32, false));
-			if version.gte(3, 2) {
-				fields.push(Field::new("misc", ItemMisc::data_type(version), false));
-				if version.gte(3, 6) {
-					fields.push(Field::new("owner", DataType::Int8, false))
-				}
-			}
-		};
-		DataType::Struct(fields)
-	}
-
-	fn into_struct_array(self, version: Version) -> StructArray {
-		let mut values = vec![];
-		{
-			values.push(self.r#type.boxed());
-			values.push(self.state.boxed());
-			values.push(self.direction.boxed());
-			values.push(self.velocity.into_struct_array(version).boxed());
-			values.push(self.position.into_struct_array(version).boxed());
-			values.push(self.damage.boxed());
-			values.push(self.timer.boxed());
-			values.push(self.id.boxed());
-			if version.gte(3, 2) {
-				values.push(self.misc.unwrap().into_struct_array(version).boxed());
-				if version.gte(3, 6) {
-					values.push(self.owner.unwrap().boxed())
-				}
-			}
-		};
-		StructArray::new(Self::data_type(version), values, None)
-	}
-
-	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, _) = array.into_data();
-		Self {
-			r#type: values[0]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<u16>>()
-				.unwrap()
-				.clone(),
-			state: values[1]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
-				.unwrap()
-				.clone(),
-			direction: values[2]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
-				.unwrap()
-				.clone(),
-			velocity: Velocity::from_struct_array(
-				values[3]
-					.as_any()
-					.downcast_ref::<StructArray>()
-					.unwrap()
-					.clone(),
-				version,
-			),
-			position: Position::from_struct_array(
-				values[4]
-					.as_any()
-					.downcast_ref::<StructArray>()
-					.unwrap()
-					.clone(),
-				version,
-			),
-			damage: values[5]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<u16>>()
-				.unwrap()
-				.clone(),
-			timer: values[6]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
-				.unwrap()
-				.clone(),
-			id: values[7]
-				.as_any()
-				.downcast_ref::<PrimitiveArray<u32>>()
-				.unwrap()
-				.clone(),
-			misc: values.get(8).map(|x| {
-				ItemMisc::from_struct_array(
-					x.as_any().downcast_ref::<StructArray>().unwrap().clone(),
-					version,
-				)
-			}),
-			owner: values.get(9).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<i8>>()
-					.unwrap()
-					.clone()
-			}),
-		}
-	}
-
-	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_u16::<BE>(self.r#type.value(i))?;
-		w.write_u8(self.state.value(i))?;
-		w.write_f32::<BE>(self.direction.value(i))?;
-		self.velocity.write(w, version, i)?;
-		self.position.write(w, version, i)?;
-		w.write_u16::<BE>(self.damage.value(i))?;
-		w.write_f32::<BE>(self.timer.value(i))?;
-		w.write_u32::<BE>(self.id.value(i))?;
-		if version.gte(3, 2) {
-			self.misc.as_ref().unwrap().write(w, version, i)?;
-			if version.gte(3, 6) {
-				w.write_i8(self.owner.as_ref().unwrap().value(i))?
-			}
-		};
-		Ok(())
-	}
-
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Item {
-		transpose::Item {
-			r#type: self.r#type.values()[i],
-			state: self.state.values()[i],
-			direction: self.direction.values()[i],
-			velocity: self.velocity.transpose_one(i, version),
-			position: self.position.transpose_one(i, version),
-			damage: self.damage.values()[i],
-			timer: self.timer.values()[i],
-			id: self.id.values()[i],
-			misc: self.misc.as_ref().map(|x| x.transpose_one(i, version)),
-			owner: self.owner.as_ref().map(|x| x.values()[i]),
-		}
-	}
-}
-
-impl From<mutable::Item> for Item {
-	fn from(x: mutable::Item) -> Self {
-		Self {
-			r#type: x.r#type.into(),
-			state: x.state.into(),
-			direction: x.direction.into(),
-			velocity: x.velocity.into(),
-			position: x.position.into(),
-			damage: x.damage.into(),
-			timer: x.timer.into(),
-			id: x.id.into(),
-			misc: x.misc.map(|x| x.into()),
-			owner: x.owner.map(|x| x.into()),
+			validity: x.validity.map(|v| v.into()),
 		}
 	}
 }

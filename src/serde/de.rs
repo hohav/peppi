@@ -23,7 +23,6 @@ use crate::{
 	ubjson,
 };
 
-pub(crate) const PAYLOADS_EVENT_CODE: u8 = 0x35;
 const MAX_PLAYERS: usize = 6;
 const ICE_CLIMBERS: u8 = 14;
 
@@ -46,6 +45,7 @@ pub struct Opts {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, num_enum::TryFromPrimitive)]
 #[repr(u8)]
 pub enum Event {
+	Payloads = 0x35,
 	GameStart = 0x36,
 	FramePre = 0x37,
 	FramePost = 0x38,
@@ -97,7 +97,7 @@ impl game::Game for ParseState {
 	}
 
 	fn len(&self) -> usize {
-		self.game.frames.id.len()
+		self.game.frames.len()
 	}
 
 	fn frame(&self, idx: usize) -> transpose::Frame {
@@ -121,25 +121,18 @@ impl ParseState {
 	}
 
 	fn frame_open(&mut self, id: i32) {
-		let len = self.game.frames.id.len();
 		self.game.frames.id.push(Some(id));
-		//FIXME: do this for leaders too? (multiplayer)
-		for p in &mut self.game.frames.ports {
-			if let Some(f) = &mut p.follower {
-				while f.pre.random_seed.len() < len {
-					f.push_none(self.game.start.slippi.version);
-				}
-			}
-		}
 	}
 
 	fn frame_close(&mut self) {
-		let len = self.game.frames.id.len();
-		//FIXME: do this for leaders too? (multiplayer)
+		let len = self.game.frames.len();
 		for p in &mut self.game.frames.ports {
+			while p.leader.len() < len {
+				p.leader.push_null(self.game.start.slippi.version);
+			}
 			if let Some(f) = &mut p.follower {
-				while f.pre.random_seed.len() < len {
-					f.push_none(self.game.start.slippi.version);
+				while f.len() < len {
+					f.push_null(self.game.start.slippi.version);
 				}
 			}
 		}
@@ -555,7 +548,7 @@ fn debug_write_event(
 /// for forwards compatibility, to allow skipping unknown events.
 fn parse_payloads<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<(usize, PayloadSizes)> {
 	let code = r.read_u8()?;
-	if code != PAYLOADS_EVENT_CODE {
+	if code != Event::Payloads as u8 {
 		return Err(err!("expected event payloads, but got: {:#02x}", code));
 	}
 
@@ -667,10 +660,17 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 		result
 	};
 
+	let event_counts = {
+		let mut m = HashMap::new();
+		m.insert(Event::Payloads as u8, 1);
+		m.insert(Event::GameStart as u8, 1);
+		m
+	};
+
 	Ok(ParseState {
 		payload_sizes: payload_sizes,
 		bytes_read: bytes1 + bytes2,
-		event_counts: HashMap::new(), // FIXME: +1 for payloads & start
+		event_counts: event_counts,
 		split_accumulator: Default::default(),
 		game: game,
 		port_indexes: port_indexes,
@@ -708,6 +708,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 	if let Some(event) = event {
 		use Event::*;
 		match event {
+			Payloads => return Err(err!("Duplicate payloads event")),
 			GeckoCodes => {
 				state.game.gecko_codes = Some(game::GeckoCodes {
 					bytes: buf.to_vec(),
@@ -718,7 +719,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 			GameEnd => state.game.end = Some(game_end(&mut &*buf)?),
 			FrameStart => {
 				// no FrameEnd events before v3.0, so simulate it
-				if !state.game.start.slippi.version.gte(3, 0) {
+				if state.game.start.slippi.version.lt(3, 0) {
 					state.frame_close();
 				}
 				let r = &mut &*buf;
@@ -728,6 +729,8 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 					.game
 					.frames
 					.start
+					.as_mut()
+					.unwrap()
 					.read_push(r, state.game.start.slippi.version)?;
 			}
 			FramePre => {
@@ -746,18 +749,32 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 						assert_eq!(id, last_id);
 					}
 				}
-				match is_follower {
-					true => state.game.frames.ports[state.port_indexes[port as usize]]
+				let port_index = state.port_indexes[port as usize];
+				if is_follower {
+					state.game.frames.ports[port_index]
+						.follower
+						.as_mut()
+						.unwrap()
+						.validity
+						.as_mut()
+						.map(|v| v.push(true));
+					state.game.frames.ports[port_index]
 						.follower
 						.as_mut()
 						.unwrap()
 						.pre
-						.read_push(r, state.game.start.slippi.version)?,
-					_ => state.game.frames.ports[state.port_indexes[port as usize]]
+						.read_push(r, state.game.start.slippi.version)?;
+				} else {
+					state.game.frames.ports[port_index]
+						.leader
+						.validity
+						.as_mut()
+						.map(|v| v.push(true));
+					state.game.frames.ports[port_index]
 						.leader
 						.pre
-						.read_push(r, state.game.start.slippi.version)?,
-				};
+						.read_push(r, state.game.start.slippi.version)?;
+				}
 			}
 			FramePost => {
 				let r = &mut &*buf;
@@ -782,18 +799,31 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
 				assert_eq!(id, state.last_id().unwrap());
-				let old_len = *state.game.frames.item_offset.last();
-				let new_len: i32 = state.game.frames.item.r#type.len().try_into().unwrap();
+				let old_len = *state.game.frames.item_offset.as_ref().unwrap().last();
+				let new_len: i32 = state
+					.game
+					.frames
+					.item
+					.as_ref()
+					.unwrap()
+					.r#type
+					.len()
+					.try_into()
+					.unwrap();
 				state
 					.game
 					.frames
 					.item_offset
+					.as_mut()
+					.unwrap()
 					.try_push(new_len.checked_sub(old_len).unwrap())
 					.unwrap();
 				state
 					.game
 					.frames
 					.end
+					.as_mut()
+					.unwrap()
 					.read_push(r, state.game.start.slippi.version)?;
 				state.frame_close();
 			}
@@ -805,6 +835,8 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 					.game
 					.frames
 					.item
+					.as_mut()
+					.unwrap()
 					.read_push(r, state.game.start.slippi.version)?;
 			}
 		};
@@ -866,11 +898,11 @@ pub fn deserialize<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> 
 
 	// FrameEnd doesn't exist until v3.0, so we simulate it in FrameStart/FramePre.
 	// But that means there can be a "dangling" frame that we need to close here.
-	if !state.game.start.slippi.version.gte(3, 0) {
+	if state.game.start.slippi.version.lt(3, 0) {
 		state.frame_close();
 	}
 
-	info!("Frames: {}", state.game.frames.id.len());
+	info!("Frames: {}", state.game.frames.len());
 
 	// Some replays have duplicated Game End events, which are safe to ignore.
 	if state.bytes_read < raw_len {

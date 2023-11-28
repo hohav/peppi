@@ -9,6 +9,10 @@ impl Version {
 	pub fn gte(&self, major: u8, minor: u8) -> bool {
 		self.0 > major || (self.0 == major && self.1 >= minor)
 	}
+
+	pub fn lt(&self, major: u8, minor: u8) -> bool {
+		!self.gte(major, minor)
+	}
 }
 
 pub struct ParseVersionError(pub String);

@@ -13,11 +13,14 @@
   [:struct
    {:attrs {:derive ["PartialEq" "Clone" "Copy" "Debug", "Default"]}}
    nm
-   (mapv field fields)])
+   (->> fields
+        (filter :type)
+        (mapv field))])
 
 (defn -main [path]
-  (let [json (read-json path)
-        decls (mapv struct-decl json)]
+  (let [decls (->> (read-json path)
+                   (sort-by key)
+                   (mapv struct-decl))]
     (println do-not-edit)
     (println (slurp (io/resource "preamble/frame/transpose.rs")))
     (println)
