@@ -1,7 +1,7 @@
 use peppi::{self, serde::de};
 use std::{fs::File, io::BufReader, path::PathBuf};
 
-use iai_callgrind::{main, library_benchmark_group, library_benchmark};
+use iai_callgrind::{library_benchmark, library_benchmark_group, main};
 
 fn game(replay: &str, skip_frames: bool) {
 	let path = PathBuf::from(format!("benches/data/{}.slp", replay));
