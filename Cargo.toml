@@ -6,6 +6,7 @@ license = "MIT"
 name = "peppi"
 repository = "https://github.com/hohav/peppi"
 version = "2.0.0-alpha.2"
+exclude = ["benches", "tests"]
 
 [dependencies]
 arrow2 = "0.18"
@@ -30,10 +31,12 @@ path = "src/lib.rs"
 [[bench]]
 name = "criterion"
 harness = false
+path = "benches/criterion.rs"
 
 [[bench]]
 name = "iai"
 harness = false
+path = "benches/iai.rs"
 bench = false
 
 [profile.bench]
