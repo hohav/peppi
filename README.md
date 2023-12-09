@@ -8,7 +8,7 @@ In your `Cargo.toml`:
 
 ```toml
 [dependencies]
-peppi = "2.0.0-alpha.1"
+peppi = "2.0.0-alpha.2"
 ```
 
 ## Usage
