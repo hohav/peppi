@@ -81,12 +81,7 @@ impl Data {
 		frame_id: i32,
 		port: PortOccupancy,
 	) -> Result<()> {
-		if self
-			.validity
-			.as_ref()
-			.map(|v| v.get_bit(idx))
-			.unwrap_or(true)
-		{
+		if self.validity.as_ref().map_or(true, |v| v.get_bit(idx)) {
 			w.write_u8(Event::FramePre as u8)?;
 			w.write_i32::<BE>(frame_id)?;
 			w.write_u8(port.port as u8)?;
@@ -107,12 +102,7 @@ impl Data {
 		frame_id: i32,
 		port: PortOccupancy,
 	) -> Result<()> {
-		if self
-			.validity
-			.as_ref()
-			.map(|v| v.get_bit(idx))
-			.unwrap_or(true)
-		{
+		if self.validity.as_ref().map_or(true, |v| v.get_bit(idx)) {
 			w.write_u8(Event::FramePost as u8)?;
 			w.write_i32::<BE>(frame_id)?;
 			w.write_u8(port.port as u8)?;
@@ -215,30 +205,22 @@ impl PortData {
 				follower: false,
 			},
 		)?;
-		self.follower
-			.as_ref()
-			.map(|f| {
-				if f.pre
-					.random_seed
-					.validity()
-					.map(|v| v.get_bit(idx))
-					.unwrap_or(true)
-				{
-					f.write_pre(
-						w,
-						version,
-						idx,
-						frame_id,
-						PortOccupancy {
-							port: self.port,
-							follower: true,
-						},
-					)
-				} else {
-					Ok(())
-				}
-			})
-			.unwrap_or(Ok(()))
+		self.follower.as_ref().map_or(Ok(()), |f| {
+			if f.validity.as_ref().map_or(true, |v| v.get_bit(idx)) {
+				f.write_pre(
+					w,
+					version,
+					idx,
+					frame_id,
+					PortOccupancy {
+						port: self.port,
+						follower: true,
+					},
+				)
+			} else {
+				Ok(())
+			}
+		})
 	}
 
 	pub fn write_post<W: Write>(
@@ -258,30 +240,22 @@ impl PortData {
 				follower: false,
 			},
 		)?;
-		self.follower
-			.as_ref()
-			.map(|f| {
-				if f.pre
-					.random_seed
-					.validity()
-					.map(|v| v.get_bit(idx))
-					.unwrap_or(true)
-				{
-					f.write_post(
-						w,
-						version,
-						idx,
-						frame_id,
-						PortOccupancy {
-							port: self.port,
-							follower: true,
-						},
-					)
-				} else {
-					Ok(())
-				}
-			})
-			.unwrap_or(Ok(()))
+		self.follower.as_ref().map_or(Ok(()), |f| {
+			if f.validity.as_ref().map_or(true, |v| v.get_bit(idx)) {
+				f.write_post(
+					w,
+					version,
+					idx,
+					frame_id,
+					PortOccupancy {
+						port: self.port,
+						follower: true,
+					},
+				)
+			} else {
+				Ok(())
+			}
+		})
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::PortData {
@@ -421,23 +395,20 @@ impl Frame {
 			}
 		}
 
-		let (item, item_offset) = values
-			.get(4)
-			.map(|v| {
-				let arrays = v.as_any().downcast_ref::<ListArray<i32>>().unwrap().clone();
-				let item_offset = arrays.offsets().clone();
-				let item = Item::from_struct_array(
-					arrays
-						.values()
-						.as_any()
-						.downcast_ref::<StructArray>()
-						.unwrap()
-						.clone(),
-					version,
-				);
-				(Some(item), Some(item_offset))
-			})
-			.unwrap_or((None, None));
+		let (item, item_offset) = values.get(4).map_or((None, None), |v| {
+			let arrays = v.as_any().downcast_ref::<ListArray<i32>>().unwrap().clone();
+			let item_offset = arrays.offsets().clone();
+			let item = Item::from_struct_array(
+				arrays
+					.values()
+					.as_any()
+					.downcast_ref::<StructArray>()
+					.unwrap()
+					.clone(),
+				version,
+			);
+			(Some(item), Some(item_offset))
+		});
 
 		Self {
 			id: values[0]

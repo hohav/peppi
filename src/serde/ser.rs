@@ -119,12 +119,7 @@ fn game_end<W: Write>(w: &mut W, e: &game::End, ver: Version) -> Result<()> {
 	w.write_u8(Event::GameEnd as u8)?;
 	w.write_u8(e.method as u8)?;
 	if ver.gte(2, 0) {
-		w.write_u8(
-			e.lras_initiator
-				.unwrap()
-				.map(|p| p.into())
-				.unwrap_or(u8::MAX),
-		)?;
+		w.write_u8(e.lras_initiator.unwrap().map_or(u8::MAX, |p| p.into()))?;
 		if ver.gte(3, 13) {
 			let players = e.players.as_ref().unwrap();
 			w.write_all(&players.iter().fold([u8::MAX; 4], |mut acc, p| {
@@ -159,7 +154,7 @@ fn frame_counts(frames: &Frame) -> FrameCounts {
 			.sum::<usize>()
 			.try_into()
 			.unwrap(),
-		items: frames.item.as_ref().map(|i| i.id.len() as u32).unwrap_or(0),
+		items: frames.item.as_ref().map_or(0, |i| i.id.len() as u32),
 	}
 }
 
@@ -180,10 +175,10 @@ fn raw_size(game: &Game, payload_sizes: &Vec<(u8, u16)>) -> u32 {
 		+ 1 + sizes[&(GameEnd as u8)] as u32 // GameEnd
 		+ counts.frame_data * (1 + sizes[&(FramePre as u8)] as u32) // FramePre
 		+ counts.frame_data * (1 + sizes[&(FramePost as u8)] as u32) // FramePost
-		+ sizes.get(&(FrameStart as u8)).map(|s| counts.frames * (1 + *s as u32)).unwrap_or(0) // FrameStart
-		+ sizes.get(&(FrameEnd as u8)).map(|s| counts.frames * (1 + *s as u32)).unwrap_or(0) // FrameEnd
-		+ sizes.get(&(Item as u8)).map(|s| counts.items * (1 + *s as u32)).unwrap_or(0) // Item
-		+ game.gecko_codes.as_ref().map(gecko_codes_size).unwrap_or(0)
+		+ sizes.get(&(FrameStart as u8)).map_or(0, |s| counts.frames * (1 + *s as u32)) // FrameStart
+		+ sizes.get(&(FrameEnd as u8)).map_or(0, |s| counts.frames * (1 + *s as u32)) // FrameEnd
+		+ sizes.get(&(Item as u8)).map_or(0, |s| counts.items * (1 + *s as u32)) // Item
+		+ game.gecko_codes.as_ref().map_or(0, gecko_codes_size)
 }
 
 pub fn serialize<W: Write>(w: &mut W, game: &Game) -> Result<()> {
