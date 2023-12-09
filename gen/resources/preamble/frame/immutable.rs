@@ -335,7 +335,7 @@ impl Frame {
 	pub fn data_type(version: Version, ports: &[PortOccupancy]) -> DataType {
 		let mut fields = vec![
 			Field::new("id", DataType::Int32, false),
-			Field::new("port", Self::port_data_type(version, ports).clone(), false),
+			Field::new("ports", Self::port_data_type(version, ports).clone(), false),
 		];
 		if version.gte(2, 2) {
 			fields.push(Field::new("start", Start::data_type(version).clone(), false));
@@ -377,7 +377,7 @@ impl Frame {
 	pub fn from_struct_array(array: StructArray, version: Version) -> Self {
 		let (fields, values, _) = array.into_data();
 		assert_eq!("id", fields[0].name);
-		assert_eq!("port", fields[1].name);
+		assert_eq!("ports", fields[1].name);
 		if version.gte(2, 2) {
 			assert_eq!("start", fields[2].name);
 			if version.gte(3, 0) {

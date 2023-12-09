@@ -39,7 +39,7 @@ fn into_struct_array() {
 			serde_json::from_slice::<serde_json::Value>(&buf.into_inner().unwrap()).unwrap(),
 			json!([{
 				"id": -123,
-				"port": {
+				"ports": {
 					"0": {
 						"leader": {
 							"pre": {
@@ -203,7 +203,7 @@ fn into_struct_array() {
 				"end": {
 					"latest_finalized_frame": 0
 				},
-				"port": {
+				"ports": {
 					"0": {
 						"leader": {
 							"pre": {
