@@ -10,7 +10,7 @@ fn write_utf8<W: Write>(w: &mut W, s: &str) -> Result<()> {
 	Ok(())
 }
 
-pub fn from_map<W: Write>(w: &mut W, map: &Map<String, Value>) -> Result<()> {
+pub(crate) fn write_map<W: Write>(w: &mut W, map: &Map<String, Value>) -> Result<()> {
 	for (k, v) in map {
 		write_utf8(w, k)?;
 		match v {
@@ -24,7 +24,7 @@ pub fn from_map<W: Write>(w: &mut W, map: &Map<String, Value>) -> Result<()> {
 			}
 			Value::Object(o) => {
 				write!(w, "{{")?;
-				from_map(w, o)?;
+				write_map(w, o)?;
 				write!(w, "}}")?;
 			}
 			_ => unimplemented!(),

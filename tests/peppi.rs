@@ -6,6 +6,10 @@ use serde_json::json;
 use ssbm_data::{action_state, character::External, character::Internal, item::Item, stage::Stage};
 
 use peppi::{
+	io::{
+		peppi::{self as io_peppi, Peppi},
+		slippi::{self, Slippi, Version},
+	},
 	model::{
 		frame::transpose::{self, Position},
 		game::immutable::Game,
@@ -14,9 +18,7 @@ use peppi::{
 			Port, Scene, ShieldDrop, Start, Ucf,
 		},
 		shift_jis::MeleeString,
-		slippi::{Slippi, Version},
 	},
-	serde,
 };
 
 mod common;
@@ -31,7 +33,7 @@ struct Buttons {
 fn button_seq(game: &Game) -> Vec<Buttons> {
 	let mut last_buttons: Option<Buttons> = None;
 	let mut button_seq = vec![];
-	for idx in 0..game.frames.id.len() {
+	for idx in 0..game.frames.len() {
 		let b = Buttons {
 			logical: game.frames.ports[0].leader.pre.buttons.values()[idx],
 			physical: game.frames.ports[0].leader.pre.buttons_physical.values()[idx],
@@ -180,7 +182,7 @@ fn basic_game() {
 		}
 	);
 
-	assert_eq!(game.frames.id.len(), 5209);
+	assert_eq!(game.frames.len(), 5209);
 
 	assert_eq!(
 		game.frames.transpose_one(1000, game.start.slippi.version),
@@ -732,31 +734,46 @@ fn items() {
 }
 
 fn _round_trip(in_path: impl AsRef<Path> + Clone) {
-	let in_bytes = fs::read(in_path.clone()).unwrap();
-	let game1 = peppi::game(&mut in_bytes.as_slice(), None).unwrap();
+	let bytes = fs::read(in_path.clone()).unwrap();
 
-	let mut out_bytes = Vec::with_capacity(in_bytes.len());
-	serde::ser::serialize(&mut out_bytes, &game1).unwrap();
+	let game2 = {
+		let slippi_game = slippi::read(&mut bytes.as_slice(), None).unwrap();
+		let peppi_game = {
+			let mut buf = Vec::new();
+			io_peppi::write(
+				&mut buf,
+				slippi_game,
+				Peppi {
+					version: io_peppi::CURRENT_VERSION,
+					slp_hash: String::new(),
+				},
+			)
+			.unwrap();
+			io_peppi::read(&mut &*buf, None).unwrap().0
+		};
 
-	// if we get a perfect byte-wise match we know we're correct. If not, we
-	// continue to detect where in the replay there is a difference.
-	if in_bytes == out_bytes {
-		return;
-	}
+		let mut buf = Vec::with_capacity(bytes.len());
+		slippi::write(&mut buf, &peppi_game).unwrap();
 
-	let game2 = peppi::game(&mut out_bytes.as_slice(), None).unwrap();
+		// If we get a perfect byte-wise match, we know we're correct.
+		// If not, we'll try to detect where the difference is.
+		if bytes == buf {
+			return;
+		}
 
+		slippi::read(&mut buf.as_slice(), None).unwrap()
+	};
+
+	let game1 = slippi::read(&mut bytes.as_slice(), None).unwrap();
 	assert_eq!(game1.start, game2.start);
 	assert_eq!(game1.end, game2.end);
 	assert_eq!(game1.metadata, game2.metadata);
 
-	assert_eq!(game1.frames.id.len(), game2.frames.id.len());
-	for idx in 0..game1.frames.id.len() {
+	assert_eq!(game1.frames.len(), game2.frames.len());
+	for idx in 0..game1.frames.len() {
 		assert_eq!(
 			game1.frames.transpose_one(idx, game1.start.slippi.version),
 			game2.frames.transpose_one(idx, game2.start.slippi.version),
-			"frame: {}",
-			idx
 		);
 	}
 }
@@ -768,8 +785,7 @@ fn round_trip() {
 		.into_iter()
 		.map(|e| e.unwrap())
 		.filter(|e| match e.file_name().to_str().unwrap() {
-			"unknown_event.slp" => false,
-			"corrupt.slp" => false,
+			"unknown_event.slp" | "corrupt.slp" => false,
 			_ => true,
 		}) {
 		println!("{:?}", entry.file_name());
@@ -780,7 +796,7 @@ fn round_trip() {
 #[test]
 fn rollback() {
 	let game = game("ics2");
-	assert_eq!(game.frames.id.len(), 9530);
+	assert_eq!(game.frames.len(), 9530);
 	assert_eq!(
 		game.frames.id.values().clone().sliced(473, 4).as_slice(),
 		[350, 351, 351, 352]

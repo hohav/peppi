@@ -15,8 +15,8 @@ use crate::{
 	model::{
 		frame::{transpose, PortOccupancy},
 		game::Port,
-		slippi::Version,
 	},
+	io::slippi::Version,
 };
 
 type BE = byteorder::BigEndian;

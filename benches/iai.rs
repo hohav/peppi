@@ -1,4 +1,7 @@
-use peppi::{self, serde::de};
+use peppi::{
+	self,
+	io::slippi::de::{read, Opts},
+};
 use std::{fs::File, io::BufReader, path::PathBuf};
 
 use iai_callgrind::{library_benchmark, library_benchmark_group, main};
@@ -6,11 +9,13 @@ use iai_callgrind::{library_benchmark, library_benchmark_group, main};
 fn game(replay: &str, skip_frames: bool) {
 	let path = PathBuf::from(format!("benches/data/{}.slp", replay));
 	let mut buf = BufReader::new(File::open(path).unwrap());
-	let opts = de::Opts {
-		skip_frames,
-		..Default::default()
-	};
-	peppi::game(&mut buf, Some(&opts)).unwrap();
+	read(
+		&mut buf,
+		Some(&Opts {
+			skip_frames,
+			..Default::default()
+		}),
+	)
 }
 
 #[library_benchmark]

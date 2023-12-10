@@ -13,10 +13,12 @@ use arrow2::{
 use byteorder::ReadBytesExt;
 use std::io::Result;
 
-use crate::model::{
-	frame::{transpose, PortOccupancy},
-	game::Port,
-	slippi::Version,
+use crate::{
+	io::slippi::Version,
+	model::{
+		frame::{transpose, PortOccupancy},
+		game::Port,
+	},
 };
 
 type BE = byteorder::BigEndian;

@@ -1,6 +1,7 @@
 use peppi::model::{frame::PortOccupancy, game::Port};
 
 use arrow2::io::json::write as json_write;
+use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::io::BufWriter;
 
@@ -40,7 +41,7 @@ fn into_struct_array() {
 			json!([{
 				"id": -123,
 				"ports": {
-					"0": {
+					"P1": {
 						"leader": {
 							"pre": {
 								"random_seed": 39656,
@@ -107,7 +108,7 @@ fn into_struct_array() {
 							}
 						}
 					},
-					"1": {
+					"P2": {
 						"leader": {
 							"pre": {
 								"random_seed": 39656,
@@ -204,7 +205,7 @@ fn into_struct_array() {
 					"latest_finalized_frame": 0
 				},
 				"ports": {
-					"0": {
+					"P1": {
 						"leader": {
 							"pre": {
 								"random_seed": 8100584,
@@ -272,7 +273,7 @@ fn into_struct_array() {
 							}
 						}
 					},
-					"1": {
+					"P2": {
 						"leader": {
 							"pre": {
 								"random_seed": 8100584,

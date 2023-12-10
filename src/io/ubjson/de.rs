@@ -22,7 +22,7 @@ fn to_val<R: Read>(r: &mut R) -> Result<Value> {
 			r.read_i32::<BigEndian>()?,
 		))),
 		// "{": map
-		0x7b => Ok(Value::Object(to_map(r)?)),
+		0x7b => Ok(Value::Object(read_map(r)?)),
 		c => Err(err!("unexpected UBJSON value type: {}", c)),
 	}
 }
@@ -35,7 +35,7 @@ fn to_key<R: Read>(r: &mut R) -> Result<Option<String>> {
 	}
 }
 
-pub fn to_map<R: Read>(r: &mut R) -> Result<Map<String, Value>> {
+pub(crate) fn read_map<R: Read>(r: &mut R) -> Result<Map<String, Value>> {
 	let mut m = Map::new();
 	while match to_key(r)? {
 		Some(k) => {

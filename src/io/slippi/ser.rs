@@ -4,14 +4,12 @@ use byteorder::WriteBytesExt;
 
 use crate::{
 	io::{
-		assert_max_version,
-		slippi::de::Event,
+		slippi::{self, de::Event},
 		ubjson,
 	},
 	model::{
 		frame::immutable::Frame,
 		game::{self, immutable::Game, GeckoCodes},
-		slippi::Version,
 	},
 };
 
@@ -112,13 +110,13 @@ fn gecko_codes<W: Write>(w: &mut W, codes: &GeckoCodes) -> Result<()> {
 	Ok(())
 }
 
-fn game_start<W: Write>(w: &mut W, s: &game::Start, ver: Version) -> Result<()> {
+fn game_start<W: Write>(w: &mut W, s: &game::Start, ver: slippi::Version) -> Result<()> {
 	assert_eq!(ver, s.slippi.version);
 	w.write_u8(Event::GameStart as u8)?;
 	w.write_all(&s.bytes.0)
 }
 
-fn game_end<W: Write>(w: &mut W, e: &game::End, ver: Version) -> Result<()> {
+fn game_end<W: Write>(w: &mut W, e: &game::End, ver: slippi::Version) -> Result<()> {
 	w.write_u8(Event::GameEnd as u8)?;
 	w.write_u8(e.method as u8)?;
 	if ver.gte(2, 0) {
@@ -186,7 +184,7 @@ fn raw_size(game: &Game, payload_sizes: &Vec<(u8, u16)>) -> u32 {
 
 /// Writes a Slippi-format game to `w`.
 pub fn write<W: Write>(w: &mut W, game: &Game) -> Result<()> {
-	assert_max_version(game)?;
+	slippi::assert_max_version(game.start.slippi.version)?;
 
 	let payload_sizes = payload_sizes(game);
 	let raw_size = raw_size(game, &payload_sizes);
@@ -220,7 +218,7 @@ pub fn write<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 		w.write_all(&[
 			0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b,
 		])?;
-		ubjson::ser::from_map(w, metadata)?;
+		ubjson::write_map(w, metadata)?;
 		w.write_all(&[0x7d])?; // closing brace for `metadata`
 	}
 

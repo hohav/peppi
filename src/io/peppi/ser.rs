@@ -7,23 +7,13 @@ use arrow2::{
 	io::ipc::write::{FileWriter, WriteOptions},
 };
 
-use serde::{Deserialize, Serialize};
-
 use crate::{
-	io::{ICE_CLIMBERS, assert_max_version},
+	io::{peppi, slippi},
 	model::{
 		frame::PortOccupancy,
-		game::immutable::Game,
+		game::{immutable::Game, ICE_CLIMBERS},
 	},
 };
-
-pub const PEPPI_FORMAT_VERSION: &str = "2.0";
-
-#[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct Peppi {
-	pub version: String,
-	pub slp_hash: String,
-}
 
 fn port_occupancy(game: &Game) -> Vec<PortOccupancy> {
 	game.start
@@ -50,13 +40,10 @@ fn tar_append<W: Write, P: AsRef<Path>>(
 	Ok(())
 }
 
-pub fn write<W: Write>(game: Game, w: W, slp_hash: String) -> Result<(), Box<dyn Error>> {
-	assert_max_version(&game)?;
-
-	let peppi = Peppi {
-		version: PEPPI_FORMAT_VERSION.to_string(),
-		slp_hash: slp_hash,
-	};
+// TODO: compression opts
+pub fn write<W: Write>(w: W, game: Game, peppi: peppi::Peppi) -> Result<(), Box<dyn Error>> {
+	slippi::assert_max_version(game.start.slippi.version)?;
+	peppi::assert_current_version(peppi.version)?;
 
 	let mut tar = tar::Builder::new(w);
 	tar_append(&mut tar, &serde_json::to_vec(&peppi)?, "peppi.json")?;

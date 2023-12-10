@@ -17,6 +17,7 @@ num_enum = "0.7"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 tar = "0.4"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
 
 [dev-dependencies]
 arrow2 = { version = "0.18", features = ["io_json"] }

@@ -5,14 +5,19 @@ use std::{
 };
 
 use peppi::{
+	io::{
+		slippi::{
+			de::{Debug, Opts},
+			read,
+		},
+		PosError,
+	},
 	model::game::immutable::Game,
-	serde::de::{Debug, Opts},
-	ParseError,
 };
 
-pub fn read_game(path: impl AsRef<Path>) -> Result<Game, ParseError> {
+pub fn read_game(path: impl AsRef<Path>) -> Result<Game, PosError> {
 	let mut buf = BufReader::new(File::open(path).unwrap());
-	peppi::game(
+	read(
 		&mut buf,
 		Some(&Opts {
 			skip_frames: false,

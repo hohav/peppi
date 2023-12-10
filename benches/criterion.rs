@@ -1,5 +1,8 @@
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
-use peppi::{self, serde::de};
+use peppi::{
+	self,
+	io::slippi::de::{read, Opts},
+};
 
 use std::{fs, path::PathBuf, time::Duration};
 
@@ -15,7 +18,7 @@ pub fn into_game(c: &mut Criterion) {
 			|b, contents| {
 				b.iter_batched(
 					|| contents.as_slice(),
-					|mut buf| peppi::game(&mut buf, None),
+					|mut buf| read(&mut buf, None),
 					BatchSize::LargeInput,
 				)
 			},
@@ -36,11 +39,13 @@ pub fn skip_frames(c: &mut Criterion) {
 				b.iter_batched(
 					|| contents.as_slice(),
 					|mut buf| {
-						let opts = de::Opts {
-							skip_frames: true,
-							..Default::default()
-						};
-						peppi::game(&mut buf, Some(&opts))
+						read(
+							&mut buf,
+							Some(&Opts {
+								skip_frames: true,
+								..Default::default()
+							}),
+						)
 					},
 					BatchSize::SmallInput,
 				)

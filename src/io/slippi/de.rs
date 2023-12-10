@@ -14,12 +14,14 @@ use log::{debug, info, warn};
 type BE = byteorder::BigEndian;
 
 use crate::{
-	io::{ICE_CLIMBERS, MAX_PLAYERS, expect_bytes, ubjson},
+	io::{expect_bytes, slippi, ubjson},
 	model::{
 		frame::{self, mutable::Frame as MutableFrame, transpose},
-		game::{self, immutable::Game, Netplay, Player, PlayerType, Port, NUM_PORTS},
+		game::{
+			self, immutable::Game, Netplay, Player, PlayerType, Port, ICE_CLIMBERS, MAX_PLAYERS,
+			NUM_PORTS,
+		},
 		shift_jis::MeleeString,
-		slippi,
 	},
 };
 
@@ -65,6 +67,18 @@ pub struct PartialGame {
 	pub frames: MutableFrame,
 	pub metadata: Option<serde_json::Map<String, serde_json::Value>>,
 	pub gecko_codes: Option<game::GeckoCodes>,
+}
+
+impl From<PartialGame> for Game {
+	fn from(game: PartialGame) -> Game {
+		Game {
+			start: game.start,
+			end: game.end,
+			frames: game.frames.into(),
+			metadata: game.metadata,
+			gecko_codes: game.gecko_codes,
+		}
+	}
 }
 
 pub struct ParseState {
@@ -133,24 +147,6 @@ impl ParseState {
 				}
 			}
 		}
-	}
-}
-
-impl From<PartialGame> for Game {
-	fn from(game: PartialGame) -> Self {
-		Game {
-			start: game.start,
-			end: game.end,
-			frames: game.frames.into(),
-			metadata: game.metadata,
-			gecko_codes: game.gecko_codes,
-		}
-	}
-}
-
-impl From<ParseState> for Game {
-	fn from(state: ParseState) -> Self {
-		Self::from(state.game)
 	}
 }
 
@@ -613,7 +609,7 @@ fn parse_game_start<R: Read>(
 pub fn parse_header<R: Read>(mut r: R, _opts: Option<&Opts>) -> Result<u32> {
 	// For speed, assume the `raw` element comes first and handle it manually.
 	// The official JS parser does this too, so it should be reliable.
-	expect_bytes(&mut r, &crate::SLIPPI_FILE_SIGNATURE)?;
+	expect_bytes(&mut r, &super::FILE_SIGNATURE)?;
 	// `raw` content size in bytes
 	r.read_u32::<BE>()
 }
@@ -847,20 +843,20 @@ pub fn parse_metadata<R: Read>(
 
 	// Since we already read the opening "{" from the `metadata` value,
 	// we know it's a map. `parse_map` will consume the corresponding "}".
-	let metadata = ubjson::de::to_map(&mut r)?;
+	let metadata = ubjson::read_map(&mut r)?;
 	info!("Metadata: {}", serde_json::to_string(&metadata)?);
 	state.game.metadata = Some(metadata);
 	Ok(())
 }
 
 /// Reads a Slippi-format game from `r`.
-pub fn read<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> {
+pub(crate) fn read<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> {
 	let raw_len = parse_header(&mut r, opts)? as usize;
 	info!("Raw length: {} bytes", raw_len);
 
 	let mut state = parse_start(&mut r, opts)?;
 
-	if opts.map(|o| o.skip_frames).unwrap_or(false) {
+	if opts.map_or(false, |o| o.skip_frames) {
 		// Skip to GameEnd, which we assume is the last event in the stream!
 		let end_offset = 1 + state.payload_sizes[Event::GameEnd as usize].unwrap().get() as usize;
 		if raw_len == 0 || raw_len - state.bytes_read < end_offset {
@@ -913,5 +909,5 @@ pub fn read<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> {
 		x => return Err(err!("expected: 0x55 or 0x7d, got: 0x{:x}", x)),
 	};
 
-	Ok(state.game.into())
+	Ok(Game::from(state.game))
 }

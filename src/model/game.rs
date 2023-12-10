@@ -1,5 +1,4 @@
 use std::{
-	error,
 	fmt::{self, Debug, Display, Formatter},
 	io,
 };
@@ -9,19 +8,16 @@ use serde::Serialize;
 use serde_json;
 
 use crate::{
-	io::slippi::de,
-	model::{frame::transpose, shift_jis::MeleeString, slippi},
+	io::slippi,
+	model::{frame::transpose, shift_jis::MeleeString},
 };
 
 pub mod immutable;
 pub mod mutable;
 
-/// We can parse files with higher versions than this, but we won't expose all information.
-/// When converting a replay with a higher version number to another format like Arrow,
-/// the conversion will be lossy.
-pub const MAX_SUPPORTED_VERSION: slippi::Version = slippi::Version(3, 13, 0);
-
 pub const NUM_PORTS: u8 = 4;
+pub const MAX_PLAYERS: usize = 6;
+pub const ICE_CLIMBERS: u8 = 14;
 
 #[repr(u8)]
 #[derive(
@@ -32,6 +28,18 @@ pub enum Port {
 	P2 = 1,
 	P3 = 2,
 	P4 = 3,
+}
+
+impl Port {
+	pub fn parse(s: &str) -> Result<Self, String> {
+		match s {
+			"P1" => Ok(Port::P1),
+			"P2" => Ok(Port::P2),
+			"P3" => Ok(Port::P3),
+			"P4" => Ok(Port::P4),
+			_ => Err(format!("invalid port: {}", s)),
+		}
+	}
 }
 
 impl Display for Port {
@@ -217,7 +225,7 @@ pub struct Start {
 
 impl Start {
 	pub fn from_bytes(bytes: &[u8]) -> io::Result<Self> {
-		de::game_start(&mut &bytes[..])
+		slippi::de::game_start(&mut &bytes[..])
 	}
 }
 
@@ -260,23 +268,9 @@ pub struct End {
 
 impl End {
 	pub fn from_bytes(bytes: &[u8]) -> io::Result<Self> {
-		de::game_end(&mut &bytes[..])
+		slippi::de::game_end(&mut &bytes[..])
 	}
 }
-
-#[derive(Clone, Copy, Debug)]
-pub struct UnexpectedPortCountError {
-	pub expected: usize,
-	pub actual: usize,
-}
-
-impl Display for UnexpectedPortCountError {
-	fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
-		write!(f, "expected {} ports, got {}", self.expected, self.actual)
-	}
-}
-
-impl error::Error for UnexpectedPortCountError {}
 
 /// Binary blob of Gecko codes in use.
 ///

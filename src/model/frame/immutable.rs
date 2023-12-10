@@ -17,11 +17,10 @@ use arrow2::{
 use byteorder::WriteBytesExt;
 
 use crate::{
-	io::slippi::de::Event,
+	io::slippi::{de::Event, Version},
 	model::{
 		frame::{self, mutable, transpose, PortOccupancy},
 		game::{Port, NUM_PORTS},
-		slippi::Version,
 	},
 };
 
@@ -295,10 +294,9 @@ impl Frame {
 		DataType::Struct(
 			ports
 				.iter()
-				.enumerate()
-				.map(|(i, p)| {
+				.map(|p| {
 					Field::new(
-						format!("{}", i),
+						format!("{}", p.port),
 						PortData::data_type(version, *p).clone(),
 						false,
 					)
@@ -308,14 +306,14 @@ impl Frame {
 	}
 
 	pub fn port_data_from_struct_array(array: StructArray, version: Version) -> Vec<PortData> {
-		let (_, values, _) = array.into_data();
+		let (fields, values, _) = array.into_data();
 		let mut ports = vec![];
 		for i in 0..NUM_PORTS {
 			if let Some(a) = values.get(i as usize) {
 				ports.push(PortData::from_struct_array(
 					a.as_any().downcast_ref::<StructArray>().unwrap().clone(),
 					version,
-					Port::try_from(i).unwrap(),
+					Port::parse(&fields[i as usize].name).unwrap(),
 				));
 			}
 		}
@@ -354,14 +352,14 @@ impl Frame {
 	}
 
 	pub fn into_struct_array(self, version: Version, ports: &[PortOccupancy]) -> StructArray {
-		let port = {
-			let values: Vec<_> = std::iter::zip(ports, self.ports)
-				.map(|(occupancy, data)| data.into_struct_array(version, *occupancy).boxed())
-				.collect();
-			StructArray::new(Self::port_data_type(version, ports), values, None).boxed()
-		};
+		let values: Vec<_> = std::iter::zip(ports, self.ports)
+			.map(|(occupancy, data)| data.into_struct_array(version, *occupancy).boxed())
+			.collect();
 
-		let mut arrays = vec![self.id.boxed(), port];
+		let mut arrays = vec![
+			self.id.boxed(),
+			StructArray::new(Self::port_data_type(version, ports), values, None).boxed(),
+		];
 
 		if version.gte(2, 2) {
 			arrays.push(self.start.unwrap().into_struct_array(version).boxed());
