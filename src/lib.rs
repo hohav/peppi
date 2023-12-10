@@ -15,21 +15,7 @@ pub mod model {
 	pub mod shift_jis;
 	pub mod slippi;
 }
-
-pub mod io {
-	pub mod slippi {
-		pub mod de;
-		pub mod ser;
-	}
-	pub mod peppi {
-		pub mod de;
-		pub mod ser;
-	}
-	pub(crate) mod ubjson {
-		pub(crate) mod de;
-		pub(crate) mod ser;
-	}
-}
+pub mod io;
 
 use std::{error, fmt, io::Read};
 
@@ -78,7 +64,7 @@ pub fn game<R: Read>(
 	opts: Option<&io::slippi::de::Opts>,
 ) -> std::result::Result<model::game::immutable::Game, ParseError> {
 	let mut r = TrackingReader { pos: 0, reader: r };
-	io::slippi::de::deserialize(&mut r, opts).map_err(|e| ParseError {
+	io::slippi::de::read(&mut r, opts).map_err(|e| ParseError {
 		error: e,
 		pos: Some(r.pos),
 	})

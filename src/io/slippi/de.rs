@@ -14,7 +14,7 @@ use log::{debug, info, warn};
 type BE = byteorder::BigEndian;
 
 use crate::{
-	io::ubjson,
+	io::{ICE_CLIMBERS, MAX_PLAYERS, expect_bytes, ubjson},
 	model::{
 		frame::{self, mutable::Frame as MutableFrame, transpose},
 		game::{self, immutable::Game, Netplay, Player, PlayerType, Port, NUM_PORTS},
@@ -22,9 +22,6 @@ use crate::{
 		slippi,
 	},
 };
-
-const MAX_PLAYERS: usize = 6;
-pub(crate) const ICE_CLIMBERS: u8 = 14;
 
 type PayloadSizes = [Option<NonZeroU16>; 256];
 
@@ -496,16 +493,6 @@ pub(crate) fn game_end(r: &mut &[u8]) -> Result<game::End> {
 	})
 }
 
-pub(crate) fn expect_bytes<R: Read>(r: &mut R, expected: &[u8]) -> Result<()> {
-	let mut actual = vec![0; expected.len()];
-	r.read_exact(&mut actual)?;
-	if expected == actual.as_slice() {
-		Ok(())
-	} else {
-		Err(err!("expected: {:?}, got: {:?}", expected, actual))
-	}
-}
-
 fn handle_splitter_event(buf: &[u8], accumulator: &mut SplitAccumulator) -> Result<Option<u8>> {
 	assert_eq!(buf.len(), 516);
 	let actual_size = (&buf[512..514]).read_u16::<BE>()?;
@@ -866,8 +853,8 @@ pub fn parse_metadata<R: Read>(
 	Ok(())
 }
 
-/// Parses a Slippi replay from `r`.
-pub fn deserialize<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> {
+/// Reads a Slippi-format game from `r`.
+pub fn read<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> {
 	let raw_len = parse_header(&mut r, opts)? as usize;
 	info!("Raw length: {} bytes", raw_len);
 

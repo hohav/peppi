@@ -8,8 +8,10 @@ use arrow2::{
 };
 
 use crate::{
-	io::peppi::ser::Peppi,
-	io::slippi::de::expect_bytes,
+	io::{
+		expect_bytes,
+		peppi::ser::Peppi,
+	},
 	model::{
 		frame::immutable::Frame,
 		game::{self, immutable::Game},
@@ -18,6 +20,14 @@ use crate::{
 };
 
 type JsMap = serde_json::Map<String, serde_json::Value>;
+
+/// Options for parsing Peppi games.
+#[derive(Clone, Debug, Default)]
+pub struct Opts {
+	/// Skip all frame data when parsing a replay for speed
+	/// (when you only need start/end/metadata).
+	pub skip_frames: bool,
+}
 
 fn read_arrow_frames<R: Read>(mut r: R, version: slippi::Version) -> Result<Frame, Box<dyn Error>> {
 	// magic number `ARROW1\0\0`
@@ -77,7 +87,7 @@ fn read_peppi_gecko_codes<R: Read>(mut r: R) -> Result<game::GeckoCodes, Box<dyn
 	})
 }
 
-pub fn read<R: Read>(r: R, skip_frames: bool) -> Result<(Game, String), Box<dyn Error>> {
+pub fn read<R: Read>(r: R, opts: &Opts) -> Result<(Game, String), Box<dyn Error>> {
 	let mut start: Option<game::Start> = None;
 	let mut end: Option<game::End> = None;
 	let mut metadata: Option<JsMap> = None;
@@ -96,11 +106,11 @@ pub fn read<R: Read>(r: R, skip_frames: bool) -> Result<(Game, String), Box<dyn 
 			Some("gecko_codes.raw") => gecko_codes = Some(read_peppi_gecko_codes(file)?),
 			Some("frames.arrow") => {
 				let version = start.as_ref().map(|s| s.slippi.version).ok_or("no start")?;
-				frames = Some(match skip_frames {
+				frames = Some(match opts.skip_frames {
 					true => unimplemented!(),
 					_ => read_arrow_frames(file, version)?,
 				});
-				if skip_frames {
+				if opts.skip_frames {
 					break;
 				}
 			}

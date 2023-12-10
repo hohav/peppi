@@ -181,7 +181,8 @@ fn raw_size(game: &Game, payload_sizes: &Vec<(u8, u16)>) -> u32 {
 		+ game.gecko_codes.as_ref().map_or(0, gecko_codes_size)
 }
 
-pub fn serialize<W: Write>(w: &mut W, game: &Game) -> Result<()> {
+/// Writes a Slippi-format game to `w`.
+pub fn write<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 	let payload_sizes = payload_sizes(game);
 	let raw_size = raw_size(game, &payload_sizes);
 

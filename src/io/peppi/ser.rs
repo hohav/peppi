@@ -10,7 +10,7 @@ use arrow2::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	io::slippi::de::ICE_CLIMBERS,
+	io::ICE_CLIMBERS,
 	model::{
 		frame::PortOccupancy,
 		game::{self, immutable::Game},
