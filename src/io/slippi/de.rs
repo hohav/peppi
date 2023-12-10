@@ -24,7 +24,7 @@ use crate::{
 };
 
 const MAX_PLAYERS: usize = 6;
-const ICE_CLIMBERS: u8 = 14;
+pub(crate) const ICE_CLIMBERS: u8 = 14;
 
 type PayloadSizes = [Option<NonZeroU16>; 256];
 
@@ -496,7 +496,7 @@ pub(crate) fn game_end(r: &mut &[u8]) -> Result<game::End> {
 	})
 }
 
-fn expect_bytes<R: Read>(r: &mut R, expected: &[u8]) -> Result<()> {
+pub(crate) fn expect_bytes<R: Read>(r: &mut R, expected: &[u8]) -> Result<()> {
 	let mut actual = vec![0; expected.len()];
 	r.read_exact(&mut actual)?;
 	if expected == actual.as_slice() {

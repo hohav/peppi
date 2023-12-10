@@ -21,6 +21,10 @@ pub mod io {
 		pub mod de;
 		pub mod ser;
 	}
+	pub mod peppi {
+		pub mod de;
+		pub mod ser;
+	}
 	pub(crate) mod ubjson {
 		pub(crate) mod de;
 		pub(crate) mod ser;
