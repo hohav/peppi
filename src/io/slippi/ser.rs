@@ -3,8 +3,11 @@ use std::io::{Result, Write};
 use byteorder::WriteBytesExt;
 
 use crate::{
-	io::slippi::de::Event,
-	io::ubjson,
+	io::{
+		assert_max_version,
+		slippi::de::Event,
+		ubjson,
+	},
 	model::{
 		frame::immutable::Frame,
 		game::{self, immutable::Game, GeckoCodes},
@@ -183,6 +186,8 @@ fn raw_size(game: &Game, payload_sizes: &Vec<(u8, u16)>) -> u32 {
 
 /// Writes a Slippi-format game to `w`.
 pub fn write<W: Write>(w: &mut W, game: &Game) -> Result<()> {
+	assert_max_version(game)?;
+
 	let payload_sizes = payload_sizes(game);
 	let raw_size = raw_size(game, &payload_sizes);
 

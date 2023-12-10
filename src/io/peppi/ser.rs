@@ -10,10 +10,10 @@ use arrow2::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	io::ICE_CLIMBERS,
+	io::{ICE_CLIMBERS, assert_max_version},
 	model::{
 		frame::PortOccupancy,
-		game::{self, immutable::Game},
+		game::immutable::Game,
 	},
 };
 
@@ -51,14 +51,7 @@ fn tar_append<W: Write, P: AsRef<Path>>(
 }
 
 pub fn write<W: Write>(game: Game, w: W, slp_hash: String) -> Result<(), Box<dyn Error>> {
-	if game.start.slippi.version > game::MAX_SUPPORTED_VERSION {
-		return Err(format!(
-			"Unsupported Slippi version ({} > {})",
-			game.start.slippi.version,
-			game::MAX_SUPPORTED_VERSION
-		)
-		.into());
-	}
+	assert_max_version(&game)?;
 
 	let peppi = Peppi {
 		version: PEPPI_FORMAT_VERSION.to_string(),
