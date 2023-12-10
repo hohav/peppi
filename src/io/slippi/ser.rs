@@ -3,13 +3,13 @@ use std::io::{Result, Write};
 use byteorder::WriteBytesExt;
 
 use crate::{
+	io::slippi::de::Event,
+	io::ubjson,
 	model::{
 		frame::immutable::Frame,
 		game::{self, immutable::Game, GeckoCodes},
 		slippi::Version,
 	},
-	serde::de::Event,
-	ubjson,
 };
 
 type BE = byteorder::BigEndian;

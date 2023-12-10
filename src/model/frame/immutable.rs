@@ -17,12 +17,12 @@ use arrow2::{
 use byteorder::WriteBytesExt;
 
 use crate::{
+	io::slippi::de::Event,
 	model::{
 		frame::{self, mutable, transpose, PortOccupancy},
 		game::{Port, NUM_PORTS},
 		slippi::Version,
 	},
-	serde::de::Event,
 };
 
 type BE = byteorder::BigEndian;

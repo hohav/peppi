@@ -14,13 +14,13 @@ use log::{debug, info, warn};
 type BE = byteorder::BigEndian;
 
 use crate::{
+	io::ubjson,
 	model::{
 		frame::{self, mutable::Frame as MutableFrame, transpose},
 		game::{self, immutable::Game, Netplay, Player, PlayerType, Port, NUM_PORTS},
 		shift_jis::MeleeString,
 		slippi,
 	},
-	ubjson,
 };
 
 const MAX_PLAYERS: usize = 6;

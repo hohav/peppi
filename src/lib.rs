@@ -9,11 +9,6 @@ pub const SLIPPI_FILE_SIGNATURE: [u8; 11] = [
 	0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c,
 ];
 
-pub(crate) mod ubjson {
-	pub(crate) mod de;
-	pub(crate) mod ser;
-}
-
 pub mod model {
 	pub mod frame;
 	pub mod game;
@@ -21,20 +16,23 @@ pub mod model {
 	pub mod slippi;
 }
 
-pub mod serde {
-	pub mod de;
-	pub mod ser;
+pub mod io {
+	pub mod slippi {
+		pub mod de;
+		pub mod ser;
+	}
+	pub(crate) mod ubjson {
+		pub(crate) mod de;
+		pub(crate) mod ser;
+	}
 }
 
-use std::{
-	error, fmt,
-	io::{self, Read},
-};
+use std::{error, fmt, io::Read};
 
 #[derive(Debug)]
 pub struct ParseError {
 	pub pos: Option<u64>,
-	pub error: io::Error,
+	pub error: std::io::Error,
 }
 
 impl fmt::Display for ParseError {
@@ -61,7 +59,7 @@ struct TrackingReader<R> {
 }
 
 impl<R: Read> Read for TrackingReader<R> {
-	fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+	fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
 		let result = self.reader.read(buf);
 		if let Ok(read) = result {
 			self.pos += read as u64;
@@ -73,10 +71,10 @@ impl<R: Read> Read for TrackingReader<R> {
 /// Parse a Slippi replay from `r`, returning a `peppi::model::game::immutable::Game`.
 pub fn game<R: Read>(
 	r: &mut R,
-	opts: Option<&serde::de::Opts>,
+	opts: Option<&io::slippi::de::Opts>,
 ) -> std::result::Result<model::game::immutable::Game, ParseError> {
 	let mut r = TrackingReader { pos: 0, reader: r };
-	serde::de::deserialize(&mut r, opts).map_err(|e| ParseError {
+	io::slippi::de::deserialize(&mut r, opts).map_err(|e| ParseError {
 		error: e,
 		pos: Some(r.pos),
 	})

@@ -72,7 +72,7 @@ For real-time parsing, you can "drive" things yourself:
 use std::fs;
 use std::io::BufReader;
 use byteorder::ReadBytesExt;
-use peppi::serde::de;
+use peppi::io::slippi::de;
 
 fn main() {
     let mut r = BufReader::new(fs::File::open("v3.12.slp").unwrap());

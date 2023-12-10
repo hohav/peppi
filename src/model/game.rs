@@ -9,8 +9,8 @@ use serde::Serialize;
 use serde_json;
 
 use crate::{
+	io::slippi::de,
 	model::{frame::transpose, shift_jis::MeleeString, slippi},
-	serde::de,
 };
 
 pub mod immutable;

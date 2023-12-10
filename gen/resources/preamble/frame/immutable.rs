@@ -20,7 +20,7 @@ use crate::{
 		game::{Port, NUM_PORTS},
 		slippi::Version,
 	},
-	serde::de::Event,
+	io::slippi::de::Event,
 };
 
 type BE = byteorder::BigEndian;
