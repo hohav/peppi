@@ -24,7 +24,9 @@ fn payload_sizes(game: &Game) -> Vec<(u8, u16)> {
 
 	sizes.push((
 		Event::FramePre as u8,
-		if ver.gte(1, 4) {
+		if ver.gte(3, 15) {
+			64
+		} else if ver.gte(1, 4) {
 			63
 		} else if ver.gte(1, 2) {
 			59

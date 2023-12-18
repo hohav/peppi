@@ -1272,6 +1272,7 @@ pub struct Pre {
 	pub triggers_physical: TriggersPhysical,
 	pub raw_analog_x: Option<PrimitiveArray<i8>>,
 	pub percent: Option<PrimitiveArray<f32>>,
+	pub raw_analog_y: Option<PrimitiveArray<i8>>,
 	pub validity: Option<Bitmap>,
 }
 
@@ -1296,7 +1297,10 @@ impl Pre {
 			if version.gte(1, 2) {
 				fields.push(Field::new("raw_analog_x", DataType::Int8, false));
 				if version.gte(1, 4) {
-					fields.push(Field::new("percent", DataType::Float32, false))
+					fields.push(Field::new("percent", DataType::Float32, false));
+					if version.gte(3, 15) {
+						fields.push(Field::new("raw_analog_y", DataType::Int8, false))
+					}
 				}
 			}
 		};
@@ -1318,7 +1322,10 @@ impl Pre {
 		if version.gte(1, 2) {
 			values.push(self.raw_analog_x.unwrap().boxed());
 			if version.gte(1, 4) {
-				values.push(self.percent.unwrap().boxed())
+				values.push(self.percent.unwrap().boxed());
+				if version.gte(3, 15) {
+					values.push(self.raw_analog_y.unwrap().boxed())
+				}
 			}
 		};
 		StructArray::new(Self::data_type(version), values, self.validity)
@@ -1401,6 +1408,12 @@ impl Pre {
 					.unwrap()
 					.clone()
 			}),
+			raw_analog_y: values.get(12).map(|x| {
+				x.as_any()
+					.downcast_ref::<PrimitiveArray<i8>>()
+					.unwrap()
+					.clone()
+			}),
 			validity: validity,
 		}
 	}
@@ -1419,7 +1432,10 @@ impl Pre {
 		if version.gte(1, 2) {
 			w.write_i8(self.raw_analog_x.as_ref().unwrap().value(i))?;
 			if version.gte(1, 4) {
-				w.write_f32::<BE>(self.percent.as_ref().unwrap().value(i))?
+				w.write_f32::<BE>(self.percent.as_ref().unwrap().value(i))?;
+				if version.gte(3, 15) {
+					w.write_i8(self.raw_analog_y.as_ref().unwrap().value(i))?
+				}
 			}
 		};
 		Ok(())
@@ -1439,6 +1455,7 @@ impl Pre {
 			triggers_physical: self.triggers_physical.transpose_one(i, version),
 			raw_analog_x: self.raw_analog_x.as_ref().map(|x| x.values()[i]),
 			percent: self.percent.as_ref().map(|x| x.values()[i]),
+			raw_analog_y: self.raw_analog_y.as_ref().map(|x| x.values()[i]),
 		}
 	}
 }
@@ -1458,6 +1475,7 @@ impl From<mutable::Pre> for Pre {
 			triggers_physical: x.triggers_physical.into(),
 			raw_analog_x: x.raw_analog_x.map(|x| x.into()),
 			percent: x.percent.map(|x| x.into()),
+			raw_analog_y: x.raw_analog_y.map(|x| x.into()),
 			validity: x.validity.map(|v| v.into()),
 		}
 	}

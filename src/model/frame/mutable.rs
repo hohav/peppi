@@ -595,6 +595,7 @@ pub struct Pre {
 	pub triggers_physical: TriggersPhysical,
 	pub raw_analog_x: Option<MutablePrimitiveArray<i8>>,
 	pub percent: Option<MutablePrimitiveArray<f32>>,
+	pub raw_analog_y: Option<MutablePrimitiveArray<i8>>,
 	pub validity: Option<MutableBitmap>,
 }
 
@@ -617,6 +618,9 @@ impl Pre {
 			percent: version
 				.gte(1, 4)
 				.then(|| MutablePrimitiveArray::<f32>::with_capacity(capacity)),
+			raw_analog_y: version
+				.gte(3, 15)
+				.then(|| MutablePrimitiveArray::<i8>::with_capacity(capacity)),
 			validity: None,
 		}
 	}
@@ -643,7 +647,10 @@ impl Pre {
 		if version.gte(1, 2) {
 			self.raw_analog_x.as_mut().unwrap().push_null();
 			if version.gte(1, 4) {
-				self.percent.as_mut().unwrap().push_null()
+				self.percent.as_mut().unwrap().push_null();
+				if version.gte(3, 15) {
+					self.raw_analog_y.as_mut().unwrap().push_null()
+				}
 			}
 		}
 	}
@@ -665,7 +672,11 @@ impl Pre {
 				.map(|x| self.raw_analog_x.as_mut().unwrap().push(Some(x)))?;
 			if version.gte(1, 4) {
 				r.read_f32::<BE>()
-					.map(|x| self.percent.as_mut().unwrap().push(Some(x)))?
+					.map(|x| self.percent.as_mut().unwrap().push(Some(x)))?;
+				if version.gte(3, 15) {
+					r.read_i8()
+						.map(|x| self.raw_analog_y.as_mut().unwrap().push(Some(x)))?
+				}
 			}
 		};
 		self.validity.as_mut().map(|v| v.push(true));
@@ -686,6 +697,7 @@ impl Pre {
 			triggers_physical: self.triggers_physical.transpose_one(i, version),
 			raw_analog_x: self.raw_analog_x.as_ref().map(|x| x.values()[i]),
 			percent: self.percent.as_ref().map(|x| x.values()[i]),
+			raw_analog_y: self.raw_analog_y.as_ref().map(|x| x.values()[i]),
 		}
 	}
 }
