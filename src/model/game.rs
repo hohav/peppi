@@ -174,6 +174,13 @@ impl Debug for Bytes {
 	}
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Match {
+	pub id: String,
+	pub game: u32,
+	pub tiebreaker: u32,
+}
+
 /// Information used to initialize the game such as the game mode, settings, characters & stage.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Start {
@@ -221,6 +228,10 @@ pub struct Start {
 	/// (added: v3.12)
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub language: Option<Language>,
+
+	/// (added: v3.14)
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub r#match: Option<Match>,
 }
 
 impl Start {

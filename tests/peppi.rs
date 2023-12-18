@@ -152,6 +152,7 @@ fn basic_game() {
 			is_frozen_ps: None,
 			scene: None,
 			language: None,
+			r#match: None,
 			bytes: Bytes(vec![
 				1, 0, 0, 0, 50, 1, 134, 76, 195, 0, 0, 0, 0, 0, 0, 255, 255, 110, 0, 8, 0, 0, 1,
 				224, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0,
@@ -585,6 +586,11 @@ fn v3_12() {
 				}
 			],
 			random_seed: 39656,
+			is_pal: Some(false),
+			is_frozen_ps: Some(false),
+			scene: Some(Scene { minor: 2, major: 8 }),
+			language: Some(Language::English),
+			r#match: None,
 			bytes: Bytes(vec![
 				3, 12, 0, 0, 50, 1, 142, 76, 195, 0, 0, 0, 0, 0, 0, 255, 255, 110, 0, 3, 0, 0, 1,
 				224, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0,
@@ -616,10 +622,6 @@ fn v3_12() {
 				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 1
 			]),
-			is_pal: Some(false),
-			is_frozen_ps: Some(false),
-			scene: Some(Scene { minor: 2, major: 8 }),
-			language: Some(Language::English),
 		}
 	);
 }

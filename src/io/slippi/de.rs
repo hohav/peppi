@@ -18,8 +18,8 @@ use crate::{
 	model::{
 		frame::{self, mutable::Frame as MutableFrame, transpose},
 		game::{
-			self, immutable::Game, Netplay, Player, PlayerType, Port, ICE_CLIMBERS, MAX_PLAYERS,
-			NUM_PORTS,
+			self, immutable::Game, Match, Netplay, Player, PlayerType, Port, ICE_CLIMBERS,
+			MAX_PLAYERS, NUM_PORTS,
 		},
 		shift_jis::MeleeString,
 	},
@@ -423,6 +423,23 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 		Ok(game::Language::try_from(r.read_u8()?).map_err(invalid_data)?)
 	})?;
 
+	let r#match = if_more(r, |r| {
+		let id = {
+			let mut buf = [0u8; 51];
+			r.read_exact(&mut buf)?;
+			let first_null = buf.iter().position(|&x| x == 0).unwrap_or(50);
+			let result = std::str::from_utf8(&buf[0..first_null]);
+			result.map(String::from).map_err(invalid_data)
+		}?;
+		let game = r.read_u32::<BE>()?;
+		let tiebreaker = r.read_u32::<BE>()?;
+		Ok(Match {
+			id,
+			game,
+			tiebreaker,
+		})
+	})?;
+
 	Ok(game::Start {
 		slippi,
 		bitfield,
@@ -445,6 +462,7 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 		scene,
 		// v3.12
 		language,
+		r#match,
 	})
 }
 
