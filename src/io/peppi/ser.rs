@@ -9,22 +9,8 @@ use arrow2::{
 
 use crate::{
 	io::{peppi, slippi},
-	model::{
-		frame::PortOccupancy,
-		game::{immutable::Game, ICE_CLIMBERS},
-	},
+	model::game::immutable::Game,
 };
-
-fn port_occupancy(game: &Game) -> Vec<PortOccupancy> {
-	game.start
-		.players
-		.iter()
-		.map(|p| PortOccupancy {
-			port: p.port,
-			follower: p.character == ICE_CLIMBERS,
-		})
-		.collect()
-}
 
 fn tar_append<W: Write, P: AsRef<Path>>(
 	builder: &mut tar::Builder<W>,
@@ -66,7 +52,7 @@ pub fn write<W: Write>(w: W, game: Game, peppi: peppi::Peppi) -> Result<(), Box<
 	}
 
 	if game.frames.id.len() > 0 {
-		let ports = port_occupancy(&game);
+		let ports = super::port_occupancy(&game.start);
 		let batch = game
 			.frames
 			.into_struct_array(game.start.slippi.version, &ports);

@@ -10,7 +10,10 @@ use std::{
 
 use crate::{
 	io::{parse_u8, PosError, TrackingReader},
-	model::game::immutable::Game,
+	model::{
+		frame::PortOccupancy,
+		game::{immutable::Game, Start, ICE_CLIMBERS},
+	},
 };
 
 pub use ser::write;
@@ -66,4 +69,15 @@ pub fn read<R: Read>(r: &mut R, opts: Option<&de::Opts>) -> Result<(Game, Peppi)
 		error: e,
 		pos: r.pos,
 	})
+}
+
+fn port_occupancy(start: &Start) -> Vec<PortOccupancy> {
+	start
+		.players
+		.iter()
+		.map(|p| PortOccupancy {
+			port: p.port,
+			follower: p.character == ICE_CLIMBERS,
+		})
+		.collect()
 }

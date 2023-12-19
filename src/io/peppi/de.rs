@@ -10,7 +10,7 @@ use arrow2::{
 use crate::{
 	io::{expect_bytes, peppi, slippi},
 	model::{
-		frame::immutable::Frame,
+		frame::{immutable::Frame, mutable::Frame as MutableFrame},
 		game::{self, immutable::Game},
 	},
 };
@@ -96,11 +96,10 @@ pub(crate) fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<(Game, peppi::P
 		debug!("processing file: {}", path.display());
 		match path.file_name().and_then(|n| n.to_str()) {
 			Some("peppi.json") => {
-				peppi = serde_json::from_reader(file)?;
+				let p: peppi::Peppi = serde_json::from_reader::<_, peppi::Peppi>(file)?;
 				// TODO: support reading v1
-				super::assert_current_version(
-					peppi.as_ref().ok_or(err!("missing peppi"))?.version,
-				)?;
+				super::assert_current_version(p.version)?;
+				peppi = Some(p);
 			}
 			Some("start.raw") => start = Some(read_peppi_start(file)?),
 			Some("end.raw") => end = Some(read_peppi_end(file)?),
@@ -112,7 +111,15 @@ pub(crate) fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<(Game, peppi::P
 					.map(|s| s.slippi.version)
 					.ok_or(err!("no start"))?;
 				frames = Some(match opts.map_or(false, |o| o.skip_frames) {
-					true => unimplemented!(),
+					true => {
+						let start = start.as_ref().ok_or(err!("missing start"))?;
+						MutableFrame::with_capacity(
+							0,
+							start.slippi.version,
+							&super::port_occupancy(start),
+						)
+						.into()
+					}
 					_ => read_arrow_frames(file, version)?,
 				});
 			}
