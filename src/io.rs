@@ -94,7 +94,7 @@ impl<R: Read> Read for HashingReader<R> {
 }
 
 pub fn format_hash(hasher: &Xxh3) -> String {
-	format!("xxh3:{:08x}", &hasher.digest())
+	format!("xxh3:{:016x}", &hasher.digest())
 }
 
 pub fn expect_bytes<R: Read>(r: &mut R, expected: &[u8]) -> Result<()> {
