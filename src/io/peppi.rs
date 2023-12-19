@@ -63,7 +63,7 @@ pub struct Peppi {
 	pub compression: Option<Compression>,
 }
 
-pub(crate) fn assert_current_version(version: Version) -> io::Result<()> {
+pub fn assert_current_version(version: Version) -> io::Result<()> {
 	if version == CURRENT_VERSION {
 		Ok(())
 	} else {

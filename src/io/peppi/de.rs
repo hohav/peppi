@@ -83,7 +83,7 @@ fn read_peppi_gecko_codes<R: Read>(mut r: R) -> Result<game::GeckoCodes, Error> 
 	})
 }
 
-pub(crate) fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<(Game, peppi::Peppi), Error> {
+pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<(Game, peppi::Peppi), Error> {
 	let mut start: Option<game::Start> = None;
 	let mut end: Option<game::End> = None;
 	let mut metadata: Option<JsMap> = None;

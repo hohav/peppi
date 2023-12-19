@@ -873,7 +873,7 @@ pub fn parse_metadata<R: Read>(
 }
 
 /// Reads a Slippi-format game from `r`.
-pub(crate) fn read<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> {
+pub fn read<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> {
 	let raw_len = parse_header(&mut r, opts)? as usize;
 	info!("Raw length: {} bytes", raw_len);
 
