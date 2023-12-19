@@ -4,7 +4,7 @@ use arrow2::{
 	array::Array,
 	chunk::Chunk,
 	datatypes::{Field, Schema},
-	io::ipc::write::{FileWriter, WriteOptions},
+	io::ipc::write::{Compression as ArrowCompression, FileWriter, WriteOptions},
 };
 
 use crate::{
@@ -26,7 +26,6 @@ fn tar_append<W: Write, P: AsRef<Path>>(
 	Ok(())
 }
 
-// TODO: compression opts
 pub fn write<W: Write>(w: W, game: Game, peppi: peppi::Peppi) -> Result<(), Box<dyn Error>> {
 	slippi::assert_max_version(game.start.slippi.version)?;
 	peppi::assert_current_version(peppi.version)?;
@@ -70,9 +69,13 @@ pub fn write<W: Write>(w: W, game: Game, peppi: peppi::Peppi) -> Result<(), Box<
 			schema,
 			None,
 			WriteOptions {
-				compression: None,
-				//compression: Some(Compression::LZ4),
-				//compression: Some(Compression::ZSTD),
+				compression: peppi.compression.map(|c| {
+					use peppi::Compression::*;
+					match c {
+						LZ4 => ArrowCompression::LZ4,
+						ZSTD => ArrowCompression::ZSTD,
+					}
+				}),
 			},
 		)?;
 		writer.write(&chunk, None)?;

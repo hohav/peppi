@@ -44,10 +44,23 @@ impl str::FromStr for Version {
 	}
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+impl Default for Version {
+	fn default() -> Self {
+		CURRENT_VERSION
+	}
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub enum Compression {
+	LZ4,
+	ZSTD,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Peppi {
 	pub version: Version,
-	pub slp_hash: String,
+	pub slp_hash: Option<String>,
+	pub compression: Option<Compression>,
 }
 
 pub(crate) fn assert_current_version(version: Version) -> io::Result<()> {

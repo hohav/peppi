@@ -7,7 +7,7 @@ use ssbm_data::{action_state, character::External, character::Internal, item::It
 
 use peppi::{
 	io::{
-		peppi::{self as io_peppi, Peppi},
+		peppi::{self as io_peppi},
 		slippi::{self, Slippi, Version},
 	},
 	model::{
@@ -742,15 +742,7 @@ fn _round_trip(in_path: impl AsRef<Path> + Clone) {
 		let slippi_game = slippi::read(&mut bytes.as_slice(), None).unwrap();
 		let peppi_game = {
 			let mut buf = Vec::new();
-			io_peppi::write(
-				&mut buf,
-				slippi_game,
-				Peppi {
-					version: io_peppi::CURRENT_VERSION,
-					slp_hash: String::new(),
-				},
-			)
-			.unwrap();
+			io_peppi::write(&mut buf, slippi_game, Default::default()).unwrap();
 			io_peppi::read(&mut &*buf, None).unwrap().0
 		};
 
