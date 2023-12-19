@@ -9,7 +9,7 @@ use std::{
 
 use arrow2::array::MutableArray;
 use byteorder::ReadBytesExt;
-use log::{debug, info, warn};
+use log::{debug, info, trace, warn};
 
 type BE = byteorder::BigEndian;
 
@@ -725,6 +725,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 				}
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
+				trace!("Frame start: {}", id);
 				state.frame_open(id);
 				state
 					.game
@@ -739,6 +740,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 				let id = r.read_i32::<BE>()?;
 				let port = r.read_u8()?;
 				let is_follower = r.read_u8()? != 0;
+				trace!("Frame pre: {}:{}", id, port);
 				if state.game.start.slippi.version.gte(2, 2) {
 					assert_eq!(id, state.last_id().unwrap());
 				} else {
@@ -782,6 +784,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 				let id = r.read_i32::<BE>()?;
 				let port = r.read_u8()?;
 				let is_follower = r.read_u8()? != 0;
+				trace!("Frame post: {}:{}", id, port);
 				assert_eq!(id, state.last_id().unwrap());
 				match is_follower {
 					true => state.game.frames.ports[state.port_indexes[port as usize]]
@@ -799,6 +802,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 			FrameEnd => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
+				trace!("Frame end: {}", id);
 				assert_eq!(id, state.last_id().unwrap());
 				let old_len = *state.game.frames.item_offset.as_ref().unwrap().last();
 				let new_len: i32 = state
@@ -831,6 +835,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 			Item => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
+				trace!("Frame item: {}", id);
 				assert_eq!(id, state.last_id().unwrap());
 				state
 					.game
