@@ -7,7 +7,7 @@ use std::io::Result;
 /// This type represents a Shift JIS string that has been decoded to utf-8.
 /// While this decoded string is valid utf-8, many characters are represented
 /// unusually or inconsistently. For that reason, most users should use
-/// [to_normalized](crate::model::shift_jis::MeleeString::to_normalized) when
+/// [to_normalized](crate::game::shift_jis::MeleeString::to_normalized) when
 /// working with this type.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct MeleeString(pub String);

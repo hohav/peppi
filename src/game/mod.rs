@@ -5,12 +5,14 @@ use serde::Serialize;
 use serde_json;
 
 use crate::{
+	frame::transpose,
+	game::shift_jis::MeleeString,
 	io::slippi::{self, Version},
-	model::{frame::transpose, shift_jis::MeleeString},
 };
 
 pub mod immutable;
 pub mod mutable;
+pub mod shift_jis;
 
 pub const NUM_PORTS: u8 = 4;
 pub const MAX_PLAYERS: usize = 6;

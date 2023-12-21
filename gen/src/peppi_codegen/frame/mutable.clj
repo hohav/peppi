@@ -6,7 +6,7 @@
    [clojure.pprint :refer [pprint]]
    [peppi-codegen.common :refer :all]
    [peppi-codegen.frame.common :refer :all]
-   [peppi-codegen.frame.immutable :as immutable]))
+   [peppi-codegen.frame.immutable.mod :as immutable]))
 
 (defn array-type
   [ty]

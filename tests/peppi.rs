@@ -6,18 +6,14 @@ use serde_json::json;
 use ssbm_data::{action_state, character::External, character::Internal, item::Item, stage::Stage};
 
 use peppi::{
+	frame::transpose::{self, Position},
+	game::{
+		immutable::Game, shift_jis::MeleeString, Bytes, DashBack, End, EndMethod, Language,
+		Netplay, Player, PlayerEnd, PlayerType, Port, Scene, ShieldDrop, Start, Ucf,
+	},
 	io::{
 		peppi::{self as io_peppi},
 		slippi::{self, Slippi, Version},
-	},
-	model::{
-		frame::transpose::{self, Position},
-		game::immutable::Game,
-		game::{
-			Bytes, DashBack, End, EndMethod, Language, Netplay, Player, PlayerEnd, PlayerType,
-			Port, Scene, ShieldDrop, Start, Ucf,
-		},
-		shift_jis::MeleeString,
 	},
 };
 

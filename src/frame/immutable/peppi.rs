@@ -8,14 +8,12 @@ use arrow2::{
 };
 
 use crate::{
-	io::slippi::Version,
-	model::{
-		frame::{
-			immutable::{Data, Frame, PortData},
-			PortOccupancy,
-		},
-		game::{Port, NUM_PORTS},
+	frame::{
+		immutable::{Data, Frame, PortData},
+		PortOccupancy,
 	},
+	game::{Port, NUM_PORTS},
+	io::slippi::Version,
 };
 
 impl Data {
@@ -258,7 +256,7 @@ impl Frame {
 	}
 }
 
-use crate::model::frame::immutable::End;
+use crate::frame::immutable::End;
 
 impl End {
 	fn data_type(version: Version) -> DataType {
@@ -293,7 +291,7 @@ impl End {
 	}
 }
 
-use crate::model::frame::immutable::Item;
+use crate::frame::immutable::Item;
 
 impl Item {
 	fn data_type(version: Version) -> DataType {
@@ -402,7 +400,7 @@ impl Item {
 	}
 }
 
-use crate::model::frame::immutable::ItemMisc;
+use crate::frame::immutable::ItemMisc;
 
 impl ItemMisc {
 	fn data_type(version: Version) -> DataType {
@@ -452,7 +450,7 @@ impl ItemMisc {
 	}
 }
 
-use crate::model::frame::immutable::Position;
+use crate::frame::immutable::Position;
 
 impl Position {
 	fn data_type(version: Version) -> DataType {
@@ -489,7 +487,7 @@ impl Position {
 	}
 }
 
-use crate::model::frame::immutable::Post;
+use crate::frame::immutable::Post;
 
 impl Post {
 	fn data_type(version: Version) -> DataType {
@@ -709,7 +707,7 @@ impl Post {
 	}
 }
 
-use crate::model::frame::immutable::Pre;
+use crate::frame::immutable::Pre;
 
 impl Pre {
 	fn data_type(version: Version) -> DataType {
@@ -854,7 +852,7 @@ impl Pre {
 	}
 }
 
-use crate::model::frame::immutable::Start;
+use crate::frame::immutable::Start;
 
 impl Start {
 	fn data_type(version: Version) -> DataType {
@@ -896,7 +894,7 @@ impl Start {
 	}
 }
 
-use crate::model::frame::immutable::StateFlags;
+use crate::frame::immutable::StateFlags;
 
 impl StateFlags {
 	fn data_type(version: Version) -> DataType {
@@ -953,7 +951,7 @@ impl StateFlags {
 	}
 }
 
-use crate::model::frame::immutable::TriggersPhysical;
+use crate::frame::immutable::TriggersPhysical;
 
 impl TriggersPhysical {
 	fn data_type(version: Version) -> DataType {
@@ -990,7 +988,7 @@ impl TriggersPhysical {
 	}
 }
 
-use crate::model::frame::immutable::Velocities;
+use crate::frame::immutable::Velocities;
 
 impl Velocities {
 	fn data_type(version: Version) -> DataType {
@@ -1048,7 +1046,7 @@ impl Velocities {
 	}
 }
 
-use crate::model::frame::immutable::Velocity;
+use crate::frame::immutable::Velocity;
 
 impl Velocity {
 	fn data_type(version: Version) -> DataType {

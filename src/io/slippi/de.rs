@@ -14,15 +14,12 @@ use log::{debug, info, trace, warn};
 type BE = byteorder::BigEndian;
 
 use crate::{
-	io::{expect_bytes, slippi, ubjson},
-	model::{
-		frame::{self, mutable::Frame as MutableFrame, transpose},
-		game::{
-			self, immutable::Game, Match, Netplay, Player, PlayerType, Port, ICE_CLIMBERS,
-			MAX_PLAYERS, NUM_PORTS,
-		},
-		shift_jis::MeleeString,
+	frame::{self, mutable::Frame as MutableFrame, transpose},
+	game::{
+		self, immutable::Game, shift_jis::MeleeString, Match, Netplay, Player, PlayerType, Port,
+		ICE_CLIMBERS, MAX_PLAYERS, NUM_PORTS,
 	},
+	io::{expect_bytes, slippi, ubjson},
 };
 
 type PayloadSizes = [Option<NonZeroU16>; 256];

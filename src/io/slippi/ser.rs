@@ -3,13 +3,11 @@ use std::io::{Result, Write};
 use byteorder::WriteBytesExt;
 
 use crate::{
+	frame::immutable::{End, Frame, Item, Post, Pre, Start},
+	game::{self, immutable::Game, GeckoCodes},
 	io::{
 		slippi::{self, de::Event},
 		ubjson,
-	},
-	model::{
-		frame::immutable::{End, Frame, Item, Post, Pre, Start},
-		game::{self, immutable::Game, GeckoCodes},
 	},
 };
 

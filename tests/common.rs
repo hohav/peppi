@@ -5,6 +5,7 @@ use std::{
 };
 
 use peppi::{
+	game::immutable::Game,
 	io::{
 		slippi::{
 			de::{Debug, Opts},
@@ -12,7 +13,6 @@ use peppi::{
 		},
 		PosError,
 	},
-	model::game::immutable::Game,
 };
 
 pub fn read_game(path: impl AsRef<Path>) -> Result<Game, PosError> {

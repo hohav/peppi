@@ -9,8 +9,8 @@ use std::{
 };
 
 use crate::{
+	game::immutable::Game,
 	io::{parse_u8, PosError, TrackingReader},
-	model::game::immutable::Game,
 };
 
 pub use ser::write;

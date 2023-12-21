@@ -8,8 +8,8 @@ use arrow2::{
 };
 
 use crate::{
+	game::immutable::Game,
 	io::{peppi, slippi},
-	model::game::immutable::Game,
 };
 
 fn tar_append<W: Write, P: AsRef<Path>>(

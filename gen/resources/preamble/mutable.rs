@@ -11,11 +11,9 @@ use byteorder::ReadBytesExt;
 use std::io::Result;
 
 use crate::{
-	model::{
-		frame::{transpose, PortOccupancy},
-		game::Port,
-	},
 	io::slippi::Version,
+	frame::{transpose, PortOccupancy},
+	game::Port,
 };
 
 type BE = byteorder::BigEndian;

@@ -10,11 +10,11 @@ use std::{
 use byteorder::WriteBytesExt;
 
 use crate::{
-	io::slippi::{de::Event, Version},
-	model::frame::{
+	frame::{
 		immutable::{Data, Frame, PortData},
 		PortOccupancy,
 	},
+	io::slippi::{de::Event, Version},
 };
 
 type BE = byteorder::BigEndian;
@@ -167,7 +167,7 @@ impl Frame {
 	}
 }
 
-use crate::model::frame::immutable::End;
+use crate::frame::immutable::End;
 
 impl End {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -186,7 +186,7 @@ impl End {
 	}
 }
 
-use crate::model::frame::immutable::Item;
+use crate::frame::immutable::Item;
 
 impl Item {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -227,7 +227,7 @@ impl Item {
 	}
 }
 
-use crate::model::frame::immutable::ItemMisc;
+use crate::frame::immutable::ItemMisc;
 
 impl ItemMisc {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -248,7 +248,7 @@ impl ItemMisc {
 	}
 }
 
-use crate::model::frame::immutable::Position;
+use crate::frame::immutable::Position;
 
 impl Position {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -265,7 +265,7 @@ impl Position {
 	}
 }
 
-use crate::model::frame::immutable::Post;
+use crate::frame::immutable::Post;
 
 impl Post {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -344,7 +344,7 @@ impl Post {
 	}
 }
 
-use crate::model::frame::immutable::Pre;
+use crate::frame::immutable::Pre;
 
 impl Pre {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -395,7 +395,7 @@ impl Pre {
 	}
 }
 
-use crate::model::frame::immutable::Start;
+use crate::frame::immutable::Start;
 
 impl Start {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -416,7 +416,7 @@ impl Start {
 	}
 }
 
-use crate::model::frame::immutable::StateFlags;
+use crate::frame::immutable::StateFlags;
 
 impl StateFlags {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -439,7 +439,7 @@ impl StateFlags {
 	}
 }
 
-use crate::model::frame::immutable::TriggersPhysical;
+use crate::frame::immutable::TriggersPhysical;
 
 impl TriggersPhysical {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -456,7 +456,7 @@ impl TriggersPhysical {
 	}
 }
 
-use crate::model::frame::immutable::Velocities;
+use crate::frame::immutable::Velocities;
 
 impl Velocities {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -479,7 +479,7 @@ impl Velocities {
 	}
 }
 
-use crate::model::frame::immutable::Velocity;
+use crate::frame::immutable::Velocity;
 
 impl Velocity {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {

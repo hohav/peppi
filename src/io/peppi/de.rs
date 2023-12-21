@@ -8,11 +8,9 @@ use arrow2::{
 };
 
 use crate::{
+	frame::{immutable::Frame, mutable::Frame as MutableFrame},
+	game::{self, immutable::Game},
 	io::{expect_bytes, peppi, slippi},
-	model::{
-		frame::{immutable::Frame, mutable::Frame as MutableFrame},
-		game::{self, immutable::Game},
-	},
 };
 
 type JsMap = serde_json::Map<String, serde_json::Value>;

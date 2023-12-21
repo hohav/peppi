@@ -4,10 +4,6 @@ macro_rules! err {
 	}
 }
 
-pub mod model {
-	pub mod frame;
-	pub mod game;
-	pub mod shift_jis;
-}
-
+pub mod frame;
+pub mod game;
 pub mod io;

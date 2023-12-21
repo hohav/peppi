@@ -1,4 +1,4 @@
-use crate::model::game::Port;
+use crate::game::Port;
 
 pub mod immutable;
 pub mod mutable;

@@ -13,13 +13,9 @@ use arrow2::{
 };
 
 use crate::{
-	model::{
-		frame::{self, mutable, transpose},
-		game::Port,
-	},
-	io::slippi::{
-		Version,
-	},
+	io::slippi::Version,
+	frame::{self, mutable, transpose},
+	game::Port,
 };
 
 #[derive(Debug)]

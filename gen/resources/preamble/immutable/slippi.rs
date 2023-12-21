@@ -8,16 +8,11 @@ use std::{
 use byteorder::WriteBytesExt;
 
 use crate::{
-	model::{
-		frame::{
-			immutable::{Data, Frame, PortData},
-			PortOccupancy,
-		},
+	frame::{
+		immutable::{Data, Frame, PortData},
+		PortOccupancy,
 	},
-	io::slippi::{
-		Version,
-		de::Event,
-	},
+	io::slippi::{Version, de::Event},
 };
 
 type BE = byteorder::BigEndian;

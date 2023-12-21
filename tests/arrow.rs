@@ -1,9 +1,9 @@
-use peppi::model::{frame::PortOccupancy, game::Port};
-
 use arrow2::io::json::write as json_write;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::io::BufWriter;
+
+use peppi::{frame::PortOccupancy, game::Port};
 
 mod common;
 use common::game;

@@ -8,22 +8,14 @@ target=target/frame
 cd "$(dirname "$0")/.."
 mkdir -p "$target/immutable"
 
-function frame {
-	echo "$dne"
-	echo
-	cat "$preamble/frame/$1.rs"
-	echo
-	clj -M -m "peppi-codegen.frame.${1//\//.}"
-}
-
-for x in mutable immutable immutable/slippi immutable/peppi transpose; do
+for x in mutable immutable/mod immutable/slippi immutable/peppi transpose; do
 	(
 		echo "$dne"
 		echo
-		cat "$preamble/frame/$x.rs"
+		cat "$preamble/$x.rs"
 		echo
 		clj -M -m "peppi-codegen.frame.${x//\//.}"
 	) | rustfmt > "$target/$x.rs"
 done
 
-rsync -a "$target/" ../src/model/frame
+rsync -a "$target/" ../src/frame

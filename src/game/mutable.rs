@@ -1,6 +1,6 @@
 use serde_json;
 
-use crate::model::{frame::mutable::Frame, game};
+use crate::{frame::mutable::Frame, game};
 
 pub struct Game {
 	pub start: game::Start,

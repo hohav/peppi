@@ -9,11 +9,9 @@ use std::{
 };
 
 use crate::{
+	frame::PortOccupancy,
+	game::{immutable::Game, Start, ICE_CLIMBERS},
 	io::{parse_u8, PosError, TrackingReader},
-	model::{
-		frame::PortOccupancy,
-		game::{immutable::Game, Start, ICE_CLIMBERS},
-	},
 };
 
 pub use ser::write;

@@ -6,16 +6,12 @@ use arrow2::{
 };
 
 use crate::{
-	model::{
-		frame::{
-			immutable::{Data, Frame, PortData},
-			PortOccupancy,
-		},
-		game::{Port, NUM_PORTS},
+	io::slippi::Version,
+	frame::{
+		immutable::{Data, Frame, PortData},
+		PortOccupancy,
 	},
-	io::slippi::{
-		Version,
-	},
+	game::{Port, NUM_PORTS},
 };
 
 impl Data {

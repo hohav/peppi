@@ -6,7 +6,7 @@
 
 (defn use-statement
   [[nm _]]
-  [:use (list "crate" "model" "frame" "immutable" nm)])
+  [:use (list "crate" "frame" "immutable" nm)])
 
 (defn arrow-field
   [{nm :name, ty :type, idx :index}]

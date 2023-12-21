@@ -1,4 +1,4 @@
-(ns peppi-codegen.frame.immutable
+(ns peppi-codegen.frame.immutable.mod
   (:require
    [clojure.java.io :as io]
    [peppi-codegen.common :refer :all]

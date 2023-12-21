@@ -1,6 +1,6 @@
 use serde_json;
 
-use crate::model::{
+use crate::{
 	frame::{immutable::Frame, transpose},
 	game::{self, End, GeckoCodes, Start},
 };
