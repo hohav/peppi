@@ -8,7 +8,7 @@ use crate::{
 		ubjson,
 	},
 	model::{
-		frame::immutable::Frame,
+		frame::immutable::{End, Frame, Item, Post, Pre, Start},
 		game::{self, immutable::Game, GeckoCodes},
 	},
 };
@@ -16,83 +16,33 @@ use crate::{
 type BE = byteorder::BigEndian;
 
 fn payload_sizes(game: &Game) -> Vec<(u8, u16)> {
+	// The order of the sizes list is important for round-tripping,
+	// which is why we use a Vec rather than a HashMap.
+	let mut sizes = Vec::new();
 	let start = &game.start;
 	let ver = start.slippi.version;
-	let mut sizes = Vec::new();
 
+	// +4 bytes for frame number, or +6 for frame number / port / follower
 	sizes.push((Event::GameStart as u8, start.bytes.0.len() as u16));
-
-	sizes.push((
-		Event::FramePre as u8,
-		if ver.gte(3, 15) {
-			64
-		} else if ver.gte(1, 4) {
-			63
-		} else if ver.gte(1, 2) {
-			59
-		} else {
-			58
-		},
-	));
-
-	sizes.push((
-		Event::FramePost as u8,
-		if ver.gte(3, 11) {
-			80
-		} else if ver.gte(3, 8) {
-			76
-		} else if ver.gte(3, 5) {
-			72
-		} else if ver.gte(2, 1) {
-			52
-		} else if ver.gte(2, 0) {
-			51
-		} else if ver.gte(0, 2) {
-			37
-		} else {
-			33
-		},
-	));
-
-	sizes.push((
-		Event::GameEnd as u8,
-		if ver.gte(3, 13) {
-			6
-		} else if ver.gte(2, 0) {
-			2
-		} else {
-			1
-		},
-	));
+	sizes.push((Event::FramePre as u8, 6 + Pre::size(ver) as u16));
+	sizes.push((Event::FramePost as u8, 6 + Post::size(ver) as u16));
+	sizes.push((Event::GameEnd as u8, game::End::size(ver) as u16));
 
 	if ver.gte(2, 2) {
-		sizes.push((Event::FrameStart as u8, if ver.gte(3, 10) { 12 } else { 8 }));
-	}
-
-	if ver.gte(3, 0) {
-		sizes.push((
-			Event::Item as u8,
-			if ver.gte(3, 6) {
-				42
-			} else if ver.gte(3, 2) {
-				41
-			} else {
-				37
-			},
-		));
-	}
-
-	if ver.gte(3, 0) {
-		sizes.push((Event::FrameEnd as u8, if ver.gte(3, 7) { 8 } else { 4 }));
-	}
-
-	if let Some(codes) = &game.gecko_codes {
-		// Higher-order bits of actual_size are lost matching slippi-behavior
-		sizes.push((Event::GeckoCodes as u8, codes.actual_size as u16));
-	}
-
-	if ver.gte(3, 3) {
-		sizes.push((0x10, 516)); // Message Splitter
+		sizes.push((Event::FrameStart as u8, 4 + Start::size(ver) as u16));
+		if ver.gte(3, 0) {
+			sizes.push((Event::Item as u8, 4 + Item::size(ver) as u16));
+			if ver.gte(3, 0) {
+				sizes.push((Event::FrameEnd as u8, 4 + End::size(ver) as u16));
+				if ver.gte(3, 3) {
+					if let Some(codes) = &game.gecko_codes {
+						// higher-order bits of actual_size are lost, matching Slippi's behavior
+						sizes.push((Event::GeckoCodes as u8, codes.actual_size as u16));
+						sizes.push((Event::MessageSplitter as u8, 516));
+					}
+				}
+			}
+		}
 	}
 
 	sizes
@@ -102,7 +52,7 @@ fn gecko_codes<W: Write>(w: &mut W, codes: &GeckoCodes) -> Result<()> {
 	let mut pos = 0;
 	let actual_size = codes.actual_size as usize;
 	while pos < actual_size {
-		w.write_u8(0x10)?; // Message Splitter
+		w.write_u8(Event::MessageSplitter as u8)?;
 		w.write_all(&codes.bytes[pos..pos + 512])?;
 		w.write_u16::<BE>(std::cmp::min(512, actual_size - pos) as u16)?;
 		w.write_u8(Event::GeckoCodes as u8)?;
@@ -191,9 +141,7 @@ pub fn write<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 	let payload_sizes = payload_sizes(game);
 	let raw_size = raw_size(game, &payload_sizes);
 
-	w.write_all(&[
-		0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c,
-	])?;
+	w.write_all(&slippi::FILE_SIGNATURE)?;
 	w.write_u32::<BE>(raw_size)?;
 
 	w.write_u8(Event::Payloads as u8)?;

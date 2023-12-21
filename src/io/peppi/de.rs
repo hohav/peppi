@@ -1,4 +1,4 @@
-use std::io::{Error, Read};
+use std::io::{Error, Read, Result};
 
 use log::debug;
 
@@ -25,7 +25,7 @@ pub struct Opts {
 	pub skip_frames: bool,
 }
 
-fn read_arrow_frames<R: Read>(mut r: R, version: slippi::Version) -> Result<Frame, Error> {
+fn read_arrow_frames<R: Read>(mut r: R, version: slippi::Version) -> Result<Frame> {
 	// magic number `ARROW1\0\0`
 	expect_bytes(&mut r, &[65, 82, 82, 79, 87, 49, 0, 0])?;
 	let metadata = read_stream_metadata(&mut r).map_err(Error::other)?;
@@ -52,19 +52,19 @@ fn read_arrow_frames<R: Read>(mut r: R, version: slippi::Version) -> Result<Fram
 	}
 }
 
-fn read_peppi_start<R: Read>(mut r: R) -> Result<game::Start, Error> {
+fn read_peppi_start<R: Read>(mut r: R) -> Result<game::Start> {
 	let mut buf = Vec::new();
 	r.read_to_end(&mut buf)?;
-	Ok(game::Start::from_bytes(buf.as_slice())?)
+	slippi::de::game_start(&mut &buf[..])
 }
 
-fn read_peppi_end<R: Read>(mut r: R) -> Result<game::End, Error> {
+fn read_peppi_end<R: Read>(mut r: R) -> Result<game::End> {
 	let mut buf = Vec::new();
 	r.read_to_end(&mut buf)?;
-	Ok(game::End::from_bytes(buf.as_slice())?)
+	slippi::de::game_end(&mut &buf[..])
 }
 
-fn read_peppi_metadata<R: Read>(r: R) -> Result<JsMap, Error> {
+fn read_peppi_metadata<R: Read>(r: R) -> Result<JsMap> {
 	let json_object: serde_json::Value = serde_json::from_reader(r)?;
 	match json_object {
 		serde_json::Value::Object(map) => Ok(map),
@@ -72,7 +72,7 @@ fn read_peppi_metadata<R: Read>(r: R) -> Result<JsMap, Error> {
 	}
 }
 
-fn read_peppi_gecko_codes<R: Read>(mut r: R) -> Result<game::GeckoCodes, Error> {
+fn read_peppi_gecko_codes<R: Read>(mut r: R) -> Result<game::GeckoCodes> {
 	let mut actual_size = [0; 4];
 	r.read_exact(&mut actual_size)?;
 	let mut bytes = Vec::new();
@@ -83,7 +83,7 @@ fn read_peppi_gecko_codes<R: Read>(mut r: R) -> Result<game::GeckoCodes, Error> 
 	})
 }
 
-pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<(Game, peppi::Peppi), Error> {
+pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<(Game, peppi::Peppi)> {
 	let mut start: Option<game::Start> = None;
 	let mut end: Option<game::End> = None;
 	let mut metadata: Option<JsMap> = None;

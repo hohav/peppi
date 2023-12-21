@@ -1,5 +1,0 @@
-#!/bin/bash
-set -euo pipefail
-
-cd "$(dirname "$0")/.."
-clj -M -m peppi-codegen.frame.transpose resources/structs.json

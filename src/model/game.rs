@@ -1,14 +1,11 @@
-use std::{
-	fmt::{self, Debug, Display, Formatter},
-	io,
-};
+use std::fmt::{self, Debug, Display, Formatter};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::Serialize;
 use serde_json;
 
 use crate::{
-	io::slippi,
+	io::slippi::{self, Version},
 	model::{frame::transpose, shift_jis::MeleeString},
 };
 
@@ -234,12 +231,6 @@ pub struct Start {
 	pub r#match: Option<Match>,
 }
 
-impl Start {
-	pub fn from_bytes(bytes: &[u8]) -> io::Result<Self> {
-		slippi::de::game_start(&mut &bytes[..])
-	}
-}
-
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
 pub enum EndMethod {
@@ -278,8 +269,14 @@ pub struct End {
 }
 
 impl End {
-	pub fn from_bytes(bytes: &[u8]) -> io::Result<Self> {
-		slippi::de::game_end(&mut &bytes[..])
+	pub(crate) fn size(version: Version) -> usize {
+		if version.gte(3, 13) {
+			6
+		} else if version.gte(2, 0) {
+			2
+		} else {
+			1
+		}
 	}
 }
 

@@ -5,6 +5,7 @@
    [clojure.string :as str]
    [clojure.pprint :refer [pprint]]
    [peppi-codegen.common :refer :all]
+   [peppi-codegen.frame.common :refer :all]
    [peppi-codegen.frame.immutable :as immutable]))
 
 (defn array-type
@@ -215,21 +216,6 @@
              (read-push-fn fields)
              (immutable/transpose-one-fn nm fields)]])
 
-(defn normalize-field
-  [idx field]
-  (-> field
-      (update :version #(some-> %
-                                (str/split #"\.")
-                                vec))
-      (assoc :index idx)))
-
-(defn -main [path]
-  (let [json (-> (read-json path)
-                 (update-vals #(map-indexed normalize-field %))
-                 (->> (sort-by key)))
-        decls (mapcat (juxt struct-decl struct-impl) json)]
-    (println do-not-edit)
-    (println (slurp (io/resource "preamble/frame/mutable.rs")))
-    (println)
-    (doseq [decl decls]
-      (println (emit-expr decl) "\n"))))
+(defn -main []
+  (doseq [decl (mapcat (juxt struct-decl struct-impl) (read-structs))]
+    (println (emit-expr decl) "\n")))

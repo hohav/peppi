@@ -44,6 +44,7 @@ pub struct Opts {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, num_enum::TryFromPrimitive)]
 #[repr(u8)]
 pub enum Event {
+	MessageSplitter = 0x10,
 	Payloads = 0x35,
 	GameStart = 0x36,
 	FramePre = 0x37,
@@ -692,8 +693,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 	let mut buf = vec![0; size];
 	r.read_exact(&mut buf)?;
 
-	if code == 0x10 {
-		// message splitter
+	if code == Event::MessageSplitter as u8 {
 		if let Some(wrapped_event) = handle_splitter_event(&buf, &mut state.split_accumulator)? {
 			code = wrapped_event;
 			buf.clear();
@@ -710,6 +710,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 		use Event::*;
 		match event {
 			Payloads => return Err(err!("Duplicate payloads event")),
+			MessageSplitter => {}
 			GeckoCodes => {
 				state.game.gecko_codes = Some(game::GeckoCodes {
 					bytes: buf.to_vec(),

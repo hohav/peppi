@@ -17,9 +17,6 @@
        (->> (sort-by key)
             (mapv (juxt (comp csk/->PascalCase :ident val) key))))])
 
-(defn -main [path]
-  (let [json (read-json path)
-        decls (mapv enum json)]
-    (println (slurp (io/resource "preamble/enums.rs")))
-    (doseq [decl decls]
-      (println (emit-expr decl) "\n"))))
+(defn -main [enum-name]
+  (doseq [decl (mapv enum (read-json (format "enums/%s.json" enum-name)))]
+    (println (emit-expr decl) "\n")))
