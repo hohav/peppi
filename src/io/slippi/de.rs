@@ -273,34 +273,10 @@ fn player(
 	}))
 }
 
-fn player_bytes_v3_11(r: &mut &[u8]) -> Result<[u8; 29]> {
-	let mut buf = [0; 29];
-	r.read_exact(&mut buf)?;
-	Ok(buf)
-}
-
-fn player_bytes_v3_9_name(r: &mut &[u8]) -> Result<[u8; 31]> {
-	let mut buf = [0; 31];
-	r.read_exact(&mut buf)?;
-	Ok(buf)
-}
-
-fn player_bytes_v3_9_code(r: &mut &[u8]) -> Result<[u8; 10]> {
-	let mut buf = [0; 10];
-	r.read_exact(&mut buf)?;
-	Ok(buf)
-}
-
-fn player_bytes_v1_3(r: &mut &[u8]) -> Result<[u8; 16]> {
-	let mut buf = [0; 16];
-	r.read_exact(&mut buf)?;
-	Ok(buf)
-}
-
-fn player_bytes_v1_0(r: &mut &[u8]) -> Result<[u8; 8]> {
-	let mut buf = [0; 8];
-	r.read_exact(&mut buf)?;
-	Ok(buf)
+fn player_bytes<const N: usize, const M: usize>(r: &mut &[u8]) -> Result<[[u8; N]; M]> {
+	let mut arrs: [[u8; N]; M] = [[0; N]; M];
+	arrs.iter_mut().try_for_each(|buf| r.read_exact(buf))?;
+	Ok(arrs)
 }
 
 pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
@@ -336,35 +312,23 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 	let damage_ratio = r.read_f32::<BE>()?;
 	r.read_exact(&mut unmapped[29..73])?;
 	// @0x65
-	let mut players_v0 = [[0; 36]; MAX_PLAYERS];
-	for p in &mut players_v0 {
-		r.read_exact(p)?;
-	}
+	let players_v0 = player_bytes::<36, MAX_PLAYERS>(r)?;
 	// @0x13d
 	let random_seed = r.read_u32::<BE>()?;
 
-	let players_v1_0 = match r.is_empty() {
-		true => [None, None, None, None],
-		_ => [
-			Some(player_bytes_v1_0(r)?),
-			Some(player_bytes_v1_0(r)?),
-			Some(player_bytes_v1_0(r)?),
-			Some(player_bytes_v1_0(r)?),
-		],
-	};
+	// v1.0
+	let players_v1_0 = if_more(r, |r| player_bytes::<8, NUM_PORTS>(r))?;
 
-	let players_v1_3 = match r.is_empty() {
-		true => [None, None, None, None],
-		_ => [
-			Some(player_bytes_v1_3(r)?),
-			Some(player_bytes_v1_3(r)?),
-			Some(player_bytes_v1_3(r)?),
-			Some(player_bytes_v1_3(r)?),
-		],
-	};
+	// v1.3
+	let players_v1_3 = if_more(r, |r| player_bytes::<16, NUM_PORTS>(r))?;
 
+	// v1.5
 	let is_pal = if_more(r, |r| Ok(r.read_u8()? != 0))?;
+
+	// v2.0
 	let is_frozen_ps = if_more(r, |r| Ok(r.read_u8()? != 0))?;
+
+	// v3.7
 	let scene = if_more(r, |r| {
 		Ok(game::Scene {
 			minor: r.read_u8()?,
@@ -372,55 +336,23 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 		})
 	})?;
 
-	let players_v3_9 = match r.is_empty() {
-		true => ([None, None, None, None], [None, None, None, None]),
-		_ => (
-			[
-				Some(player_bytes_v3_9_name(r)?),
-				Some(player_bytes_v3_9_name(r)?),
-				Some(player_bytes_v3_9_name(r)?),
-				Some(player_bytes_v3_9_name(r)?),
-			],
-			[
-				Some(player_bytes_v3_9_code(r)?),
-				Some(player_bytes_v3_9_code(r)?),
-				Some(player_bytes_v3_9_code(r)?),
-				Some(player_bytes_v3_9_code(r)?),
-			],
-		),
-	};
+	// v3.9
+	let players_v3_9 = if_more(r, |r| {
+		Ok((
+			player_bytes::<31, NUM_PORTS>(r)?,
+			player_bytes::<10, NUM_PORTS>(r)?,
+		))
+	})?;
 
-	let players_v3_11 = match r.is_empty() {
-		true => [None, None, None, None],
-		_ => [
-			Some(player_bytes_v3_11(r)?),
-			Some(player_bytes_v3_11(r)?),
-			Some(player_bytes_v3_11(r)?),
-			Some(player_bytes_v3_11(r)?),
-		],
-	};
+	// v3.11
+	let players_v3_11 = if_more(r, |r| player_bytes::<29, NUM_PORTS>(r))?;
 
-	let mut players = Vec::<Player>::new();
-	for n in 0..NUM_PORTS {
-		let nu = n as usize;
-		if let Some(p) = player(
-			Port::try_from(n).map_err(invalid_data)?,
-			&players_v0[nu],
-			is_teams,
-			players_v1_0[nu],
-			players_v1_3[nu],
-			players_v3_9.0[nu],
-			players_v3_9.1[nu],
-			players_v3_11[nu],
-		)? {
-			players.push(p);
-		}
-	}
-
+	// v3.12
 	let language = if_more(r, |r| {
 		Ok(game::Language::try_from(r.read_u8()?).map_err(invalid_data)?)
 	})?;
 
+	// v3.14
 	let r#match = if_more(r, |r| {
 		let id = {
 			let mut buf = [0u8; 51];
@@ -437,6 +369,22 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 			tiebreaker,
 		})
 	})?;
+
+	let players = (0..NUM_PORTS)
+		.filter_map(|n| {
+			player(
+				Port::try_from(n as u8).unwrap(),
+				&players_v0[n],
+				is_teams,
+				players_v1_0.map(|p| p[n]),
+				players_v1_3.map(|p| p[n]),
+				players_v3_9.map(|p| p.0[n]),
+				players_v3_9.map(|p| p.1[n]),
+				players_v3_11.map(|p| p[n]),
+			)
+			.transpose()
+		})
+		.collect::<Result<Vec<_>>>()?;
 
 	Ok(game::Start {
 		slippi,

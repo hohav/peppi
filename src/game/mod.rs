@@ -14,7 +14,7 @@ pub mod immutable;
 pub mod mutable;
 pub mod shift_jis;
 
-pub const NUM_PORTS: u8 = 4;
+pub const NUM_PORTS: usize = 4;
 pub const MAX_PLAYERS: usize = 6;
 pub const ICE_CLIMBERS: u8 = 14;
 
