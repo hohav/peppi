@@ -282,6 +282,17 @@ fn basic_game() {
 }
 
 #[test]
+fn skip_frames() {
+	let g1 = read_game(get_path("game"), false).unwrap();
+	let g2 = read_game(get_path("game"), true).unwrap();
+
+	assert_eq!(g1.start, g2.start);
+	assert_eq!(g1.end, g2.end);
+	assert_eq!(g1.metadata, g2.metadata);
+	assert_eq!(g2.frames.len(), 0);
+}
+
+#[test]
 fn ics() {
 	let game = game("ics");
 	assert_eq!(
@@ -654,7 +665,7 @@ fn unknown_event() {
 
 #[test]
 fn corrupt_replay() {
-	assert!(matches!(read_game(get_path("corrupt")), Err(_)));
+	assert!(matches!(read_game(get_path("corrupt"), false), Err(_)));
 }
 
 #[test]

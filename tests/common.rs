@@ -6,12 +6,18 @@ use std::{
 
 use peppi::{
 	game::immutable::Game,
-	io::{slippi::read, PosError},
+	io::{slippi, PosError},
 };
 
-pub fn read_game(path: impl AsRef<Path>) -> Result<Game, PosError> {
+pub fn read_game(path: impl AsRef<Path>, skip_frames: bool) -> Result<Game, PosError> {
 	let mut buf = BufReader::new(File::open(path).unwrap());
-	read(&mut buf, None)
+	slippi::read(
+		&mut buf,
+		Some(&slippi::de::Opts {
+			skip_frames: skip_frames,
+			..Default::default()
+		}),
+	)
 }
 
 pub fn get_path(name: &str) -> PathBuf {
@@ -19,5 +25,5 @@ pub fn get_path(name: &str) -> PathBuf {
 }
 
 pub fn game(name: &str) -> Game {
-	read_game(get_path(name)).unwrap()
+	read_game(get_path(name), false).unwrap()
 }
