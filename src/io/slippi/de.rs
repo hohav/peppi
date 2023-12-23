@@ -481,7 +481,7 @@ fn debug_write_event(
 	// where `count` is how many of that event we've seen already
 	let code_dir = debug.dir.join(format!("{}", code));
 	fs::create_dir_all(&code_dir)?;
-	let count = state.and_then(|s| s.event_counts.get(&code)).unwrap_or(&0);
+	let count = state.map_or(0, |s| *s.event_counts.get(&code).unwrap_or(&0));
 	let mut f = File::create(code_dir.join(format!("{}", count)))?;
 	f.write_all(buf)?;
 	Ok(())
@@ -607,12 +607,7 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 		result
 	};
 
-	let event_counts = {
-		let mut m = HashMap::new();
-		m.insert(Event::Payloads as u8, 1);
-		m.insert(Event::GameStart as u8, 1);
-		m
-	};
+	let event_counts = HashMap::from([(Event::Payloads as u8, 1), (Event::GameStart as u8, 1)]);
 
 	Ok(ParseState {
 		payload_sizes: payload_sizes,
@@ -649,6 +644,8 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 	if let Some(ref d) = opts.as_ref().and_then(|o| o.debug.as_ref()) {
 		debug_write_event(&buf, code, Some(state), d)?;
 	}
+
+	*state.event_counts.entry(code).or_default() += 1;
 
 	let event = Event::try_from(code).ok();
 	if let Some(event) = event {
