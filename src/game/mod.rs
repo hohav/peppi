@@ -2,7 +2,7 @@ use std::fmt::{self, Debug, Display, Formatter};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::Serialize;
-use serde_json;
+use serde_json::{Map, Value};
 
 use crate::{
 	frame::transpose,
@@ -294,7 +294,7 @@ pub struct GeckoCodes {
 pub trait Game {
 	fn start(&self) -> &Start;
 	fn end(&self) -> &Option<End>;
-	fn metadata(&self) -> &Option<serde_json::Map<String, serde_json::Value>>;
+	fn metadata(&self) -> &Option<Map<String, Value>>;
 	fn gecko_codes(&self) -> &Option<GeckoCodes>;
 
 	/// Duration of the game in frames.

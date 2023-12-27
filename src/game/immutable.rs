@@ -1,4 +1,4 @@
-use serde_json;
+use serde_json::{Map, Value};
 
 use crate::{
 	frame::{immutable::Frame, transpose},
@@ -10,7 +10,7 @@ pub struct Game {
 	pub start: Start,
 	pub end: Option<End>,
 	pub frames: Frame,
-	pub metadata: Option<serde_json::Map<String, serde_json::Value>>,
+	pub metadata: Option<Map<String, Value>>,
 	pub gecko_codes: Option<GeckoCodes>,
 	pub hash: Option<String>,
 }
@@ -24,7 +24,7 @@ impl game::Game for Game {
 		&self.end
 	}
 
-	fn metadata(&self) -> &Option<serde_json::Map<String, serde_json::Value>> {
+	fn metadata(&self) -> &Option<Map<String, Value>> {
 		&self.metadata
 	}
 
