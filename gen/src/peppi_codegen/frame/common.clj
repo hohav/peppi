@@ -13,7 +13,7 @@
 
 (defn read-structs
   []
-  (-> (read-json "structs.json")
+  (-> (read-json "frames.json")
       (update-vals #(map-indexed normalize-field %))
       (->> (sort-by key))))
 

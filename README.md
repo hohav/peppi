@@ -104,3 +104,9 @@ fn main() {
 ## Inspector
 
 ⚠ The `slp` tool has moved to the [peppi-slp](https://github.com/hohav/peppi-slp) crate.
+
+## Development
+
+The Rust source files in [src/frame](src/frame) are generated using Clojure from [frames.json](gen/resources/frames.json), which describes all the per-frame fields present in each version of the [spec](https://github.com/project-slippi/slippi-wiki/blob/master/SPEC.md). If you make changes to `frames.json` or modify the generator code in `gen/src`, run `gen/scripts/frames` to regenerate those Rust files.
+
+If you're adding support for a new version of the spec, you'll also need to bump `peppi::io::slippi::MAX_SUPPORTED_VERSION`.

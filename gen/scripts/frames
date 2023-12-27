@@ -9,6 +9,7 @@ cd "$(dirname "$0")/.."
 mkdir -p "$target/immutable"
 
 for x in mutable immutable/mod immutable/slippi immutable/peppi transpose; do
+	echo "generating: src/frame/$x.rs"
 	(
 		echo "$dne"
 		echo
