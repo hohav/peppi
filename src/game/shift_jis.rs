@@ -34,9 +34,9 @@ impl TryFrom<&[u8]> for MeleeString {
 	type Error = std::io::Error;
 	fn try_from(s: &[u8]) -> Result<MeleeString> {
 		let first_null = s.iter().position(|&x| x == 0).unwrap_or(s.len());
-		match SHIFT_JIS.decode_without_bom_handling(&s[0..first_null]) {
-			(_, true) => Err(err!("invalid Shift JIS sequence")),
-			(cow, _) => Ok(MeleeString(cow.to_string())),
+		match SHIFT_JIS.decode_without_bom_handling_and_without_replacement(&s[0..first_null]) {
+			Some(cow) => Ok(MeleeString(cow.to_string())),
+			_ => Err(err!("invalid Shift JIS sequence")),
 		}
 	}
 }
