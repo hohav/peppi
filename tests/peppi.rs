@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{fs, io::Cursor, path::Path};
 
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -746,11 +746,11 @@ fn _round_trip(in_path: impl AsRef<Path> + Clone) {
 	let bytes = fs::read(in_path.clone()).unwrap();
 
 	let game2 = {
-		let slippi_game = slippi::read(&mut bytes.as_slice(), None).unwrap();
+		let slippi_game = slippi::read(Cursor::new(bytes.as_slice()), None).unwrap();
 		let peppi_game = {
 			let mut buf = Vec::new();
 			io_peppi::write(&mut buf, slippi_game, Default::default()).unwrap();
-			io_peppi::read(&mut &*buf, None).unwrap().0
+			io_peppi::read(&mut &*buf, None).unwrap()
 		};
 
 		let mut buf = Vec::with_capacity(bytes.len());
@@ -762,10 +762,10 @@ fn _round_trip(in_path: impl AsRef<Path> + Clone) {
 			return;
 		}
 
-		slippi::read(&mut buf.as_slice(), None).unwrap()
+		slippi::read(Cursor::new(buf.as_slice()), None).unwrap()
 	};
 
-	let game1 = slippi::read(&mut bytes.as_slice(), None).unwrap();
+	let game1 = slippi::read(Cursor::new(bytes.as_slice()), None).unwrap();
 	assert_eq!(game1.start, game2.start);
 	assert_eq!(game1.end, game2.end);
 	assert_eq!(game1.metadata, game2.metadata);

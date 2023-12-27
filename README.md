@@ -13,7 +13,7 @@ peppi = "2.0.0-alpha.2"
 
 ## Usage
 
-One-shot parsing just requires calling `peppi::game`.
+One-shot parsing of a Slippi (.slp) replay:
 
 ```rust
 use std::{fs, io};
@@ -23,7 +23,8 @@ use ssbm_data::action_state::Common::{self, *};
 
 fn main() {
     let mut r = io::BufReader::new(fs::File::open("game.slp").unwrap());
-    let game = peppi::game(&mut r, None).unwrap();
+    // replace with `peppi::io::peppi::read` to read Peppi (.slpp) replays
+    let game = peppi::io::slippi::read(&mut r, None).unwrap();
 
     // print general info about the game
     println!("{:#?}", game);
@@ -66,7 +67,7 @@ fn main() {
 }
 ```
 
-For real-time parsing, you can "drive" things yourself:
+For live games, you can drive parsing yourself:
 
 ```rust
 use std::fs;

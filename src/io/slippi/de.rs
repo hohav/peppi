@@ -2,7 +2,7 @@ use std::{
 	collections::HashMap,
 	error,
 	fs::{self, File},
-	io::{self, Read, Result, Write},
+	io::{self, Read, Result, Seek, SeekFrom, Write},
 	num::NonZeroU16,
 	path::PathBuf,
 };
@@ -19,7 +19,7 @@ use crate::{
 		self, immutable::Game, shift_jis::MeleeString, Match, Netplay, Player, PlayerType, Port,
 		ICE_CLIMBERS, MAX_PLAYERS, NUM_PORTS,
 	},
-	io::{expect_bytes, slippi, ubjson},
+	io::{expect_bytes, slippi, ubjson, HashingReader},
 };
 
 type PayloadSizes = [Option<NonZeroU16>; 256];
@@ -65,6 +65,7 @@ pub struct PartialGame {
 	pub frames: MutableFrame,
 	pub metadata: Option<serde_json::Map<String, serde_json::Value>>,
 	pub gecko_codes: Option<game::GeckoCodes>,
+	pub hash: Option<String>,
 }
 
 impl From<PartialGame> for Game {
@@ -75,6 +76,7 @@ impl From<PartialGame> for Game {
 			frames: game.frames.into(),
 			metadata: game.metadata,
 			gecko_codes: game.gecko_codes,
+			hash: game.hash,
 		}
 	}
 }
@@ -591,12 +593,17 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 		})
 		.collect();
 	let version = start.slippi.version;
+	let capacity = match opts.map_or(false, |o| o.skip_frames) {
+		true => 0,
+		false => 1024,
+	};
 	let game = PartialGame {
 		start: start.clone(),
 		end: None,
-		frames: MutableFrame::with_capacity(1024, version, &ports),
+		frames: MutableFrame::with_capacity(capacity, version, &ports),
 		metadata: None,
 		gecko_codes: None,
+		hash: None,
 	};
 
 	let port_indexes = {
@@ -816,7 +823,8 @@ pub fn parse_metadata<R: Read>(
 }
 
 /// Reads a Slippi-format game from `r`.
-pub fn read<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> {
+pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
+	let mut r = HashingReader::new(r, !opts.map_or(false, |o| o.skip_frames));
 	let raw_len = parse_header(&mut r, opts)? as usize;
 	info!("Raw length: {} bytes", raw_len);
 
@@ -832,9 +840,7 @@ pub fn read<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> {
 		}
 		let skip = raw_len - state.bytes_read - end_offset;
 		info!("Jumping to GameEnd (skipping {} bytes)", skip);
-		// In theory we should seek() if `r` is Seekable, but it's not much
-		// faster and is very awkward to implement without specialization.
-		io::copy(&mut r.by_ref().take(skip as u64), &mut io::sink())?;
+		r.seek(SeekFrom::Current(skip.try_into().map_err(invalid_data)?))?;
 		state.bytes_read += skip;
 	}
 
@@ -875,5 +881,6 @@ pub fn read<R: Read>(mut r: &mut R, opts: Option<&Opts>) -> Result<Game> {
 		x => return Err(err!("expected: 0x55 or 0x7d, got: 0x{:x}", x)),
 	};
 
+	state.game.hash = r.into_digest();
 	Ok(Game::from(state.game))
 }

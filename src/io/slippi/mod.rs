@@ -4,7 +4,7 @@ pub mod ser;
 use serde::{Deserialize, Serialize};
 use std::{
 	fmt,
-	io::{self, Error, Read},
+	io::{self, Error, Read, Seek},
 	str,
 };
 
@@ -76,9 +76,9 @@ pub fn assert_max_version(version: Version) -> io::Result<()> {
 	}
 }
 
-/// Parses a Slippi replay from `r`, returning a `Game`.
-pub fn read<R: Read>(r: &mut R, opts: Option<&de::Opts>) -> Result<Game, PosError> {
-	let mut r = TrackingReader { pos: 0, reader: r };
+/// Parses a Slippi replay from `r`.
+pub fn read<R: Read + Seek>(r: R, opts: Option<&de::Opts>) -> Result<Game, PosError> {
+	let mut r = TrackingReader::new(r);
 	de::read(&mut r, opts).map_err(|e| PosError {
 		error: e,
 		pos: r.pos,

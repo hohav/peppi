@@ -58,7 +58,6 @@ pub enum Compression {
 pub struct Peppi {
 	pub version: Version,
 	pub slp_hash: Option<String>,
-	pub compression: Option<Compression>,
 }
 
 pub fn assert_current_version(version: Version) -> io::Result<()> {
@@ -73,15 +72,6 @@ pub fn assert_current_version(version: Version) -> io::Result<()> {
 	}
 }
 
-/// Parses a Peppi replay from `r`, returning a `Game` and a `Peppi`.
-pub fn read<R: Read>(r: &mut R, opts: Option<&de::Opts>) -> Result<(Game, Peppi), PosError> {
-	let mut r = TrackingReader { pos: 0, reader: r };
-	de::read(&mut r, opts).map_err(|e| PosError {
-		error: e,
-		pos: r.pos,
-	})
-}
-
 fn port_occupancy(start: &Start) -> Vec<PortOccupancy> {
 	start
 		.players
@@ -91,4 +81,13 @@ fn port_occupancy(start: &Start) -> Vec<PortOccupancy> {
 			follower: p.character == ICE_CLIMBERS,
 		})
 		.collect()
+}
+
+/// Parses a Peppi replay from `r`.
+pub fn read<R: Read>(r: &mut R, opts: Option<&de::Opts>) -> Result<Game, PosError> {
+	let mut r = TrackingReader::new(r);
+	de::read(&mut r, opts).map_err(|e| PosError {
+		error: e,
+		pos: r.pos,
+	})
 }

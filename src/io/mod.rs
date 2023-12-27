@@ -5,7 +5,7 @@ pub(crate) mod ubjson;
 use std::{
 	error::Error,
 	fmt,
-	io::{Read, Result},
+	io::{Read, Result, Seek, SeekFrom},
 };
 
 use xxhash_rust::xxh3::Xxh3;
@@ -28,7 +28,7 @@ impl Error for PosError {
 	}
 }
 
-fn parse_u8(s: &str) -> std::io::Result<u8> {
+fn parse_u8(s: &str) -> Result<u8> {
 	s.parse().map_err(|_| err!("couldn't parse integer: {}", s))
 }
 
@@ -62,22 +62,32 @@ impl<R: Read> Read for TrackingReader<R> {
 	}
 }
 
-/// Reader that hashes the bytes it reads. Wrap with a `BufReader` for performance.
-pub struct HashingReader<R> {
-	reader: R,
-	hasher: Box<Xxh3>,
+impl<S: Seek> Seek for TrackingReader<S> {
+	fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
+		let result = self.reader.seek(pos);
+		if let Ok(pos) = result {
+			self.pos = pos;
+		}
+		result
+	}
 }
 
-impl<R> HashingReader<R> {
-	pub fn new(reader: R) -> Self {
+/// Reader that hashes the bytes it reads.
+pub struct HashingReader<R: Read> {
+	reader: R,
+	hasher: Option<Box<Xxh3>>,
+}
+
+impl<R: Read> HashingReader<R> {
+	pub fn new(reader: R, hash: bool) -> Self {
 		Self {
 			reader,
-			hasher: Box::new(Xxh3::new()),
+			hasher: hash.then(|| Box::new(Xxh3::new())),
 		}
 	}
 
-	pub fn into_digest(self) -> String {
-		format_hash(&self.hasher)
+	pub fn into_digest(self) -> Option<String> {
+		self.hasher.as_deref().map(format_hash)
 	}
 
 	pub fn into_inner(self) -> R {
@@ -88,7 +98,16 @@ impl<R> HashingReader<R> {
 impl<R: Read> Read for HashingReader<R> {
 	fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
 		let n = self.reader.read(buf)?;
-		self.hasher.update(&buf[..n]);
+		self.hasher.as_mut().map(|h| h.update(&buf[..n]));
+		Ok(n)
+	}
+}
+
+impl<R: Read + Seek> Seek for HashingReader<R> {
+	fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
+		let n = self.reader.seek(pos)?;
+		// disable hashing, since we'll no longer get a meaningful result
+		self.hasher = None;
 		Ok(n)
 	}
 }

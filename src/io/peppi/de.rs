@@ -81,7 +81,7 @@ fn read_peppi_gecko_codes<R: Read>(mut r: R) -> Result<game::GeckoCodes> {
 	})
 }
 
-pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<(Game, peppi::Peppi)> {
+pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<Game> {
 	let mut start: Option<game::Start> = None;
 	let mut end: Option<game::End> = None;
 	let mut metadata: Option<JsMap> = None;
@@ -120,19 +120,18 @@ pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<(Game, peppi::Peppi)> 
 					}
 					_ => read_arrow_frames(file, version)?,
 				});
+				break;
 			}
 			_ => debug!("=> skipping"),
 		};
 	}
 
-	Ok((
-		Game {
-			metadata: metadata,
-			start: start.ok_or(err!("missing start"))?,
-			end: end,
-			gecko_codes: gecko_codes,
-			frames: frames.ok_or(err!("missing frames"))?,
-		},
-		peppi.ok_or(err!("missing peppi"))?,
-	))
+	Ok(Game {
+		metadata: metadata,
+		start: start.ok_or(err!("missing start"))?,
+		end: end,
+		gecko_codes: gecko_codes,
+		frames: frames.ok_or(err!("missing frames"))?,
+		hash: peppi.ok_or(err!("missing peppi"))?.slp_hash,
+	})
 }

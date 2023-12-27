@@ -4,13 +4,19 @@ use arrow2::{
 	array::Array,
 	chunk::Chunk,
 	datatypes::{Field, Schema},
-	io::ipc::write::{Compression as ArrowCompression, FileWriter, WriteOptions},
+	io::ipc::write::{Compression, FileWriter, WriteOptions},
 };
 
 use crate::{
 	game::immutable::Game,
 	io::{peppi, slippi},
 };
+
+/// Options for writing Peppi files.
+#[derive(Clone, Debug, Default)]
+pub struct Opts {
+	pub compression: Option<Compression>,
+}
 
 fn tar_append<W: Write, P: AsRef<Path>>(
 	builder: &mut tar::Builder<W>,
@@ -26,12 +32,18 @@ fn tar_append<W: Write, P: AsRef<Path>>(
 	Ok(())
 }
 
-pub fn write<W: Write>(w: W, game: Game, peppi: peppi::Peppi) -> Result<(), Box<dyn Error>> {
+pub fn write<W: Write>(w: W, game: Game, opts: Option<&Opts>) -> Result<(), Box<dyn Error>> {
 	slippi::assert_max_version(game.start.slippi.version)?;
-	peppi::assert_current_version(peppi.version)?;
 
 	let mut tar = tar::Builder::new(w);
-	tar_append(&mut tar, &serde_json::to_vec(&peppi)?, "peppi.json")?;
+	tar_append(
+		&mut tar,
+		&serde_json::to_vec(&peppi::Peppi {
+			version: peppi::CURRENT_VERSION,
+			slp_hash: game.hash,
+		})?,
+		"peppi.json",
+	)?;
 	tar_append(
 		&mut tar,
 		&serde_json::to_vec(&game.metadata)?,
@@ -69,13 +81,7 @@ pub fn write<W: Write>(w: W, game: Game, peppi: peppi::Peppi) -> Result<(), Box<
 			schema,
 			None,
 			WriteOptions {
-				compression: peppi.compression.map(|c| {
-					use peppi::Compression::*;
-					match c {
-						LZ4 => ArrowCompression::LZ4,
-						ZSTD => ArrowCompression::ZSTD,
-					}
-				}),
+				compression: opts.map_or(None, |o| o.compression),
 			},
 		)?;
 		writer.write(&chunk, None)?;
