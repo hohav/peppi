@@ -1,4 +1,4 @@
-use std::io::{Result, Write};
+use std::io::Write;
 
 use byteorder::WriteBytesExt;
 
@@ -7,7 +7,7 @@ use crate::{
 	game::{self, immutable::Game, GeckoCodes},
 	io::{
 		slippi::{self, de::Event},
-		ubjson,
+		ubjson, Result,
 	},
 };
 
@@ -63,7 +63,7 @@ fn gecko_codes<W: Write>(w: &mut W, codes: &GeckoCodes) -> Result<()> {
 fn game_start<W: Write>(w: &mut W, s: &game::Start, ver: slippi::Version) -> Result<()> {
 	assert_eq!(ver, s.slippi.version);
 	w.write_u8(Event::GameStart as u8)?;
-	w.write_all(&s.bytes.0)
+	Ok(w.write_all(&s.bytes.0)?)
 }
 
 fn game_end<W: Write>(w: &mut W, e: &game::End, ver: slippi::Version) -> Result<()> {

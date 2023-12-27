@@ -2,7 +2,7 @@ use std::{
 	collections::HashMap,
 	error,
 	fs::{self, File},
-	io::{self, Read, Result, Seek, SeekFrom, Write},
+	io::{self, Read, Seek, SeekFrom, Write},
 	num::NonZeroU16,
 	path::PathBuf,
 };
@@ -19,7 +19,7 @@ use crate::{
 		self, immutable::Game, shift_jis::MeleeString, Match, Netplay, Player, PlayerType, Port,
 		ICE_CLIMBERS, MAX_PLAYERS, NUM_PORTS,
 	},
-	io::{expect_bytes, slippi, ubjson, HashingReader},
+	io::{expect_bytes, slippi, ubjson, HashingReader, Result},
 };
 
 type PayloadSizes = [Option<NonZeroU16>; 256];
@@ -550,10 +550,11 @@ fn parse_payloads<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<(usize, Payl
 fn parse_game_start<R: Read>(
 	mut r: R,
 	payload_sizes: &PayloadSizes,
+	bytes_read: usize,
 	opts: Option<&Opts>,
 ) -> Result<(usize, game::Start)> {
 	let code = r.read_u8()?;
-	debug!("Event: {:#x}", code);
+	debug!("Event {:#x} @{:#x}", code, bytes_read);
 
 	let size = payload_sizes[code as usize]
 		.ok_or_else(|| err!("unknown event: {:#02x}", code))?
@@ -567,7 +568,7 @@ fn parse_game_start<R: Read>(
 
 	match Event::try_from(code) {
 		// +1 byte for the event code
-		Ok(Event::GameStart) => Ok((size + 1, game_start(&mut &*buf)?)),
+		Ok(Event::GameStart) => Ok((bytes_read + size + 1, game_start(&mut &*buf)?)),
 		_ => Err(err!("Invalid event before start: {:#02x}", code)),
 	}
 }
@@ -577,12 +578,12 @@ pub fn parse_header<R: Read>(mut r: R, _opts: Option<&Opts>) -> Result<u32> {
 	// The official JS parser does this too, so it should be reliable.
 	expect_bytes(&mut r, &super::FILE_SIGNATURE)?;
 	// `raw` content size in bytes
-	r.read_u32::<BE>()
+	Ok(r.read_u32::<BE>()?)
 }
 
 pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState> {
-	let (bytes1, payload_sizes) = parse_payloads(&mut r, opts)?;
-	let (bytes2, start) = parse_game_start(&mut r, &payload_sizes, opts)?;
+	let (bytes_read, payload_sizes) = parse_payloads(&mut r, opts)?;
+	let (bytes_read, start) = parse_game_start(&mut r, &payload_sizes, bytes_read, opts)?;
 
 	let ports: Vec<_> = start
 		.players
@@ -617,12 +618,12 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 	let event_counts = HashMap::from([(Event::Payloads as u8, 1), (Event::GameStart as u8, 1)]);
 
 	Ok(ParseState {
-		payload_sizes: payload_sizes,
-		bytes_read: bytes1 + bytes2,
-		event_counts: event_counts,
+		payload_sizes,
+		bytes_read,
+		event_counts,
+		game,
+		port_indexes,
 		split_accumulator: Default::default(),
-		game: game,
-		port_indexes: port_indexes,
 	})
 }
 
@@ -632,7 +633,7 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 /// Game End (which signals the end of the event stream).
 pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts>) -> Result<u8> {
 	let mut code = r.read_u8()?;
-	debug!("Event: {:#x}", code);
+	debug!("Event {:#x} @{:#x}", code, state.bytes_read);
 
 	let size = state.payload_sizes[code as usize]
 		.ok_or_else(|| err!("unknown event: {:#02x}", code))?

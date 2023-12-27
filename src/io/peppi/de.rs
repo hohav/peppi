@@ -1,4 +1,4 @@
-use std::io::{Error, Read, Result};
+use std::io::Read;
 
 use log::debug;
 
@@ -10,7 +10,7 @@ use arrow2::{
 use crate::{
 	frame::{immutable::Frame, mutable::Frame as MutableFrame},
 	game::{self, immutable::Game},
-	io::{expect_bytes, peppi, slippi},
+	io::{expect_bytes, peppi, slippi, Result},
 };
 
 type JsMap = serde_json::Map<String, serde_json::Value>;
@@ -26,11 +26,11 @@ pub struct Opts {
 fn read_arrow_frames<R: Read>(mut r: R, version: slippi::Version) -> Result<Frame> {
 	// magic number `ARROW1\0\0`
 	expect_bytes(&mut r, &[65, 82, 82, 79, 87, 49, 0, 0])?;
-	let metadata = read_stream_metadata(&mut r).map_err(Error::other)?;
+	let metadata = read_stream_metadata(&mut r)?;
 	let reader = StreamReader::new(r, metadata, None);
 	let mut frame: Option<Frame> = None;
 	for result in reader {
-		match result.map_err(Error::other)? {
+		match result? {
 			StreamState::Some(chunk) => match frame {
 				None => {
 					let f = chunk.arrays()[0]

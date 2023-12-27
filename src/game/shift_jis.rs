@@ -1,7 +1,7 @@
 use encoding_rs::SHIFT_JIS;
 use serde::Serialize;
 
-use std::io::Result;
+use crate::io::{err, Error, Result};
 
 /// Melee encodes strings using the Shift JIS character encoding for Japanese.
 /// This type represents a Shift JIS string that has been decoded to utf-8.
@@ -31,7 +31,7 @@ impl MeleeString {
 }
 
 impl TryFrom<&[u8]> for MeleeString {
-	type Error = std::io::Error;
+	type Error = Error;
 	fn try_from(s: &[u8]) -> Result<MeleeString> {
 		let first_null = s.iter().position(|&x| x == 0).unwrap_or(s.len());
 		match SHIFT_JIS.decode_without_bom_handling_and_without_replacement(&s[0..first_null]) {

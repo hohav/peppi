@@ -1,13 +1,15 @@
-use std::io::{Error, ErrorKind, Read, Result};
+use std::io::Read;
 
 use byteorder::{BigEndian, ReadBytesExt};
 use serde_json::{Map, Value};
+
+use crate::io::Result;
 
 fn to_utf8<R: Read>(r: &mut R) -> Result<String> {
 	let length = r.read_u8()?;
 	let mut buf = vec![0; length as usize];
 	r.read_exact(&mut buf)?;
-	String::from_utf8(buf).map_err(|e| Error::new(ErrorKind::InvalidData, e))
+	Ok(String::from_utf8(buf)?)
 }
 
 fn to_val<R: Read>(r: &mut R) -> Result<Value> {

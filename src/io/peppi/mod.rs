@@ -2,18 +2,15 @@ pub mod de;
 pub mod ser;
 
 use serde::{Deserialize, Serialize};
-use std::{
-	fmt,
-	io::{self, Error, Read},
-	str,
-};
+use std::{fmt, str};
 
 use crate::{
 	frame::PortOccupancy,
-	game::{immutable::Game, Start, ICE_CLIMBERS},
-	io::{parse_u8, PosError, TrackingReader},
+	game::{Start, ICE_CLIMBERS},
+	io::{parse_u8, Error, Result},
 };
 
+pub use de::read;
 pub use ser::write;
 
 /// Current version of the Peppi format
@@ -33,7 +30,7 @@ impl fmt::Display for Version {
 
 impl str::FromStr for Version {
 	type Err = Error;
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
+	fn from_str(s: &str) -> Result<Self> {
 		let mut i = s.split('.');
 		match (i.next(), i.next(), i.next()) {
 			(Some(major), Some(minor), None) => Ok(Version(parse_u8(major)?, parse_u8(minor)?)),
@@ -60,7 +57,7 @@ pub struct Peppi {
 	pub slp_hash: Option<String>,
 }
 
-pub fn assert_current_version(version: Version) -> io::Result<()> {
+pub fn assert_current_version(version: Version) -> Result<()> {
 	if version == CURRENT_VERSION {
 		Ok(())
 	} else {
@@ -81,13 +78,4 @@ fn port_occupancy(start: &Start) -> Vec<PortOccupancy> {
 			follower: p.character == ICE_CLIMBERS,
 		})
 		.collect()
-}
-
-/// Parses a Peppi replay from `r`.
-pub fn read<R: Read>(r: &mut R, opts: Option<&de::Opts>) -> Result<Game, PosError> {
-	let mut r = TrackingReader::new(r);
-	de::read(&mut r, opts).map_err(|e| PosError {
-		error: e,
-		pos: r.pos,
-	})
 }

@@ -2,17 +2,11 @@ pub mod de;
 pub mod ser;
 
 use serde::{Deserialize, Serialize};
-use std::{
-	fmt,
-	io::{self, Error, Read, Seek},
-	str,
-};
+use std::{fmt, str};
 
-use crate::{
-	game::immutable::Game,
-	io::{parse_u8, PosError, TrackingReader},
-};
+use crate::io::{parse_u8, Error, Result};
 
+pub use de::read;
 pub use ser::write;
 
 /// We can parse files with higher versions than this, but we won't expose all information.
@@ -40,7 +34,7 @@ impl Version {
 
 impl str::FromStr for Version {
 	type Err = Error;
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
+	fn from_str(s: &str) -> Result<Self> {
 		let mut i = s.split('.');
 		match (i.next(), i.next(), i.next(), i.next()) {
 			(Some(major), Some(minor), Some(patch), None) => Ok(Version(
@@ -64,7 +58,7 @@ pub struct Slippi {
 	pub version: Version,
 }
 
-pub fn assert_max_version(version: Version) -> io::Result<()> {
+pub fn assert_max_version(version: Version) -> Result<()> {
 	if version <= MAX_SUPPORTED_VERSION {
 		Ok(())
 	} else {
@@ -74,13 +68,4 @@ pub fn assert_max_version(version: Version) -> io::Result<()> {
 			MAX_SUPPORTED_VERSION
 		))
 	}
-}
-
-/// Parses a Slippi replay from `r`.
-pub fn read<R: Read + Seek>(r: R, opts: Option<&de::Opts>) -> Result<Game, PosError> {
-	let mut r = TrackingReader::new(r);
-	de::read(&mut r, opts).map_err(|e| PosError {
-		error: e,
-		pos: r.pos,
-	})
 }

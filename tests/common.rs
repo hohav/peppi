@@ -6,10 +6,10 @@ use std::{
 
 use peppi::{
 	game::immutable::Game,
-	io::{slippi, PosError},
+	io::{slippi, Result},
 };
 
-pub fn read_game(path: impl AsRef<Path>, skip_frames: bool) -> Result<Game, PosError> {
+pub fn read_game(path: impl AsRef<Path>, skip_frames: bool) -> Result<Game> {
 	let mut buf = BufReader::new(File::open(path).unwrap());
 	slippi::read(
 		&mut buf,
