@@ -35,6 +35,9 @@ pub struct Debug {
 pub struct Opts {
 	/// Skip all frame data (faster when you only need start/end/metadata).
 	pub skip_frames: bool,
+	/// Don't compute a hash of the replay's contents.
+	/// Enabled automatically when `skip_frames` is on.
+	pub skip_hash: bool,
 	/// Debug options.
 	pub debug: Option<Debug>,
 }
@@ -827,7 +830,7 @@ pub fn parse_metadata<R: Read>(
 /// Reads a Slippi-format game from `r`.
 pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
 	// Wrap so we can hash all the bytes we've read at the end.
-	let mut r = HashingReader::new(r, !opts.map_or(false, |o| o.skip_frames));
+	let mut r = HashingReader::new(r, !opts.map_or(false, |o| o.skip_frames || o.skip_hash));
 
 	// Handle Event Payloads and Game Start
 	let raw_len = parse_header(&mut r, opts)? as usize;
