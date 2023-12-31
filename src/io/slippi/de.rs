@@ -555,7 +555,7 @@ fn parse_game_start<R: Read>(
 	opts: Option<&Opts>,
 ) -> Result<(usize, game::Start)> {
 	let code = r.read_u8()?;
-	debug!("Event {:#x} @{:#x}", code, bytes_read);
+	debug!("Event {:#02x} @{:#x}", code, bytes_read);
 
 	let size = payload_sizes[code as usize]
 		.ok_or_else(|| err!("unknown event: {:#02x}", code))?
@@ -634,7 +634,7 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 /// Game End (which signals the end of the event stream).
 pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts>) -> Result<u8> {
 	let mut code = r.read_u8()?;
-	debug!("Event {:#x} @{:#x}", code, state.bytes_read);
+	debug!("Event {:#02x} @{:#x}", code, state.bytes_read);
 
 	let size = state.payload_sizes[code as usize]
 		.ok_or_else(|| err!("unknown event: {:#02x}", code))?
@@ -885,7 +885,7 @@ pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
 			expect_bytes(&mut r, &[0x7d])?;
 		}
 		0x7d => {} // top-level closing brace ("}")
-		x => return Err(err!("expected: 0x55 or 0x7d, got: 0x{:x}", x)),
+		x => return Err(err!("expected: 0x55 or 0x7d, got: {:#02x}", x)),
 	};
 
 	state.game.hash = r.into_digest();
