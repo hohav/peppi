@@ -26,15 +26,16 @@ type PayloadSizes = [Option<NonZeroU16>; 256];
 
 #[derive(Clone, Debug)]
 pub struct Debug {
+	/// Output the each event's payload to `{dir}/{event_code}/{event_num}`.
 	pub dir: PathBuf,
 }
 
 /// Options for parsing replays.
 #[derive(Clone, Debug, Default)]
 pub struct Opts {
-	/// Skip all frame data when parsing a replay for speed
-	/// (when you only need start/end/metadata).
+	/// Skip all frame data (faster when you only need start/end/metadata).
 	pub skip_frames: bool,
+	/// Debug options.
 	pub debug: Option<Debug>,
 }
 
@@ -825,7 +826,10 @@ pub fn parse_metadata<R: Read>(
 
 /// Reads a Slippi-format game from `r`.
 pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
+	// Wrap so we can hash all the bytes we've read at the end.
 	let mut r = HashingReader::new(r, !opts.map_or(false, |o| o.skip_frames));
+
+	// Handle Event Payloads and Game Start
 	let raw_len = parse_header(&mut r, opts)? as usize;
 	info!("Raw length: {} bytes", raw_len);
 
@@ -845,7 +849,7 @@ pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
 		state.bytes_read += skip;
 	}
 
-	// `raw_len` will be 0 for an in-progress replay
+	// Main event loop. `raw_len` will be 0 for an in-progress replay.
 	while raw_len == 0 || state.bytes_read < raw_len {
 		if parse_event(r.by_ref(), &mut state, opts)? == Event::GameEnd as u8 {
 			break;
@@ -873,6 +877,8 @@ pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
 		);
 	}
 
+	// Some replays have no `metadata` (e.g. Fizzi's anonymized Ranked dataset),
+	// in which case the next char should be the final UBSJON `}`.
 	match r.read_u8()? {
 		0x55 => {
 			parse_metadata(r.by_ref(), &mut state, opts)?;
