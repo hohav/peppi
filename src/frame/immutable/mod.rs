@@ -15,6 +15,12 @@ use crate::{
 	io::slippi::Version,
 };
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Rollbacks {
+	First,
+	Last,
+}
+
 #[derive(Debug)]
 pub struct Data {
 	pub pre: Pre,
@@ -105,25 +111,30 @@ impl Frame {
 		}
 	}
 
-	pub fn rollback_indexes_initial(&self) -> Vec<usize> {
-		self.rollback_indexes(self.id.values().as_slice().iter().enumerate())
+	/// Frames IDs may appear multiple times due to rollbacks. This fn lets you
+	/// dedupe rollback frames, by returning `true` for only one of each unique
+	/// frame ID. The value returned at index `i` corresponds to `self.id[i]`.
+	pub fn deduped_validity(&self, rollbacks_to_keep: Rollbacks) -> Vec<bool> {
+		use Rollbacks::*;
+		match rollbacks_to_keep {
+			First => self.deduped_validity_(self.id.values_iter().enumerate()),
+			Last => self.deduped_validity_(self.id.values_iter().enumerate().rev()),
+		}
 	}
 
-	pub fn rollback_indexes_final(&self) -> Vec<usize> {
-		let mut result =
-			self.rollback_indexes(self.id.values().as_slice().iter().enumerate().rev());
-		result.reverse();
-		result
-	}
-
-	fn rollback_indexes<'a>(&self, ids: impl Iterator<Item = (usize, &'a i32)>) -> Vec<usize> {
-		let mut result = vec![];
-		let mut seen_ids = vec![false; self.id.len()];
+	fn deduped_validity_<'a>(&self, ids: impl Iterator<Item = (usize, &'a i32)>) -> Vec<bool> {
+		let mut result = vec![false; self.len()];
+		let unique_id_count = self.id.values_iter().max().map_or(0, |idx| {
+			1 + usize::try_from(idx - frame::FIRST_INDEX).unwrap()
+		});
+		let mut seen = vec![false; unique_id_count];
 		for (idx, id) in ids {
 			let zero_based_id = usize::try_from(id - frame::FIRST_INDEX).unwrap();
-			if !seen_ids[zero_based_id] {
-				seen_ids[zero_based_id] = true;
-				result.push(idx);
+			if !seen[zero_based_id] {
+				seen[zero_based_id] = true;
+				result[idx] = true;
+			} else {
+				result[idx] = false;
 			}
 		}
 		result

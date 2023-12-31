@@ -6,7 +6,10 @@ use serde_json::json;
 use ssbm_data::{action_state, character::External, character::Internal, item::Item, stage::Stage};
 
 use peppi::{
-	frame::transpose::{self, Position},
+	frame::{
+		immutable::Rollbacks,
+		transpose::{self, Position},
+	},
 	game::{
 		immutable::Game, shift_jis::MeleeString, Bytes, DashBack, End, EndMethod, Language,
 		Netplay, Player, PlayerEnd, PlayerType, Port, Scene, ShieldDrop, Start, Ucf,
@@ -795,7 +798,7 @@ fn round_trip() {
 }
 
 #[test]
-fn rollback() {
+fn deduped_validity() {
 	let game = game("ics2");
 	assert_eq!(game.frames.len(), 9530);
 	assert_eq!(
@@ -803,11 +806,13 @@ fn rollback() {
 		[350, 351, 351, 352]
 	);
 	assert_eq!(
-		game.frames.rollback_indexes_initial()[473..476],
-		[473, 474, 476]
+		game.frames.deduped_validity(Rollbacks::First)[473..477],
+		[true, true, false, true],
+		"second instance of frame 351 skipped"
 	);
 	assert_eq!(
-		game.frames.rollback_indexes_final()[473..476],
-		[473, 475, 476]
+		game.frames.deduped_validity(Rollbacks::Last)[473..477],
+		[true, false, true, true],
+		"first instance of frame 351 skipped"
 	);
 }
