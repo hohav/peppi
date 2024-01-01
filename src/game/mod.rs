@@ -5,7 +5,7 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 
 use crate::{
-	frame::transpose,
+	frame::{transpose, PortOccupancy},
 	game::shift_jis::MeleeString,
 	io::slippi::{self, Version},
 };
@@ -303,4 +303,15 @@ pub trait Game {
 	/// Combines all data for a single frame into a struct.
 	/// Avoid calling this if you need maximum performance.
 	fn frame(&self, idx: usize) -> transpose::Frame;
+}
+
+pub fn port_occupancy(start: &Start) -> Vec<PortOccupancy> {
+	start
+		.players
+		.iter()
+		.map(|p| PortOccupancy {
+			port: p.port,
+			follower: p.character == ICE_CLIMBERS,
+		})
+		.collect()
 }

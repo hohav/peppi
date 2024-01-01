@@ -16,8 +16,8 @@ type BE = byteorder::BigEndian;
 use crate::{
 	frame::{self, mutable::Frame as MutableFrame, transpose},
 	game::{
-		self, immutable::Game, shift_jis::MeleeString, Match, Netplay, Player, PlayerType, Port,
-		ICE_CLIMBERS, MAX_PLAYERS, NUM_PORTS,
+		self, immutable::Game, port_occupancy, shift_jis::MeleeString, Match, Netplay, Player,
+		PlayerType, Port, MAX_PLAYERS, NUM_PORTS,
 	},
 	io::{expect_bytes, slippi, ubjson, HashingReader, Result},
 };
@@ -589,14 +589,7 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 	let (bytes_read, payload_sizes) = parse_payloads(&mut r, opts)?;
 	let (bytes_read, start) = parse_game_start(&mut r, &payload_sizes, bytes_read, opts)?;
 
-	let ports: Vec<_> = start
-		.players
-		.iter()
-		.map(|p| frame::PortOccupancy {
-			port: p.port,
-			follower: p.character == ICE_CLIMBERS,
-		})
-		.collect();
+	let ports = port_occupancy(&start);
 	let version = start.slippi.version;
 	let capacity = match opts.map_or(false, |o| o.skip_frames) {
 		true => 0,

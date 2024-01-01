@@ -9,7 +9,7 @@ use arrow2::{
 
 use crate::{
 	frame::{immutable::Frame, mutable::Frame as MutableFrame},
-	game::{self, immutable::Game},
+	game::{self, immutable::Game, port_occupancy},
 	io::{expect_bytes, peppi, slippi, Result},
 };
 
@@ -111,12 +111,8 @@ pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<Game> {
 				frames = Some(match opts.map_or(false, |o| o.skip_frames) {
 					true => {
 						let start = start.as_ref().ok_or(err!("missing start"))?;
-						MutableFrame::with_capacity(
-							0,
-							start.slippi.version,
-							&super::port_occupancy(start),
-						)
-						.into()
+						MutableFrame::with_capacity(0, start.slippi.version, &port_occupancy(start))
+							.into()
 					}
 					_ => read_arrow_frames(file, version)?,
 				});

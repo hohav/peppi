@@ -8,7 +8,7 @@ use arrow2::{
 };
 
 use crate::{
-	game::immutable::Game,
+	game::{immutable::Game, port_occupancy},
 	io::{peppi, slippi},
 };
 
@@ -63,7 +63,7 @@ pub fn write<W: Write>(w: W, game: Game, opts: Option<&Opts>) -> Result<(), Box<
 	}
 
 	if game.frames.id.len() > 0 {
-		let ports = super::port_occupancy(&game.start);
+		let ports = port_occupancy(&game.start);
 		let batch = game
 			.frames
 			.into_struct_array(game.start.slippi.version, &ports);

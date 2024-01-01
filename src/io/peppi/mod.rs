@@ -4,11 +4,7 @@ pub mod ser;
 use serde::{Deserialize, Serialize};
 use std::{fmt, str};
 
-use crate::{
-	frame::PortOccupancy,
-	game::{Start, ICE_CLIMBERS},
-	io::{parse_u8, Error, Result},
-};
+use crate::io::{parse_u8, Error, Result};
 
 pub use de::read;
 pub use ser::write;
@@ -67,15 +63,4 @@ pub fn assert_current_version(version: Version) -> Result<()> {
 			CURRENT_VERSION
 		))
 	}
-}
-
-fn port_occupancy(start: &Start) -> Vec<PortOccupancy> {
-	start
-		.players
-		.iter()
-		.map(|p| PortOccupancy {
-			port: p.port,
-			follower: p.character == ICE_CLIMBERS,
-		})
-		.collect()
 }
