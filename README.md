@@ -26,11 +26,13 @@ fn main() {
     // replace with `peppi::io::peppi::read` to read Peppi (.slpp) replays
     let game = peppi::io::slippi::read(&mut r, None).unwrap();
 
-    // print general info about the game
-    println!("{:#?}", game);
+    println!("{:#?}", game); // print general info about the game
 
-    // example: find the frames on which each player died
+    // Example: find the frames on which each player died
+
     let mut is_dead = vec![false; game.frames.ports.len()];
+    // Note that frame indexes are zero-based and monotonically increasing,
+    // unlike frame IDs (`Frame.id`) which start at -123 and can roll back.
     for frame_idx in 0..game.frames.len() {
         for (port_idx, port_data) in game.frames.ports.iter().enumerate() {
             match port_data
