@@ -12,3 +12,9 @@ pub struct PortOccupancy {
 	pub port: Port,
 	pub follower: bool,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Rollbacks {
+	ExceptFirst,
+	ExceptLast,
+}

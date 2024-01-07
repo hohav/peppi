@@ -7,8 +7,8 @@ use ssbm_data::{action_state, character::External, character::Internal, item::It
 
 use peppi::{
 	frame::{
-		immutable::Rollbacks,
 		transpose::{self, Position},
+		Rollbacks,
 	},
 	game::{
 		immutable::Game, shift_jis::MeleeString, Bytes, DashBack, End, EndMethod, Language,
@@ -798,7 +798,7 @@ fn round_trip() {
 }
 
 #[test]
-fn deduped_validity() {
+fn rollbacks() {
 	let game = game("ics2");
 	assert_eq!(game.frames.len(), 9530);
 	assert_eq!(
@@ -806,13 +806,13 @@ fn deduped_validity() {
 		[350, 351, 351, 352]
 	);
 	assert_eq!(
-		game.frames.deduped_validity(Rollbacks::First)[473..477],
-		[true, true, false, true],
-		"second instance of frame 351 skipped"
+		game.frames.rollbacks(Rollbacks::ExceptFirst)[473..477],
+		[false, false, true, false],
+		"returns true for second instance of frame 351"
 	);
 	assert_eq!(
-		game.frames.deduped_validity(Rollbacks::Last)[473..477],
-		[true, false, true, true],
-		"first instance of frame 351 skipped"
+		game.frames.rollbacks(Rollbacks::ExceptLast)[473..477],
+		[false, true, false, false],
+		"returns true for first instance of frame 351"
 	);
 }

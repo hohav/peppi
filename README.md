@@ -18,22 +18,27 @@ One-shot parsing of a Slippi (.slp) replay:
 ```rust
 use std::{fs, io};
 
+// replace with `peppi::io::peppi::read` to read Peppi (.slpp) replays
+use peppi::io::slippi::read;
+
+use peppi::frame::Rollbacks;
+
 // you can optionally use the `ssbm-data` crate for enums
 use ssbm_data::action_state::Common::{self, *};
 
 fn main() {
     let mut r = io::BufReader::new(fs::File::open("game.slp").unwrap());
-    // replace with `peppi::io::peppi::read` to read Peppi (.slpp) replays
-    let game = peppi::io::slippi::read(&mut r, None).unwrap();
+    let game = read(&mut r, None).unwrap();
 
     println!("{:#?}", game); // print general info about the game
 
     // Example: find the frames on which each player died
-
     let mut is_dead = vec![false; game.frames.ports.len()];
-    // Note that frame indexes are zero-based and monotonically increasing,
-    // unlike frame IDs (`Frame.id`) which start at -123 and can roll back.
+    let rollbacks = game.frames.rollbacks(Rollbacks::ExceptLast);
     for frame_idx in 0..game.frames.len() {
+        if rollbacks[frame_idx] {
+            continue;
+        }
         for (port_idx, port_data) in game.frames.ports.iter().enumerate() {
             match port_data
                 .leader
