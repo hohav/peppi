@@ -29,7 +29,7 @@ fn main() {
     // print general info about the game
     println!("{:#?}", game);
 
-    // find the frames on which each player died
+    // example: find the frames on which each player died
     let mut is_dead: Vec<_> = game.frames.ports.iter().map(|_| false).collect();
     for frame_idx in 0..game.frames.id.len() {
         for (port_idx, port_data) in game.frames.ports.iter().enumerate() {
