@@ -1,103 +1,54 @@
 use peppi::{
 	self,
-	io::slippi::de::{read, Opts},
+	io::slippi::de::{self, Opts},
 };
-use std::{fs::File, io::BufReader, path::PathBuf};
+use std::{hint::black_box, io::Cursor, path::PathBuf};
 
 use iai_callgrind::{library_benchmark, library_benchmark_group, main};
 
-fn game(replay: &str, skip_frames: bool) {
+fn read(replay: &str) -> Vec<u8> {
 	let path = PathBuf::from(format!("benches/data/{}.slp", replay));
-	let mut buf = BufReader::new(File::open(path).unwrap());
-	read(
-		&mut buf,
-		Some(&Opts {
-			skip_frames,
-			..Default::default()
-		}),
-	)
+	std::fs::read(path).unwrap()
 }
 
 #[library_benchmark]
-fn casual_doubles() {
-	game("casual_doubles", false)
+#[benches::parse_full(
+	read("casual_doubles"),
+	read("hbox_llod_timeout_g8"),
+	read("ics_ditto"),
+	read("mango_zain_netplay"),
+	read("old_ver_thegang"),
+	read("short_game_tbh10")
+)]
+fn parse_full(buf: Vec<u8>) {
+	black_box(de::read(&mut Cursor::new(&buf[..]), None).unwrap());
 }
 
 #[library_benchmark]
-fn casual_doubles_skip_frames() {
-	game("casual_doubles", true)
-}
-
-#[library_benchmark]
-fn hbox_llod_timeout_g8() {
-	game("hbox_llod_timeout_g8", false)
-}
-
-#[library_benchmark]
-fn hbox_llod_timeout_g8_skip_frames() {
-	game("hbox_llod_timeout_g8", true)
-}
-
-#[library_benchmark]
-fn ics_ditto() {
-	game("ics_ditto", false)
-}
-
-#[library_benchmark]
-fn ics_ditto_skip_frames() {
-	game("ics_ditto", true)
-}
-
-#[library_benchmark]
-fn mango_zain_netplay() {
-	game("mango_zain_netplay", false)
-}
-
-#[library_benchmark]
-fn mango_zain_netplay_skip_frames() {
-	game("mango_zain_netplay", true)
-}
-
-#[library_benchmark]
-fn old_ver_thegang() {
-	game("old_ver_thegang", false)
-}
-
-#[library_benchmark]
-fn old_ver_thegang_skip_frames() {
-	game("old_ver_thegang", true)
-}
-
-#[library_benchmark]
-fn short_game_tbh10() {
-	game("short_game_tbh10", false)
-}
-
-#[library_benchmark]
-fn short_game_tbh10_skip_frames() {
-	game("short_game_tbh10", true)
+#[benches::parse_skip_frames(
+	read("casual_doubles"),
+	read("hbox_llod_timeout_g8"),
+	read("ics_ditto"),
+	read("mango_zain_netplay"),
+	read("old_ver_thegang"),
+	read("short_game_tbh10")
+)]
+fn parse_skip_frames(buf: Vec<u8>) {
+	let opts = Opts {
+		skip_frames: true,
+		..Default::default()
+	};
+	black_box(de::read(&mut Cursor::new(&buf[..]), Some(&opts)).unwrap());
 }
 
 library_benchmark_group!(
 	name = full;
-	benchmarks =
-		casual_doubles,
-		hbox_llod_timeout_g8,
-		ics_ditto,
-		mango_zain_netplay,
-		old_ver_thegang,
-		short_game_tbh10
+	benchmarks = parse_full
 );
 
 library_benchmark_group!(
 	name = skip_frames;
-	benchmarks =
-		casual_doubles_skip_frames,
-		hbox_llod_timeout_g8_skip_frames,
-		ics_ditto_skip_frames,
-		mango_zain_netplay_skip_frames,
-		old_ver_thegang_skip_frames,
-		short_game_tbh10_skip_frames
+	benchmarks = parse_skip_frames
 );
 
 main!(library_benchmark_groups = full, skip_frames);
