@@ -4,7 +4,7 @@ use peppi::{
 	io::slippi::de::{read, Opts},
 };
 
-use std::{fs, path::PathBuf, time::Duration};
+use std::{fs, io::Cursor, path::PathBuf, time::Duration};
 
 pub fn into_game(c: &mut Criterion) {
 	let dir = PathBuf::from("benches/data");
@@ -18,7 +18,7 @@ pub fn into_game(c: &mut Criterion) {
 			|b, contents| {
 				b.iter_batched(
 					|| contents.as_slice(),
-					|mut buf| read(&mut buf, None),
+					|buf| read(&mut Cursor::new(buf), None),
 					BatchSize::LargeInput,
 				)
 			},
@@ -38,9 +38,9 @@ pub fn skip_frames(c: &mut Criterion) {
 			|b, contents| {
 				b.iter_batched(
 					|| contents.as_slice(),
-					|mut buf| {
+					|buf| {
 						read(
-							&mut buf,
+							&mut Cursor::new(buf),
 							Some(&Opts {
 								skip_frames: true,
 								..Default::default()

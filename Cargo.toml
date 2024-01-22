@@ -9,7 +9,7 @@ version = "2.0.0-alpha.4"
 exclude = ["benches", "tests"]
 
 [dependencies]
-arrow2 = { version = "0.18", features = ["io_ipc", "io_ipc_compression", "io_json" ] }
+arrow2 = { version = "0.17", features = ["io_ipc", "io_ipc_compression", "io_json" ] }
 byteorder = "1"
 encoding_rs = "0.8"
 log = "0.4"
@@ -21,7 +21,7 @@ thiserror = "1.0"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 
 [dev-dependencies]
-arrow2 = { version = "0.18", features = ["io_json"] }
+arrow2 = { version = "0.17", features = ["io_json"] }
 criterion = "0.5"
 iai-callgrind = "0.9"
 pretty_assertions = "1.3"
