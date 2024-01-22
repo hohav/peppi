@@ -133,6 +133,7 @@ fn raw_size(game: &Game, payload_sizes: &Vec<(u8, u16)>) -> u32 {
 }
 
 /// Writes a Slippi-format game to `w`.
+/// Returns an error if the game's version is higher than `MAX_SUPPORTED_VERSION`.
 pub fn write<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 	slippi::assert_max_version(game.start.slippi.version)?;
 
