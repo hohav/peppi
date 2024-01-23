@@ -37,7 +37,7 @@ pub struct Opts {
 	pub skip_frames: bool,
 	/// Don't compute a hash of the replay's contents.
 	/// Enabled automatically when `skip_frames` is on.
-	pub skip_hash: bool,
+	pub compute_hash: bool,
 	/// Debug options.
 	pub debug: Option<Debug>,
 }
@@ -822,8 +822,9 @@ pub fn parse_metadata<R: Read>(
 
 /// Reads a Slippi-format game from `r`.
 pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
+	let hash = opts.map_or(false, |o| o.compute_hash);
 	// Wrap so we can hash all the bytes we've read at the end.
-	let mut r = HashingReader::new(r, !opts.map_or(false, |o| o.skip_frames || o.skip_hash));
+	let mut r = HashingReader::new(r, hash);
 
 	// Handle Event Payloads and Game Start
 	let raw_len = parse_header(&mut r, opts)? as usize;
@@ -841,7 +842,11 @@ pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
 		}
 		let skip = raw_len - state.bytes_read - end_offset;
 		info!("Jumping to GameEnd (skipping {} bytes)", skip);
-		r.seek(SeekFrom::Current(skip.try_into().map_err(invalid_data)?))?;
+		if hash {
+			io::copy(&mut r.by_ref().take(skip as u64), &mut io::sink())?;
+		} else {
+			r.seek(SeekFrom::Current(skip.try_into().map_err(invalid_data)?))?;
+		}
 		state.bytes_read += skip;
 	}
 
