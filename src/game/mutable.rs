@@ -9,4 +9,5 @@ pub struct Game {
 	pub metadata: Option<serde_json::Map<String, serde_json::Value>>,
 	pub gecko_codes: Option<game::GeckoCodes>,
 	pub hash: Option<String>,
+	pub quirks: Option<game::Quirks>,
 }

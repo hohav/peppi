@@ -17,7 +17,7 @@ use crate::{
 	frame::{self, mutable::Frame as MutableFrame, transpose},
 	game::{
 		self, immutable::Game, port_occupancy, shift_jis::MeleeString, Match, Netplay, Player,
-		PlayerType, Port, MAX_PLAYERS, NUM_PORTS,
+		PlayerType, Port, Quirks, MAX_PLAYERS, NUM_PORTS,
 	},
 	io::{expect_bytes, slippi, ubjson, HashingReader, Result},
 };
@@ -70,6 +70,7 @@ pub struct PartialGame {
 	pub metadata: Option<serde_json::Map<String, serde_json::Value>>,
 	pub gecko_codes: Option<game::GeckoCodes>,
 	pub hash: Option<String>,
+	pub quirks: Option<Quirks>,
 }
 
 impl From<PartialGame> for Game {
@@ -81,6 +82,7 @@ impl From<PartialGame> for Game {
 			metadata: game.metadata,
 			gecko_codes: game.gecko_codes,
 			hash: game.hash,
+			quirks: game.quirks,
 		}
 	}
 }
@@ -602,6 +604,7 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 		metadata: None,
 		gecko_codes: None,
 		hash: None,
+		quirks: None,
 	};
 
 	let port_indexes = {
@@ -868,9 +871,20 @@ pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
 	// Some replays have duplicated Game End events, which are safe to ignore.
 	if state.bytes_read < raw_len {
 		let len = raw_len - state.bytes_read;
-		warn!("Extra content after Game End ({} bytes)", len);
 		let mut buf = vec![0; len];
 		r.read_exact(&mut buf)?;
+		if len == 1 + game::End::size(state.game.start.slippi.version)
+			&& buf[0] == Event::GameEnd as u8
+		{
+			info!("Skipping duplicate Game End event");
+			state
+				.game
+				.quirks
+				.get_or_insert(Quirks::default())
+				.double_game_end = true;
+		} else {
+			warn!("Extra content after Game End ({} bytes)", len);
+		}
 	} else if raw_len > 0 && state.bytes_read > raw_len {
 		warn!(
 			"Consumed more than expected ({} bytes)",

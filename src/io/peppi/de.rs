@@ -122,12 +122,14 @@ pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<Game> {
 		};
 	}
 
+	let peppi = peppi.ok_or(err!("missing peppi"))?;
 	Ok(Game {
 		metadata: metadata,
 		start: start.ok_or(err!("missing start"))?,
 		end: end,
 		gecko_codes: gecko_codes,
 		frames: frames.ok_or(err!("missing frames"))?,
-		hash: peppi.ok_or(err!("missing peppi"))?.slp_hash,
+		hash: peppi.slp_hash,
+		quirks: peppi.quirks,
 	})
 }

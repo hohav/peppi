@@ -2,7 +2,7 @@ use serde_json::{Map, Value};
 
 use crate::{
 	frame::{immutable::Frame, transpose},
-	game::{self, End, GeckoCodes, Start},
+	game::{self, End, GeckoCodes, Quirks, Start},
 };
 
 #[derive(Debug)]
@@ -13,6 +13,7 @@ pub struct Game {
 	pub metadata: Option<Map<String, Value>>,
 	pub gecko_codes: Option<GeckoCodes>,
 	pub hash: Option<String>,
+	pub quirks: Option<Quirks>,
 }
 
 impl game::Game for Game {

@@ -1,7 +1,7 @@
 use std::fmt::{self, Debug, Display, Formatter};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::{
@@ -303,6 +303,12 @@ pub trait Game {
 	/// Combines all data for a single frame into a struct.
 	/// Avoid calling this if you need maximum performance.
 	fn frame(&self, idx: usize) -> transpose::Frame;
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+/// Slippi quirks that we need to track for round-trip integrity.
+pub struct Quirks {
+	pub double_game_end: bool,
 }
 
 pub fn port_occupancy(start: &Start) -> Vec<PortOccupancy> {

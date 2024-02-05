@@ -124,6 +124,10 @@ fn raw_size(game: &Game, payload_sizes: &Vec<(u8, u16)>) -> u32 {
 	1 + 1 + (3 * payload_sizes.len() as u32) // Payload sizes
 		+ 1 + sizes[&(GameStart as u8)] as u32 // GameStart
 		+ 1 + sizes[&(GameEnd as u8)] as u32 // GameEnd
+		+ match game.quirks.map_or(false, |q| q.double_game_end) {
+			true => 1 + sizes[&(GameEnd as u8)] as u32, // ...and another for good measure
+			_ => 0u32,
+		}
 		+ counts.frame_data * (1 + sizes[&(FramePre as u8)] as u32) // FramePre
 		+ counts.frame_data * (1 + sizes[&(FramePost as u8)] as u32) // FramePost
 		+ sizes.get(&(FrameStart as u8)).map_or(0, |s| counts.frames * (1 + *s as u32)) // FrameStart
@@ -161,6 +165,9 @@ pub fn write<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 
 	if let Some(end) = &game.end {
 		game_end(w, end, ver)?;
+		if game.quirks.map_or(false, |q| q.double_game_end) {
+			game_end(w, end, ver)?;
+		}
 	}
 
 	if let Some(metadata) = &game.metadata {

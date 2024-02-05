@@ -4,7 +4,10 @@ pub mod ser;
 use serde::{Deserialize, Serialize};
 use std::{fmt, str};
 
-use crate::io::{parse_u8, Error, Result};
+use crate::{
+	game::Quirks,
+	io::{parse_u8, Error, Result},
+};
 
 pub use de::read;
 pub use ser::write;
@@ -50,7 +53,10 @@ pub enum Compression {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Peppi {
 	pub version: Version,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub slp_hash: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub quirks: Option<Quirks>,
 }
 
 pub fn assert_current_version(version: Version) -> Result<()> {

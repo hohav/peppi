@@ -41,6 +41,7 @@ pub fn write<W: Write>(w: W, game: Game, opts: Option<&Opts>) -> Result<(), Box<
 		&serde_json::to_vec(&peppi::Peppi {
 			version: peppi::CURRENT_VERSION,
 			slp_hash: game.hash,
+			quirks: game.quirks,
 		})?,
 		"peppi.json",
 	)?;
