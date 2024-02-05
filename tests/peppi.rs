@@ -746,29 +746,27 @@ fn items() {
 }
 
 fn _round_trip(in_path: impl AsRef<Path> + Clone) {
-	let bytes = fs::read(in_path.clone()).unwrap();
+	let bytes1 = fs::read(in_path.clone()).unwrap();
 
-	let game2 = {
-		let slippi_game = slippi::read(Cursor::new(bytes.as_slice()), None).unwrap();
-		let peppi_game = {
-			let mut buf = Vec::new();
-			io_peppi::write(&mut buf, slippi_game, Default::default()).unwrap();
-			io_peppi::read(&mut &*buf, None).unwrap()
-		};
-
-		let mut buf = Vec::with_capacity(bytes.len());
-		slippi::write(&mut buf, &peppi_game).unwrap();
-
-		// If we get a perfect byte-wise match, we know we're correct.
-		// If not, we'll try to detect where the difference is.
-		if bytes == buf {
-			return;
-		}
-
-		slippi::read(Cursor::new(buf.as_slice()), None).unwrap()
+	let slippi_game = slippi::read(Cursor::new(bytes1.as_slice()), None).unwrap();
+	let peppi_game = {
+		let mut buf = Vec::new();
+		io_peppi::write(&mut buf, slippi_game, Default::default()).unwrap();
+		io_peppi::read(&mut &*buf, None).unwrap()
 	};
 
-	let game1 = slippi::read(Cursor::new(bytes.as_slice()), None).unwrap();
+	let mut bytes2 = Vec::with_capacity(bytes1.len());
+	slippi::write(&mut bytes2, &peppi_game).unwrap();
+
+	// If we get a perfect byte-wise match, we know we're correct.
+	// If not, we'll try to detect where the difference is.
+	if bytes1 == bytes2 {
+		return;
+	}
+
+	let game2 = slippi::read(Cursor::new(bytes2.as_slice()), None).unwrap();
+	let game1 = slippi::read(Cursor::new(bytes1.as_slice()), None).unwrap();
+
 	assert_eq!(game1.start, game2.start);
 	assert_eq!(game1.end, game2.end);
 	assert_eq!(game1.metadata, game2.metadata);
@@ -780,6 +778,9 @@ fn _round_trip(in_path: impl AsRef<Path> + Clone) {
 			game2.frames.transpose_one(idx, game2.start.slippi.version),
 		);
 	}
+
+	assert_eq!(bytes1.len(), bytes2.len());
+	assert_eq!(bytes1, bytes2);
 }
 
 #[test]
