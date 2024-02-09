@@ -12,7 +12,7 @@ pub use ser::write;
 /// We can read replays with higher versions than this, but that discards information.
 /// We don't support writing these replays as a result, though this restriction may be
 /// relaxed in the future.
-pub const MAX_SUPPORTED_VERSION: Version = Version(3, 15, 0);
+pub const MAX_SUPPORTED_VERSION: Version = Version(3, 16, 0);
 
 /// Every .slp file will start with a UBJSON opening brace, `raw` key & type: "{U\x03raw[$U#l"
 pub const FILE_SIGNATURE: [u8; 11] = [

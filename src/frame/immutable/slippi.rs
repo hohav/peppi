@@ -201,7 +201,10 @@ impl Item {
 		if version.gte(3, 2) {
 			self.misc.as_ref().unwrap().write(w, version, i)?;
 			if version.gte(3, 6) {
-				w.write_i8(self.owner.as_ref().unwrap().value(i))?
+				w.write_i8(self.owner.as_ref().unwrap().value(i))?;
+				if version.gte(3, 16) {
+					w.write_u16::<BE>(self.instance_id.as_ref().unwrap().value(i))?
+				}
 			}
 		};
 		Ok(())
@@ -220,7 +223,10 @@ impl Item {
 		if version.gte(3, 2) {
 			size += ItemMisc::size(version);
 			if version.gte(3, 6) {
-				size += size_of::<i8>()
+				size += size_of::<i8>();
+				if version.gte(3, 16) {
+					size += size_of::<u16>()
+				}
 			}
 		};
 		size
@@ -295,7 +301,13 @@ impl Post {
 						if version.gte(3, 8) {
 							w.write_f32::<BE>(self.hitlag.as_ref().unwrap().value(i))?;
 							if version.gte(3, 11) {
-								w.write_u32::<BE>(self.animation_index.as_ref().unwrap().value(i))?
+								w.write_u32::<BE>(self.animation_index.as_ref().unwrap().value(i))?;
+								if version.gte(3, 16) {
+									w.write_u16::<BE>(
+										self.instance_hit_by.as_ref().unwrap().value(i),
+									)?;
+									w.write_u16::<BE>(self.instance_id.as_ref().unwrap().value(i))?
+								}
 							}
 						}
 					}
@@ -333,7 +345,11 @@ impl Post {
 						if version.gte(3, 8) {
 							size += size_of::<f32>();
 							if version.gte(3, 11) {
-								size += size_of::<u32>()
+								size += size_of::<u32>();
+								if version.gte(3, 16) {
+									size += size_of::<u16>();
+									size += size_of::<u16>()
+								}
 							}
 						}
 					}
