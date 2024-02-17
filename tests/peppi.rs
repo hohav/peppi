@@ -1,4 +1,4 @@
-use std::{fs, io::Cursor, path::Path};
+use std::{collections::HashSet, fs, io::Cursor, path::Path};
 
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -11,7 +11,7 @@ use peppi::{
 		Rollbacks,
 	},
 	game::{
-		immutable::Game, shift_jis::MeleeString, Bytes, DashBack, End, EndMethod, Language,
+		immutable::Game, shift_jis::MeleeString, Bytes, DashBack, End, EndMethod, Language, Match,
 		Netplay, Player, PlayerEnd, PlayerType, Port, Scene, ShieldDrop, Start, Ucf,
 	},
 	io::{
@@ -660,6 +660,78 @@ fn v3_13() {
 }
 
 #[test]
+fn v3_14() {
+	let game = game("v3.16");
+	assert_eq!(
+		game.start.r#match,
+		Some(Match {
+			id: String::from("mode.unranked-2024-02-15T14:37:23.22-0"),
+			game: 1,
+			tiebreaker: 0
+		})
+	)
+}
+
+#[test]
+fn v3_15() {
+	let game = game("v3.16");
+	assert_eq!(
+		game.frames
+			.transpose_one(200, game.start.slippi.version)
+			.ports[0]
+			.leader
+			.pre
+			.raw_analog_y,
+		Some(-21)
+	)
+}
+
+#[test]
+fn v3_16() {
+	let game = game("v3.16");
+	let player1_ids = game.frames.ports[0]
+		.leader
+		.post
+		.instance_id
+		.as_ref()
+		.unwrap();
+	let player2_ids = game.frames.ports[1]
+		.leader
+		.post
+		.instance_id
+		.as_ref()
+		.unwrap();
+	let mut id_set: HashSet<u16> = player1_ids.values_iter().cloned().collect();
+	id_set.remove(&0);
+
+	// player1 and player2 ids should not share any instance ids
+	assert!(player2_ids.values_iter().all(|id| !id_set.contains(id)));
+
+	let player2_hit_bys = game.frames.ports[1]
+		.leader
+		.post
+		.instance_hit_by
+		.as_ref()
+		.unwrap();
+
+	// player2 should be hit by player1 ids
+	assert!(player2_hit_bys
+		.values_iter()
+		.all(|id| *id == 0 || id_set.contains(id)));
+
+	let items = game.frames.item.as_ref().unwrap();
+	let item_instance_ids = items.instance_id.as_ref().unwrap();
+	let item_types = &items.r#type;
+
+	// Shy guy (210) should have instance id of 0
+	// The laser/gun should share instance id with the Fox player (P1)
+	assert!(item_instance_ids
+		.values_iter()
+		.zip(item_types.values_iter())
+		.all(|(&id, &r#type)| (r#type == 210 && id == 0) || id_set.contains(&id)));
+}
+
+#[test]
 fn unknown_event() {
 	// shouldn't panic
 	// TODO: check for warning
@@ -701,6 +773,7 @@ fn items() {
 			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
 			misc: Some(transpose::ItemMisc(5, 5, 5, 5)),
 			owner: Some(0),
+			instance_id: None,
 		}])
 	);
 	assert_eq!(
@@ -721,6 +794,7 @@ fn items() {
 			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
 			misc: Some(transpose::ItemMisc(5, 0, 5, 5)),
 			owner: Some(0),
+			instance_id: None,
 		}])
 	);
 	assert_eq!(
@@ -741,6 +815,7 @@ fn items() {
 			velocity: transpose::Velocity { x: 0.0, y: 0.0 },
 			misc: Some(transpose::ItemMisc(5, 0, 5, 5)),
 			owner: Some(0),
+			instance_id: None,
 		}])
 	);
 }
