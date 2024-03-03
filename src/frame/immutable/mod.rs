@@ -191,6 +191,7 @@ pub struct Item {
 	pub id: PrimitiveArray<u32>,
 	pub misc: Option<ItemMisc>,
 	pub owner: Option<PrimitiveArray<i8>>,
+	pub instance_id: Option<PrimitiveArray<u16>>,
 	pub validity: Option<Bitmap>,
 }
 
@@ -207,6 +208,7 @@ impl Item {
 			id: self.id.values()[i],
 			misc: self.misc.as_ref().map(|x| x.transpose_one(i, version)),
 			owner: self.owner.as_ref().map(|x| x.values()[i]),
+			instance_id: self.instance_id.as_ref().map(|x| x.values()[i]),
 		}
 	}
 }
@@ -224,6 +226,7 @@ impl From<mutable::Item> for Item {
 			id: x.id.into(),
 			misc: x.misc.map(|x| x.into()),
 			owner: x.owner.map(|x| x.into()),
+			instance_id: x.instance_id.map(|x| x.into()),
 			validity: x.validity.map(|v| v.into()),
 		}
 	}
@@ -303,6 +306,8 @@ pub struct Post {
 	pub velocities: Option<Velocities>,
 	pub hitlag: Option<PrimitiveArray<f32>>,
 	pub animation_index: Option<PrimitiveArray<u32>>,
+	pub last_hit_by_instance: Option<PrimitiveArray<u16>>,
+	pub instance_id: Option<PrimitiveArray<u16>>,
 	pub validity: Option<Bitmap>,
 }
 
@@ -336,6 +341,8 @@ impl Post {
 				.map(|x| x.transpose_one(i, version)),
 			hitlag: self.hitlag.as_ref().map(|x| x.values()[i]),
 			animation_index: self.animation_index.as_ref().map(|x| x.values()[i]),
+			last_hit_by_instance: self.last_hit_by_instance.as_ref().map(|x| x.values()[i]),
+			instance_id: self.instance_id.as_ref().map(|x| x.values()[i]),
 		}
 	}
 }
@@ -364,6 +371,8 @@ impl From<mutable::Post> for Post {
 			velocities: x.velocities.map(|x| x.into()),
 			hitlag: x.hitlag.map(|x| x.into()),
 			animation_index: x.animation_index.map(|x| x.into()),
+			last_hit_by_instance: x.last_hit_by_instance.map(|x| x.into()),
+			instance_id: x.instance_id.map(|x| x.into()),
 			validity: x.validity.map(|v| v.into()),
 		}
 	}

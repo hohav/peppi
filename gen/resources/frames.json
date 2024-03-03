@@ -75,7 +75,11 @@
 		{ "name": "hitlag", "type": "f32",
 			"version": "3.8" },
 		{ "name": "animation_index", "type": "u32",
-			"version": "3.11" }
+			"version": "3.11" },
+		{ "name": "last_hit_by_instance", "type": "u16",
+			"version": "3.16" },
+		{ "name": "instance_id", "type": "u16",
+			"version": "3.16" }
 	],
 	"Start": [
 		{ "name": "random_seed", "type": "u32" },
@@ -104,6 +108,8 @@
 		{ "name": "misc", "type": "ItemMisc",
 			"version": "3.2" },
 		{ "name": "owner", "type": "i8",
-			"version": "3.6" }
+			"version": "3.6" },
+		{ "name": "instance_id", "type": "u16",
+			"version": "3.16" }
 	]
 }

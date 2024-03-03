@@ -308,7 +308,10 @@ impl Item {
 			if version.gte(3, 2) {
 				fields.push(Field::new("misc", ItemMisc::data_type(version), false));
 				if version.gte(3, 6) {
-					fields.push(Field::new("owner", DataType::Int8, false))
+					fields.push(Field::new("owner", DataType::Int8, false));
+					if version.gte(3, 16) {
+						fields.push(Field::new("instance_id", DataType::UInt16, false))
+					}
 				}
 			}
 		};
@@ -328,7 +331,10 @@ impl Item {
 		if version.gte(3, 2) {
 			values.push(self.misc.unwrap().into_struct_array(version).boxed());
 			if version.gte(3, 6) {
-				values.push(self.owner.unwrap().boxed())
+				values.push(self.owner.unwrap().boxed());
+				if version.gte(3, 16) {
+					values.push(self.instance_id.unwrap().boxed())
+				}
 			}
 		};
 		StructArray::new(Self::data_type(version), values, self.validity)
@@ -392,6 +398,12 @@ impl Item {
 			owner: values.get(9).map(|x| {
 				x.as_any()
 					.downcast_ref::<PrimitiveArray<i8>>()
+					.unwrap()
+					.clone()
+			}),
+			instance_id: values.get(10).map(|x| {
+				x.as_any()
+					.downcast_ref::<PrimitiveArray<u16>>()
 					.unwrap()
 					.clone()
 			}),
@@ -531,7 +543,19 @@ impl Post {
 										"animation_index",
 										DataType::UInt32,
 										false,
-									))
+									));
+									if version.gte(3, 16) {
+										fields.push(Field::new(
+											"last_hit_by_instance",
+											DataType::UInt16,
+											false,
+										));
+										fields.push(Field::new(
+											"instance_id",
+											DataType::UInt16,
+											false,
+										))
+									}
 								}
 							}
 						}
@@ -570,7 +594,11 @@ impl Post {
 						if version.gte(3, 8) {
 							values.push(self.hitlag.unwrap().boxed());
 							if version.gte(3, 11) {
-								values.push(self.animation_index.unwrap().boxed())
+								values.push(self.animation_index.unwrap().boxed());
+								if version.gte(3, 16) {
+									values.push(self.last_hit_by_instance.unwrap().boxed());
+									values.push(self.instance_id.unwrap().boxed())
+								}
 							}
 						}
 					}
@@ -699,6 +727,18 @@ impl Post {
 			animation_index: values.get(20).map(|x| {
 				x.as_any()
 					.downcast_ref::<PrimitiveArray<u32>>()
+					.unwrap()
+					.clone()
+			}),
+			last_hit_by_instance: values.get(21).map(|x| {
+				x.as_any()
+					.downcast_ref::<PrimitiveArray<u16>>()
+					.unwrap()
+					.clone()
+			}),
+			instance_id: values.get(22).map(|x| {
+				x.as_any()
+					.downcast_ref::<PrimitiveArray<u16>>()
 					.unwrap()
 					.clone()
 			}),

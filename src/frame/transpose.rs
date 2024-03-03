@@ -41,6 +41,7 @@ pub struct Item {
 	pub id: u32,
 	pub misc: Option<ItemMisc>,
 	pub owner: Option<i8>,
+	pub instance_id: Option<u16>,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
@@ -75,6 +76,8 @@ pub struct Post {
 	pub velocities: Option<Velocities>,
 	pub hitlag: Option<f32>,
 	pub animation_index: Option<u32>,
+	pub last_hit_by_instance: Option<u16>,
+	pub instance_id: Option<u16>,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
