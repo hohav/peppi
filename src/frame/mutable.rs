@@ -414,7 +414,7 @@ pub struct Post {
 	pub velocities: Option<Velocities>,
 	pub hitlag: Option<MutablePrimitiveArray<f32>>,
 	pub animation_index: Option<MutablePrimitiveArray<u32>>,
-	pub instance_hit_by: Option<MutablePrimitiveArray<u16>>,
+	pub last_hit_by_instance: Option<MutablePrimitiveArray<u16>>,
 	pub instance_id: Option<MutablePrimitiveArray<u16>>,
 	pub validity: Option<MutableBitmap>,
 }
@@ -465,7 +465,7 @@ impl Post {
 			animation_index: version
 				.gte(3, 11)
 				.then(|| MutablePrimitiveArray::<u32>::with_capacity(capacity)),
-			instance_hit_by: version
+			last_hit_by_instance: version
 				.gte(3, 16)
 				.then(|| MutablePrimitiveArray::<u16>::with_capacity(capacity)),
 			instance_id: version
@@ -512,7 +512,7 @@ impl Post {
 							if version.gte(3, 11) {
 								self.animation_index.as_mut().unwrap().push_null();
 								if version.gte(3, 16) {
-									self.instance_hit_by.as_mut().unwrap().push_null();
+									self.last_hit_by_instance.as_mut().unwrap().push_null();
 									self.instance_id.as_mut().unwrap().push_null()
 								}
 							}
@@ -563,7 +563,7 @@ impl Post {
 								})?;
 								if version.gte(3, 16) {
 									r.read_u16::<BE>().map(|x| {
-										self.instance_hit_by.as_mut().unwrap().push(Some(x))
+										self.last_hit_by_instance.as_mut().unwrap().push(Some(x))
 									})?;
 									r.read_u16::<BE>()
 										.map(|x| self.instance_id.as_mut().unwrap().push(Some(x)))?
@@ -607,7 +607,7 @@ impl Post {
 				.map(|x| x.transpose_one(i, version)),
 			hitlag: self.hitlag.as_ref().map(|x| x.values()[i]),
 			animation_index: self.animation_index.as_ref().map(|x| x.values()[i]),
-			instance_hit_by: self.instance_hit_by.as_ref().map(|x| x.values()[i]),
+			last_hit_by_instance: self.last_hit_by_instance.as_ref().map(|x| x.values()[i]),
 			instance_id: self.instance_id.as_ref().map(|x| x.values()[i]),
 		}
 	}

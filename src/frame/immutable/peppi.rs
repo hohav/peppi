@@ -546,7 +546,7 @@ impl Post {
 									));
 									if version.gte(3, 16) {
 										fields.push(Field::new(
-											"instance_hit_by",
+											"last_hit_by_instance",
 											DataType::UInt16,
 											false,
 										));
@@ -596,7 +596,7 @@ impl Post {
 							if version.gte(3, 11) {
 								values.push(self.animation_index.unwrap().boxed());
 								if version.gte(3, 16) {
-									values.push(self.instance_hit_by.unwrap().boxed());
+									values.push(self.last_hit_by_instance.unwrap().boxed());
 									values.push(self.instance_id.unwrap().boxed())
 								}
 							}
@@ -730,7 +730,7 @@ impl Post {
 					.unwrap()
 					.clone()
 			}),
-			instance_hit_by: values.get(21).map(|x| {
+			last_hit_by_instance: values.get(21).map(|x| {
 				x.as_any()
 					.downcast_ref::<PrimitiveArray<u16>>()
 					.unwrap()

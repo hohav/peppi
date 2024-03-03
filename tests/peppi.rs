@@ -710,7 +710,7 @@ fn v3_16() {
 	let player2_hit_bys = game.frames.ports[1]
 		.leader
 		.post
-		.instance_hit_by
+		.last_hit_by_instance
 		.as_ref()
 		.unwrap();
 

@@ -76,7 +76,7 @@ pub struct Post {
 	pub velocities: Option<Velocities>,
 	pub hitlag: Option<f32>,
 	pub animation_index: Option<u32>,
-	pub instance_hit_by: Option<u16>,
+	pub last_hit_by_instance: Option<u16>,
 	pub instance_id: Option<u16>,
 }
 

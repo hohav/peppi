@@ -304,7 +304,7 @@ impl Post {
 								w.write_u32::<BE>(self.animation_index.as_ref().unwrap().value(i))?;
 								if version.gte(3, 16) {
 									w.write_u16::<BE>(
-										self.instance_hit_by.as_ref().unwrap().value(i),
+										self.last_hit_by_instance.as_ref().unwrap().value(i),
 									)?;
 									w.write_u16::<BE>(self.instance_id.as_ref().unwrap().value(i))?
 								}
