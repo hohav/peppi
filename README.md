@@ -17,26 +17,34 @@ peppi = "2.0.0-alpha.4"
 
 ## Usage
 
-One-shot parsing of a Slippi (.slp) replay:
+One-shot `.slp` parsing with [slippi::read](https://docs.rs/peppi/latest/peppi/io/slippi/de/fn.read.html) (use [peppi::read](https://docs.rs/peppi/latest/peppi/io/peppi/de/fn.read.html) instead for `.slpp`):
 
 ```rust
 use std::{fs, io};
-
-// replace with `peppi::io::peppi::read` to read Peppi (.slpp) replays
 use peppi::io::slippi::read;
 
+fn main() {
+    let mut r = io::BufReader::new(fs::File::open("tests/data/game.slp").unwrap());
+    let game = read(&mut r, None).unwrap();
+    println!("{:#?}", game);
+}
+```
+
+Here's a more involved example that finds the frames on which each player died:
+
+```rust
+use std::{fs, io};
+use peppi::io::slippi::read;
 use peppi::frame::Rollbacks;
 
-// you can optionally use the `ssbm-data` crate for enums
+// `ssbm-data` provides enums for characters, stages, action states, etc.
+// You can just hard-code constants instead, if you prefer.
 use ssbm_data::action_state::Common::{self, *};
 
 fn main() {
     let mut r = io::BufReader::new(fs::File::open("game.slp").unwrap());
     let game = read(&mut r, None).unwrap();
 
-    println!("{:#?}", game); // print general info about the game
-
-    // Example: find the frames on which each player died
     let mut is_dead = vec![false; game.frames.ports.len()];
     let rollbacks = game.frames.rollbacks(Rollbacks::ExceptLast);
     for frame_idx in 0..game.frames.len() {
@@ -78,7 +86,7 @@ fn main() {
 }
 ```
 
-For live games, you can drive parsing yourself:
+For parsing live games, you can drive things yourself:
 
 ```rust
 use std::fs;
