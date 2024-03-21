@@ -1,5 +1,5 @@
 use pretty_assertions::assert_eq;
-use serde_json;
+use serde_json::{from_str, json, to_string, Value};
 
 mod common;
 use common::game;
@@ -7,8 +7,9 @@ use common::game;
 #[test]
 fn json_metadata() {
 	let game = game("v3.12");
-	let expected: serde_json::Value = serde_json::from_str(
-		r#"{
+	assert_eq!(
+		from_str::<Value>(&to_string(&game.metadata).unwrap()).unwrap(),
+		json!({
 			"startAt":"2022-06-04T21:58:00Z",
 			"lastFrame":0,
 			"players":{
@@ -32,19 +33,16 @@ fn json_metadata() {
 				}
 			},
 			"playedOn":"dolphin"
-		}"#,
+		})
 	)
-	.unwrap();
-	let actual: serde_json::Value =
-		serde_json::from_str(&serde_json::to_string(&game.metadata).unwrap()).unwrap();
-	assert_eq!(expected, actual);
 }
 
 #[test]
 fn json_start() {
 	let game = game("v3.12");
-	let expected: serde_json::Value = serde_json::from_str(
-		r#"{
+	assert_eq!(
+		from_str::<Value>(&to_string(&game.start).unwrap()).unwrap(),
+		json!({
 			"slippi":{
 				"version":[3,12,0]
 			},
@@ -115,25 +113,18 @@ fn json_start() {
 				"major":8
 			},
 			"language":"English"
-		}"#,
-	)
-	.unwrap();
-	let actual: serde_json::Value =
-		serde_json::from_str(&serde_json::to_string(&game.start).unwrap()).unwrap();
-	assert_eq!(expected, actual);
+		})
+	);
 }
 
 #[test]
 fn json_end() {
 	let game = game("v3.12");
-	let expected: serde_json::Value = serde_json::from_str(
-		r#"{
+	assert_eq!(
+		from_str::<Value>(&to_string(&game.end).unwrap()).unwrap(),
+		json!({
 			"method":"NoContest",
 			"lras_initiator":"P2"
-		}"#,
-	)
-	.unwrap();
-	let actual: serde_json::Value =
-		serde_json::from_str(&serde_json::to_string(&game.end).unwrap()).unwrap();
-	assert_eq!(expected, actual);
+		})
+	);
 }
