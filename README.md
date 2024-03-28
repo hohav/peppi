@@ -32,7 +32,8 @@ fn main() {
 }
 ```
 
-Here's a more involved example that finds the frames on which each player died:
+<details>
+<summary>A more involved example</summary>
 
 ```rust
 use std::{fs, io};
@@ -43,6 +44,7 @@ use peppi::frame::Rollbacks;
 // You can just hard-code constants instead, if you prefer.
 use ssbm_data::action_state::Common::{self, *};
 
+/// Print the frames on which each player died.
 fn main() {
     let mut r = io::BufReader::new(fs::File::open("game.slp").unwrap());
     let game = read(&mut r, None).unwrap();
@@ -87,8 +89,10 @@ fn main() {
     }
 }
 ```
+</details>
 
-For parsing live games, you can drive things yourself:
+<details>
+<summary>Live parsing</summary>
 
 ```rust
 use std::fs;
@@ -121,6 +125,7 @@ fn main() {
     }
 }
 ```
+</details>
 
 ## Development
 
