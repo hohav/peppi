@@ -129,3 +129,17 @@ fn main() {
 The Rust source files in [src/frame](src/frame) are generated using Clojure from [frames.json](gen/resources/frames.json), which describes all the per-frame fields present in each version of the [spec](https://github.com/project-slippi/slippi-wiki/blob/master/SPEC.md). If you make changes to `frames.json` or modify the generator code in `gen/src`, run `gen/scripts/frames` to regenerate those Rust files.
 
 If you're adding support for a new version of the spec, you'll also need to bump `peppi::io::slippi::MAX_SUPPORTED_VERSION`.
+
+## Peppi Format
+
+The Peppi format (`.slpp`) is a [GNU tar](https://en.wikipedia.org/wiki/Tar_(computing)) archive containing the following files:
+
+- peppi.json
+- metadata.json
+- start.json
+- start.raw
+- end.json
+- end.raw
+- frames.arrow
+
+The last of these, `frames.arrow`, is an [Arrow IPC](https://arrow.apache.org/docs/format/Columnar.html#ipc-file-format) file containing all of the game's frame data. This is a columnar format, which makes `.slpp` about twice as compressible as `.slp`.
