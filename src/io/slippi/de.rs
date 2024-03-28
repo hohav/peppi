@@ -629,8 +629,7 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 
 /// Parses a single event from `r`.
 ///
-/// Returns the number of bytes read, and a `game::End` if the event was a
-/// Game End (which signals the end of the event stream).
+/// Returns the event code that was parsed.
 pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts>) -> Result<u8> {
 	let mut code = r.read_u8()?;
 	debug!("Event {:#02x} @{:#x}", code, state.bytes_read);
