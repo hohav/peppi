@@ -17,14 +17,13 @@ fn payload_sizes(game: &Game) -> Vec<(u8, u16)> {
 	// The order of the sizes list is important for round-tripping,
 	// which is why we use a Vec rather than a HashMap.
 	let mut sizes = Vec::new();
-	let start = &game.start;
-	let ver = start.slippi.version;
+	let ver = game.start.slippi.version.clone();
 
 	// +4 bytes for frame number, or +6 for frame number / port / follower
-	sizes.push((Event::GameStart as u8, start.bytes.0.len() as u16));
+	sizes.push((Event::GameStart as u8, game.start.bytes.0.len() as u16));
 	sizes.push((Event::FramePre as u8, 6 + Pre::size(ver) as u16));
 	sizes.push((Event::FramePost as u8, 6 + Post::size(ver) as u16));
-	sizes.push((Event::GameEnd as u8, game::End::size(ver) as u16));
+	sizes.push((Event::GameEnd as u8, game.end.as_ref().map_or(game::End::size(ver), |e| e.bytes.0.len()) as u16));
 
 	if ver.gte(2, 2) {
 		sizes.push((Event::FrameStart as u8, 4 + Start::size(ver) as u16));
@@ -66,20 +65,9 @@ fn game_start<W: Write>(w: &mut W, s: &game::Start, ver: slippi::Version) -> Res
 	Ok(w.write_all(&s.bytes.0)?)
 }
 
-fn game_end<W: Write>(w: &mut W, e: &game::End, ver: slippi::Version) -> Result<()> {
+fn game_end<W: Write>(w: &mut W, e: &game::End, _ver: slippi::Version) -> Result<()> {
 	w.write_u8(Event::GameEnd as u8)?;
-	w.write_u8(e.method as u8)?;
-	if ver.gte(2, 0) {
-		w.write_u8(e.lras_initiator.unwrap().map_or(u8::MAX, |p| p.into()))?;
-		if ver.gte(3, 13) {
-			let players = e.players.as_ref().unwrap();
-			w.write_all(&players.iter().fold([u8::MAX; 4], |mut acc, p| {
-				acc[p.port as usize] = p.placement;
-				acc
-			}))?;
-		}
-	}
-	Ok(())
+	Ok(w.write_all(&e.bytes.0)?)
 }
 
 #[derive(Debug)]
