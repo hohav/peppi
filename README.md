@@ -130,6 +130,15 @@ The Rust source files in [src/frame](src/frame) are generated using Clojure from
 
 If you're adding support for a new version of the spec, you'll also need to bump `peppi::io::slippi::MAX_SUPPORTED_VERSION`.
 
+## Goals
+
+- Performance: Peppi aims to be the fastest parser for `.slp` files.
+- Ergonomics: It should be easy and natural to work with parsed data.
+- Lenience: accept-and-warn on malformed data, when feasible.
+- Cross-language support: other languages should be able to interact with Peppi easily and efficiently.
+- Round-tripping: Peppi can parse a replay and then write it back, bit-for-bit identically.
+- Alternative format: Peppi provides an [alternative format](#peppi-format) that is more compressible and easier to work with than `.slp`.
+
 ## Peppi Format
 
 The Peppi format (`.slpp`) is a [GNU tar](https://en.wikipedia.org/wiki/Tar_(computing)) archive containing the following files:
