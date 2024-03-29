@@ -58,7 +58,7 @@ pub struct Slippi {
 	pub version: Version,
 }
 
-pub fn assert_max_version(version: Version) -> Result<()> {
+pub(crate) fn assert_max_version(version: Version) -> Result<()> {
 	if version <= MAX_SUPPORTED_VERSION {
 		Ok(())
 	} else {

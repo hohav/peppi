@@ -66,7 +66,7 @@ pub struct Peppi {
 	pub quirks: Option<Quirks>,
 }
 
-pub fn assert_current_version(version: Version) -> Result<()> {
+pub(crate) fn assert_current_version(version: Version) -> Result<()> {
 	if version < MIN_VERSION {
 		Err(err!("unsupported version ({} < {})", version, MIN_VERSION))
 	} else {
