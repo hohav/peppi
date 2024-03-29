@@ -46,7 +46,7 @@ use ssbm_data::action_state::Common::{self, *};
 
 /// Print the frames on which each player died.
 fn main() {
-    let mut r = io::BufReader::new(fs::File::open("game.slp").unwrap());
+    let mut r = io::BufReader::new(fs::File::open("tests/data/game.slp").unwrap());
     let game = read(&mut r, None).unwrap();
 
     let mut is_dead = vec![false; game.frames.ports.len()];
@@ -101,7 +101,7 @@ use byteorder::ReadBytesExt;
 use peppi::io::slippi::de;
 
 fn main() {
-    let mut r = BufReader::new(fs::File::open("v3.12.slp").unwrap());
+    let mut r = BufReader::new(fs::File::open("tests/data/game.slp").unwrap());
 
     // UBJSON wrapper (skip if using spectator protocol)
     let size = de::parse_header(&mut r, None).unwrap() as usize;
