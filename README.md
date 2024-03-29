@@ -144,7 +144,7 @@ If you're adding support for a new version of the spec, you'll also need to bump
 
 ## Peppi Format
 
-The Peppi format (`.slpp`) is a [GNU tar](https://en.wikipedia.org/wiki/Tar_(computing)) archive containing the following files:
+The Peppi format (`.slpp`) is a [GNU tar](https://en.wikipedia.org/wiki/Tar_(computing)) archive containing the following files, in order:
 
 - peppi.json
 - metadata.json
