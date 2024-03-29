@@ -144,7 +144,8 @@ fn gecko_codes_size(gecko_codes: &GeckoCodes) -> u32 {
 	num_blocks * (512 + 5)
 }
 
-/// Writes a Slippi-format game to `w`.
+/// Writes a replay to `w` in Slippi (`.slp`) format.
+///
 /// Returns an error if the game's version is higher than `MAX_SUPPORTED_VERSION`.
 pub fn write<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 	slippi::assert_max_version(game.start.slippi.version)?;

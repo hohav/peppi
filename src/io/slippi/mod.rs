@@ -9,16 +9,17 @@ use crate::io::{parse_u8, Error, Result};
 pub use de::read;
 pub use ser::write;
 
-/// We can read replays with higher versions than this, but that discards information.
-/// We don't support writing these replays as a result, though this restriction may be
-/// relaxed in the future.
+/// Peppi can read replays with higher versions than this, but that discards information.
+/// So we refuse to re-serialze such replays, to avoid inadvertent information loss.
+/// This restriction may be removed in the future.
 pub const MAX_SUPPORTED_VERSION: Version = Version(3, 16, 0);
 
-/// Every .slp file will start with a UBJSON opening brace, `raw` key & type: "{U\x03raw[$U#l"
+/// Every `.slp` file starts with a UBJSON opening brace, "raw" key & type (`{U\x03raw[$U#l`).
 pub const FILE_SIGNATURE: [u8; 11] = [
 	0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c,
 ];
 
+/// Slippi format version.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 pub struct Version(pub u8, pub u8, pub u8);
 
@@ -53,6 +54,7 @@ impl fmt::Display for Version {
 	}
 }
 
+/// Slippi format options.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Slippi {
 	pub version: Version,

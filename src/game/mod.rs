@@ -1,3 +1,8 @@
+//! A single game of Super Smash Brothers Melee.
+//!
+//! The mutable/immutable distinction is essentially an artifact of the underlying Arrow library.
+//! You'll only encounter mutable data if you're parsing live games.
+
 use std::fmt::{self, Debug, Display, Formatter};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -14,10 +19,16 @@ pub mod immutable;
 pub mod mutable;
 pub mod shift_jis;
 
+/// How many ports the game supports.
 pub const NUM_PORTS: usize = 4;
+
+/// Some modes allow more characters than ports, e.g. Cruel Melee.
 pub const MAX_PLAYERS: usize = 6;
+
+/// Since ICs are unique mechanically, sometimes we need to treat them specially.
 pub const ICE_CLIMBERS: u8 = 14;
 
+/// A slot that can be occupied by a player.
 #[repr(u8)]
 #[derive(
 	Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, IntoPrimitive, TryFromPrimitive,
@@ -59,6 +70,7 @@ impl Default for Port {
 	}
 }
 
+/// How a player is controlled.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
 pub enum PlayerType {
@@ -67,12 +79,14 @@ pub enum PlayerType {
 	Demo = 2,
 }
 
+/// Information about the team a player belongs to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Team {
 	pub color: u8,
 	pub shade: u8,
 }
 
+/// Dashback fix type.
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
 pub enum DashBack {
@@ -80,6 +94,7 @@ pub enum DashBack {
 	Arduino = 2,
 }
 
+/// Shield drop fix type.
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
 pub enum ShieldDrop {
@@ -87,6 +102,7 @@ pub enum ShieldDrop {
 	Arduino = 2,
 }
 
+/// The language the game is set to.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
 pub enum Language {
@@ -158,12 +174,14 @@ pub struct Player {
 	pub netplay: Option<Netplay>,
 }
 
+/// Major & minor scene numbers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Scene {
 	pub minor: u8,
 	pub major: u8,
 }
 
+/// Container for raw bytes of `Start` & `End` events.
 #[derive(PartialEq, Eq, Clone)]
 pub struct Bytes(pub Vec<u8>);
 
@@ -173,6 +191,7 @@ impl Debug for Bytes {
 	}
 }
 
+/// Information about the match a game belongs to.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Match {
 	pub id: String,
@@ -233,6 +252,7 @@ pub struct Start {
 	pub r#match: Option<Match>,
 }
 
+/// How the game ended.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
 pub enum EndMethod {

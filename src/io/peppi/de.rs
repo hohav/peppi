@@ -81,6 +81,7 @@ fn read_peppi_gecko_codes<R: Read>(mut r: R) -> Result<game::GeckoCodes> {
 	})
 }
 
+/// Reads a Peppi (`.slpp`) replay from `r`.
 pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<Game> {
 	let mut start: Option<game::Start> = None;
 	let mut end: Option<game::End> = None;

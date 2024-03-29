@@ -15,6 +15,10 @@ use crate::{
 /// Options for writing Peppi files.
 #[derive(Clone, Debug, Default)]
 pub struct Opts {
+	/// Internal compression to use, if any.
+	///
+	/// Use this to maximize read speed while saving some disk space (e.g. for machine learning).
+	/// If you just want maximum compression, compress the entire `.slpp` file instead.
 	pub compression: Option<Compression>,
 }
 
@@ -32,6 +36,9 @@ fn tar_append<W: Write, P: AsRef<Path>>(
 	Ok(())
 }
 
+/// Writes a replay to `w` in Peppi (`.slpp`) format.
+///
+/// Returns an error if the game's version is higher than `MAX_SUPPORTED_VERSION`.
 pub fn write<W: Write>(w: W, game: Game, opts: Option<&Opts>) -> Result<(), Box<dyn Error>> {
 	slippi::assert_max_version(game.start.slippi.version)?;
 

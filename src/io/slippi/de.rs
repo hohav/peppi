@@ -822,7 +822,7 @@ pub fn parse_metadata<R: Read>(
 	Ok(())
 }
 
-/// Reads a Slippi-format game from `r`.
+/// Reads a Slippi (`.slp`) replay from `r`.
 pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
 	let hash = opts.map_or(false, |o| o.compute_hash);
 	// Wrap so we can hash all the bytes we've read at the end.

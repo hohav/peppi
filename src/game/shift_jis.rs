@@ -1,3 +1,5 @@
+//! Melee's internal string encoding.
+
 use encoding_rs::SHIFT_JIS;
 use serde::Serialize;
 

@@ -12,15 +12,16 @@ use crate::{
 pub use de::read;
 pub use ser::write;
 
-/// Current version of the Peppi format
+/// Current version of the Peppi format.
 pub const CURRENT_VERSION: Version = Version(2, 0, 0);
 
-/// Minimum supported version of the Peppi format for reading
+/// Minimum supported version of the Peppi format for reading.
 pub const MIN_VERSION: Version = Version(2, 0, 0);
 
-/// Peppi files are TAR archives, guaranteed to start with `peppi.json`
+/// Peppi files are TAR archives, guaranteed to start with `peppi.json`.
 pub const FILE_SIGNATURE: [u8; 10] = [0x70, 0x65, 0x70, 0x70, 0x69, 0x2e, 0x6a, 0x73, 0x6f, 0x6e];
 
+/// Peppi format version.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 pub struct Version(pub u8, pub u8, pub u8);
 
@@ -51,12 +52,14 @@ impl Default for Version {
 	}
 }
 
+/// Compression algorithms supported by Arrow.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub enum Compression {
 	LZ4,
 	ZSTD,
 }
 
+/// Peppi format options.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Peppi {
 	pub version: Version,

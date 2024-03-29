@@ -1,3 +1,7 @@
+//! Serialization and deserialization of replays.
+//!
+//! Peppi supports reading and writing both `.slp` (Slippi) and `.slpp` (Peppi) replays.
+
 macro_rules! err {
 	($( $arg: expr ),*) => {
 		crate::io::Error::InvalidData(format!($( $arg ),*))
@@ -15,6 +19,7 @@ use std::io::{Read, Seek, SeekFrom};
 use thiserror::Error as ThisError;
 use xxhash_rust::xxh3::Xxh3;
 
+/// An error encountered while serializing or deserializing a replay.
 #[derive(ThisError, Debug)]
 pub enum Error {
 	#[error("invalid data: {0}")]
