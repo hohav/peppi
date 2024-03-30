@@ -14,7 +14,7 @@ In your `Cargo.toml`:
 
 ```toml
 [dependencies]
-peppi = "2.0.0-alpha.5"
+peppi = "2.0"
 ```
 
 ## Usage
