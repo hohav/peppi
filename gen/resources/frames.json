@@ -1,115 +1,316 @@
 {
 	"StateFlags": [
-		{ "type": "u8" },
-		{ "type": "u8" },
-		{ "type": "u8" },
-		{ "type": "u8" },
-		{ "type": "u8" }
+		{
+			"type": "u8"
+		},
+		{
+			"type": "u8"
+		},
+		{
+			"type": "u8"
+		},
+		{
+			"type": "u8"
+		},
+		{
+			"type": "u8"
+		}
 	],
 	"Velocities": [
-		{ "name": "self_x_air", "type": "f32" },
-		{ "name": "self_y", "type": "f32" },
-		{ "name": "knockback_x", "type": "f32" },
-		{ "name": "knockback_y", "type": "f32" },
-		{ "name": "self_x_ground", "type": "f32" }
+		{
+			"name": "self_x_air",
+			"type": "f32"
+		},
+		{
+			"name": "self_y",
+			"type": "f32"
+		},
+		{
+			"name": "knockback_x",
+			"type": "f32"
+		},
+		{
+			"name": "knockback_y",
+			"type": "f32"
+		},
+		{
+			"name": "self_x_ground",
+			"type": "f32"
+		}
 	],
 	"Position": [
-		{ "name": "x", "type": "f32" },
-		{ "name": "y", "type": "f32" }
+		{
+			"name": "x",
+			"type": "f32"
+		},
+		{
+			"name": "y",
+			"type": "f32"
+		}
 	],
 	"Velocity": [
-		{ "name": "x", "type": "f32" },
-		{ "name": "y", "type": "f32" }
+		{
+			"name": "x",
+			"type": "f32"
+		},
+		{
+			"name": "y",
+			"type": "f32"
+		}
 	],
 	"TriggersPhysical": [
-		{ "name": "l", "type": "f32" },
-		{ "name": "r", "type": "f32" }
+		{
+			"name": "l",
+			"type": "f32"
+		},
+		{
+			"name": "r",
+			"type": "f32"
+		}
 	],
 	"Pre": [
-		{ "name": "random_seed", "type": "u32" },
-		{ "name": "state", "type": "u16" },
-		{ "name": "position", "type": "Position" },
-		{ "name": "direction", "type": "f32" },
-		{ "name": "joystick", "type": "Position" },
-		{ "name": "cstick", "type": "Position" },
-		{ "name": "triggers", "type": "f32" },
-		{ "name": "buttons", "type": "u32" },
-		{ "name": "buttons_physical", "type": "u16" },
-		{ "name": "triggers_physical", "type": "TriggersPhysical" },
-		{ "name": "raw_analog_x", "type": "i8",
-			"version": "1.2" },
-		{ "name": "percent", "type": "f32",
-			"version": "1.4" },
-		{ "name": "raw_analog_y", "type": "i8",
-			"version": "3.15" }
+		{
+			"name": "random_seed",
+			"type": "u32"
+		},
+		{
+			"name": "state",
+			"type": "u16"
+		},
+		{
+			"name": "position",
+			"type": "Position"
+		},
+		{
+			"name": "direction",
+			"type": "f32"
+		},
+		{
+			"name": "joystick",
+			"type": "Position"
+		},
+		{
+			"name": "cstick",
+			"type": "Position"
+		},
+		{
+			"name": "triggers",
+			"type": "f32"
+		},
+		{
+			"name": "buttons",
+			"type": "u32"
+		},
+		{
+			"name": "buttons_physical",
+			"type": "u16"
+		},
+		{
+			"name": "triggers_physical",
+			"type": "TriggersPhysical"
+		},
+		{
+			"name": "raw_analog_x",
+			"type": "i8",
+			"version": "1.2"
+		},
+		{
+			"name": "percent",
+			"type": "f32",
+			"version": "1.4"
+		},
+		{
+			"name": "raw_analog_y",
+			"type": "i8",
+			"version": "3.15"
+		}
 	],
 	"Post": [
-		{ "name": "character", "type": "u8" },
-		{ "name": "state", "type": "u16" },
-		{ "name": "position", "type": "Position" },
-		{ "name": "direction", "type": "f32" },
-		{ "name": "percent", "type": "f32" },
-		{ "name": "shield", "type": "f32" },
-		{ "name": "last_attack_landed", "type": "u8" },
-		{ "name": "combo_count", "type": "u8" },
-		{ "name": "last_hit_by", "type": "u8" },
-		{ "name": "stocks", "type": "u8" },
-		{ "name": "state_age", "type": "f32",
-			"version": "0.2" },
-		{ "name": "state_flags", "type": "StateFlags",
-			"version": "2.0" },
-		{ "name": "misc_as", "type": "f32",
-			"version": "2.0" },
-		{ "name": "airborne", "type": "u8",
-			"version": "2.0" },
-		{ "name": "ground", "type": "u16",
-			"version": "2.0" },
-		{ "name": "jumps", "type": "u8",
-			"version": "2.0" },
-		{ "name": "l_cancel", "type": "u8",
-			"version": "2.0" },
-		{ "name": "hurtbox_state", "type": "u8",
-			"version": "2.1" },
-		{ "name": "velocities", "type": "Velocities",
-			"version": "3.5" },
-		{ "name": "hitlag", "type": "f32",
-			"version": "3.8" },
-		{ "name": "animation_index", "type": "u32",
-			"version": "3.11" },
-		{ "name": "last_hit_by_instance", "type": "u16",
-			"version": "3.16" },
-		{ "name": "instance_id", "type": "u16",
-			"version": "3.16" }
+		{
+			"name": "character",
+			"type": "u8"
+		},
+		{
+			"name": "state",
+			"type": "u16"
+		},
+		{
+			"name": "position",
+			"type": "Position"
+		},
+		{
+			"name": "direction",
+			"type": "f32"
+		},
+		{
+			"name": "percent",
+			"type": "f32"
+		},
+		{
+			"name": "shield",
+			"type": "f32"
+		},
+		{
+			"name": "last_attack_landed",
+			"type": "u8"
+		},
+		{
+			"name": "combo_count",
+			"type": "u8"
+		},
+		{
+			"name": "last_hit_by",
+			"type": "u8"
+		},
+		{
+			"name": "stocks",
+			"type": "u8"
+		},
+		{
+			"name": "state_age",
+			"type": "f32",
+			"version": "0.2"
+		},
+		{
+			"name": "state_flags",
+			"type": "StateFlags",
+			"version": "2.0"
+		},
+		{
+			"name": "misc_as",
+			"type": "f32",
+			"version": "2.0"
+		},
+		{
+			"name": "airborne",
+			"type": "u8",
+			"version": "2.0"
+		},
+		{
+			"name": "ground",
+			"type": "u16",
+			"version": "2.0"
+		},
+		{
+			"name": "jumps",
+			"type": "u8",
+			"version": "2.0"
+		},
+		{
+			"name": "l_cancel",
+			"type": "u8",
+			"version": "2.0"
+		},
+		{
+			"name": "hurtbox_state",
+			"type": "u8",
+			"version": "2.1"
+		},
+		{
+			"name": "velocities",
+			"type": "Velocities",
+			"version": "3.5"
+		},
+		{
+			"name": "hitlag",
+			"type": "f32",
+			"version": "3.8"
+		},
+		{
+			"name": "animation_index",
+			"type": "u32",
+			"version": "3.11"
+		},
+		{
+			"name": "last_hit_by_instance",
+			"type": "u16",
+			"version": "3.16"
+		},
+		{
+			"name": "instance_id",
+			"type": "u16",
+			"version": "3.16"
+		}
 	],
 	"Start": [
-		{ "name": "random_seed", "type": "u32" },
-		{ "name": "scene_frame_counter", "type": "u32",
-			"version": "3.10" }
+		{
+			"name": "random_seed",
+			"type": "u32"
+		},
+		{
+			"name": "scene_frame_counter",
+			"type": "u32",
+			"version": "3.10"
+		}
 	],
 	"End": [
-		{ "name": "latest_finalized_frame", "type": "i32",
-			"version": "3.7" }
+		{
+			"name": "latest_finalized_frame",
+			"type": "i32",
+			"version": "3.7"
+		}
 	],
 	"ItemMisc": [
-		{ "type": "u8" },
-		{ "type": "u8" },
-		{ "type": "u8" },
-		{ "type": "u8" }
+		{
+			"type": "u8"
+		},
+		{
+			"type": "u8"
+		},
+		{
+			"type": "u8"
+		},
+		{
+			"type": "u8"
+		}
 	],
 	"Item": [
-		{ "name": "type", "type": "u16" },
-		{ "name": "state", "type": "u8" },
-		{ "name": "direction", "type": "f32" },
-		{ "name": "velocity", "type": "Velocity" },
-		{ "name": "position", "type": "Position" },
-		{ "name": "damage", "type": "u16" },
-		{ "name": "timer", "type": "f32" },
-		{ "name": "id", "type": "u32" },
-		{ "name": "misc", "type": "ItemMisc",
-			"version": "3.2" },
-		{ "name": "owner", "type": "i8",
-			"version": "3.6" },
-		{ "name": "instance_id", "type": "u16",
-			"version": "3.16" }
+		{
+			"name": "type",
+			"type": "u16"
+		},
+		{
+			"name": "state",
+			"type": "u8"
+		},
+		{
+			"name": "direction",
+			"type": "f32"
+		},
+		{
+			"name": "velocity",
+			"type": "Velocity"
+		},
+		{
+			"name": "position",
+			"type": "Position"
+		},
+		{
+			"name": "damage",
+			"type": "u16"
+		},
+		{
+			"name": "timer",
+			"type": "f32"
+		},
+		{
+			"name": "id",
+			"type": "u32"
+		},
+		{
+			"name": "misc",
+			"type": "ItemMisc",
+			"version": "3.2"
+		},
+		{
+			"name": "owner",
+			"type": "i8",
+			"version": "3.6"
+		},
+		{
+			"name": "instance_id",
+			"type": "u16",
+			"version": "3.16"
+		}
 	]
 }
