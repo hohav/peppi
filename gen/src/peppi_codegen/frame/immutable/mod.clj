@@ -12,9 +12,19 @@
     :else                ty))
 
 (defn struct-field
-  [{nm :name, ty :type, ver :version}]
-  [nm (cond->> (array-type ty)
-        ver (conj ["Option"]))])
+  [{nm :name, ty :type, ver :version, desc :description}]
+  [:struct-field
+   {:docstring desc}
+   nm
+   (cond->> (array-type ty)
+     ver (conj ["Option"]))])
+
+(defn tuple-struct-field
+  [{ty :type, ver :version, desc :description}]
+  [:tuple-struct-field
+   {:docstring desc}
+   (cond->> (array-type ty)
+     ver (conj ["Option"]))])
 
 (defn transpose-one-field-init
   [{idx :index, nm :name, ty :type, ver :version}]
@@ -53,13 +63,27 @@
   [ty]
   (list "mutable" ty))
 
-(defn struct-decl
+(defmulti struct-decl
+  (fn [[nm fields]]
+    (named? fields)))
+
+(defmethod struct-decl true
   [[nm fields]]
   [:struct
    {:attrs {:derive ["Debug"]}}
    nm
-   (cond->> (mapv struct-field fields)
-     (named? fields) (append ["validity" ["Option" "Bitmap"]]))])
+   (->> (mapv struct-field fields)
+        (append [:struct-field
+                 {:docstring "Indicates which indexes are valid (`None` means \"all valid\"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)"}
+                 "validity"
+                 ["Option" "Bitmap"]]))])
+
+(defmethod struct-decl false
+  [[nm fields]]
+  [:tuple-struct
+   {:attrs {:derive ["Debug"]}}
+   nm
+   (mapv tuple-struct-field fields)])
 
 (defn struct-impl
   [[nm fields]]

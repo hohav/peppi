@@ -4,19 +4,40 @@
    [peppi-codegen.common :refer :all]
    [peppi-codegen.frame.common :refer :all]))
 
-(defn field
+(defn struct-field
   [{nm :name, ty :type, ver :version}]
-  [nm (cond->> ty
-        ver (conj ["Option"]))])
+  [:struct-field
+   nm
+   (cond->> ty
+     ver (conj ["Option"]))])
 
-(defn struct-decl
+(defn tuple-struct-field
+  [{ty :type, ver :version}]
+  [:tuple-struct-field
+   (cond->> ty
+     ver (conj ["Option"]))])
+
+(defmulti struct-decl
+  (fn [[nm fields]]
+    (named? fields)))
+
+(defmethod struct-decl true
   [[nm fields]]
   [:struct
    {:attrs {:derive ["PartialEq" "Clone" "Copy" "Debug", "Default"]}}
    nm
    (->> fields
         (filter :type)
-        (mapv field))])
+        (mapv struct-field))])
+
+(defmethod struct-decl false
+  [[nm fields]]
+  [:tuple-struct
+   {:attrs {:derive ["PartialEq" "Clone" "Copy" "Debug", "Default"]}}
+   nm
+   (->> fields
+        (filter :type)
+        (mapv tuple-struct-field))])
 
 (defn -main []
   (doseq [decl (mapv struct-decl (read-structs))]

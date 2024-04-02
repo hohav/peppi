@@ -303,14 +303,6 @@
   [_ ty]
   (format "use %s;" (emit-type ty)))
 
-(defn emit-struct-field
-  [[nm ty]]
-  (format "\tpub %s: %s," (emit-ident nm) (emit-type ty)))
-
-(defn emit-tuple-struct-field
-  [[_ ty]]
-  (format "\tpub %s," (emit-type ty)))
-
 (defn enum-item
   [[nm value]]
   (format "%s = %s" nm value))
@@ -335,20 +327,35 @@
           nm
           (str/join ", " (mapv enum-item items))))
 
+(defmethod emit-expr* :struct-field
+  [{:keys [docstring]} nm ty]
+  (cond->> (format "\tpub %s: %s," (emit-ident nm) (emit-type ty))
+    docstring (->> docstring
+                   str/split-lines
+                   (mapv #(str "/// " %))
+                   (str/join "\n"))))
+
+(defmethod emit-expr* :tuple-struct-field
+  [_ ty]
+  (format "\tpub %s," (emit-type ty)))
+
 (defmethod emit-expr* :struct
   [{:keys [attrs]} nm fields]
-  (let [decl (format "%s\npub struct %s"
-                     (emit-attrs attrs)
-                     nm)]
-    (if (ffirst fields)
-      (->> fields ; normal struct
-           (mapv emit-struct-field)
-           (str/join "\n")
-           (format "%s {\n%s\n}" decl))
-      (->> fields ; tuple struct
-           (mapv emit-tuple-struct-field)
-           (str/join "\n")
-           (format "%s (\n%s\n);" decl)))))
+  (->> fields
+       (mapv emit-expr)
+       (str/join "\n")
+       (format "%s\npub struct %s {\n%s\n}"
+               (emit-attrs attrs)
+               nm)))
+
+(defmethod emit-expr* :tuple-struct
+  [{:keys [attrs]} nm fields]
+  (->> fields
+       (mapv emit-expr)
+       (str/join "\n")
+       (format "%s\npub struct %s (\n%s\n);"
+               (emit-attrs attrs)
+               nm)))
 
 (defmethod emit-expr* :let
   [props nm expr]

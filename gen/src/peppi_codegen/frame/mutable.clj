@@ -199,14 +199,34 @@
      true (append [:struct-init "Ok" [[nil [:unit]]]]))])
 
 (defn struct-field
-  [{nm :name, ty :type, ver :version}]
-  [nm (cond->> (array-type ty)
-        ver (conj ["Option"]))])
+  [{nm :name, ty :type, ver :version, desc :description}]
+  [:struct-field
+   {:docstring desc}
+   nm
+   (cond->> (array-type ty)
+     ver (conj ["Option"]))])
 
-(defn struct-decl
+(defn tuple-struct-field
+  [{ty :type, ver :version}]
+  [:tuple-struct-field
+   (cond->> (array-type ty)
+     ver (conj ["Option"]))])
+
+(defmulti struct-decl
+  (fn [[nm fields]]
+    (named? fields)))
+
+(defmethod struct-decl true
   [[nm fields]]
-  [:struct nm (cond->> (mapv struct-field fields)
-                (named? fields) (append ["validity" ["Option" "MutableBitmap"]]))])
+  [:struct nm (->> (mapv struct-field fields)
+                   (append [:struct-field
+                            {:docstring "Indicates which indexes are valid (`None` means \"all valid\"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)"}
+                            "validity"
+                            ["Option" "MutableBitmap"]]))])
+
+(defmethod struct-decl false
+  [[nm fields]]
+  [:tuple-struct nm (mapv tuple-struct-field fields)])
 
 (defn struct-impl
   [[nm fields]]

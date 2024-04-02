@@ -18,6 +18,7 @@ use crate::{
 
 type BE = byteorder::BigEndian;
 
+/// Frame data for a single character (ICs are two characters).
 pub struct Data {
 	pub pre: Pre,
 	pub post: Post,
@@ -54,9 +55,11 @@ impl Data {
 	}
 }
 
+/// Frame data for a single port.
 pub struct PortData {
 	pub port: Port,
 	pub leader: Data,
+	/// The "backup" ICs character
 	pub follower: Option<Data>,
 }
 
@@ -85,12 +88,19 @@ impl PortData {
 	}
 }
 
+/// All frame data for a single game, in struct-of-arrays format.
 pub struct Frame {
+	/// Frame IDs start at `-123` and increment each frame. May repeat in case of rollbacks
 	pub id: MutablePrimitiveArray<i32>,
+	/// Port-specific data
 	pub ports: Vec<PortData>,
+	/// Start-of-frame data
 	pub start: Option<Start>,
+	/// End-of-frame data
 	pub end: Option<End>,
+	/// Logically, each frame has its own array of items. But we represent all item data in a flat array, with this field indicating the start of each sub-array
 	pub item_offset: Option<Offsets<i32>>,
+	/// Item data
 	pub item: Option<Item>,
 }
 

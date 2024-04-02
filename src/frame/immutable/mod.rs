@@ -15,6 +15,7 @@ use crate::{
 	io::slippi::Version,
 };
 
+/// Frame data for a single character (ICs are two characters).
 #[derive(Debug)]
 pub struct Data {
 	pub pre: Pre,
@@ -41,10 +42,12 @@ impl From<mutable::Data> for Data {
 	}
 }
 
+/// Frame data for a single port.
 #[derive(Debug)]
 pub struct PortData {
 	pub port: Port,
 	pub leader: Data,
+	/// The "backup" ICs character
 	pub follower: Option<Data>,
 }
 
@@ -68,12 +71,19 @@ impl From<mutable::PortData> for PortData {
 	}
 }
 
+/// All frame data for a single game, in struct-of-arrays format.
 pub struct Frame {
+	/// Frame IDs start at `-123` and increment each frame. May repeat in case of rollbacks
 	pub id: PrimitiveArray<i32>,
+	/// Port-specific data
 	pub ports: Vec<PortData>,
+	/// Start-of-frame data
 	pub start: Option<Start>,
+	/// End-of-frame data
 	pub end: Option<End>,
+	/// Logically, each frame has its own array of items. But we represent all item data in a flat array, with this field indicating the start of each sub-array
 	pub item_offset: Option<OffsetsBuffer<i32>>,
+	/// Item data
 	pub item: Option<Item>,
 }
 
@@ -158,7 +168,9 @@ impl fmt::Debug for Frame {
 
 #[derive(Debug)]
 pub struct End {
+	/// Index of the latest frame which is guaranteed not to happen again (rollback)
 	pub latest_finalized_frame: Option<PrimitiveArray<i32>>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<Bitmap>,
 }
 
@@ -181,17 +193,29 @@ impl From<mutable::End> for End {
 
 #[derive(Debug)]
 pub struct Item {
+	/// Item type
 	pub r#type: PrimitiveArray<u16>,
+	/// Item’s action state
 	pub state: PrimitiveArray<u8>,
+	/// Direction item is facing
 	pub direction: PrimitiveArray<f32>,
+	/// Item’s velocity
 	pub velocity: Velocity,
+	/// Item’s position
 	pub position: Position,
+	/// Amount of damage item has taken
 	pub damage: PrimitiveArray<u16>,
+	/// Frames remaining until item expires
 	pub timer: PrimitiveArray<f32>,
+	/// Unique, serial ID per item spawned
 	pub id: PrimitiveArray<u32>,
+	/// Miscellaneous item state
 	pub misc: Option<ItemMisc>,
+	/// Port that owns the item (-1 when unowned)
 	pub owner: Option<PrimitiveArray<i8>>,
+	/// Inherited instance ID of the owner (0 when unowned)
 	pub instance_id: Option<PrimitiveArray<u16>>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<Bitmap>,
 }
 
@@ -261,6 +285,7 @@ impl From<mutable::ItemMisc> for ItemMisc {
 pub struct Position {
 	pub x: PrimitiveArray<f32>,
 	pub y: PrimitiveArray<f32>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<Bitmap>,
 }
 
@@ -285,29 +310,53 @@ impl From<mutable::Position> for Position {
 
 #[derive(Debug)]
 pub struct Post {
+	/// In-game character (can only change for Zelda/Sheik)
 	pub character: PrimitiveArray<u8>,
+	/// Character’s action state
 	pub state: PrimitiveArray<u16>,
+	/// Character’s position
 	pub position: Position,
+	/// Direction the character is facing
 	pub direction: PrimitiveArray<f32>,
+	/// Damage taken (percent)
 	pub percent: PrimitiveArray<f32>,
+	/// Size/health of shield
 	pub shield: PrimitiveArray<f32>,
+	/// Last attack ID that this character landed
 	pub last_attack_landed: PrimitiveArray<u8>,
+	/// Combo count (as defined by the game)
 	pub combo_count: PrimitiveArray<u8>,
+	/// Port that last hit this player. Bugged in Melee: will be set to `6` in certain situations
 	pub last_hit_by: PrimitiveArray<u8>,
+	/// Number of stocks remaining
 	pub stocks: PrimitiveArray<u8>,
+	/// Number of frames action state has been active. Can have a fractional component
 	pub state_age: Option<PrimitiveArray<f32>>,
+	/// State flags
 	pub state_flags: Option<StateFlags>,
+	/// Used for different things. While in hitstun, contains hitstun frames remaining
 	pub misc_as: Option<PrimitiveArray<f32>>,
+	/// Is the character airborne?
 	pub airborne: Option<PrimitiveArray<u8>>,
+	/// Ground ID the character last touched
 	pub ground: Option<PrimitiveArray<u16>>,
+	/// Number of jumps remaining
 	pub jumps: Option<PrimitiveArray<u8>>,
+	/// L-cancel status (0 = none, 1 = successful, 2 = unsuccessful)
 	pub l_cancel: Option<PrimitiveArray<u8>>,
+	/// Hurtbox state (0 = vulnerable, 1 = invulnerable, 2 = intangible)
 	pub hurtbox_state: Option<PrimitiveArray<u8>>,
+	/// Self-induced and knockback velocities
 	pub velocities: Option<Velocities>,
+	/// Hitlag frames remaining
 	pub hitlag: Option<PrimitiveArray<f32>>,
+	/// Animation the character is in
 	pub animation_index: Option<PrimitiveArray<u32>>,
+	/// Instance ID of the player/item that last hit this player
 	pub last_hit_by_instance: Option<PrimitiveArray<u16>>,
+	/// Unique, serial ID for each new action state across all characters. Resets to 0 on death
 	pub instance_id: Option<PrimitiveArray<u16>>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<Bitmap>,
 }
 
@@ -380,19 +429,33 @@ impl From<mutable::Post> for Post {
 
 #[derive(Debug)]
 pub struct Pre {
+	/// Random seed
 	pub random_seed: PrimitiveArray<u32>,
+	/// Character’s action state
 	pub state: PrimitiveArray<u16>,
+	/// Character’s position
 	pub position: Position,
+	/// Direction the character is facing
 	pub direction: PrimitiveArray<f32>,
+	/// Processed analog joystick position
 	pub joystick: Position,
+	/// Processed analog c-stick position
 	pub cstick: Position,
+	/// Processed analog trigger position
 	pub triggers: PrimitiveArray<f32>,
+	/// Processed button-state bitmask
 	pub buttons: PrimitiveArray<u32>,
+	/// Physical button-state bitmask
 	pub buttons_physical: PrimitiveArray<u16>,
+	/// Physical analog trigger positions (useful for IPM)
 	pub triggers_physical: TriggersPhysical,
+	/// Raw joystick x-position
 	pub raw_analog_x: Option<PrimitiveArray<i8>>,
+	/// Damage taken (percent)
 	pub percent: Option<PrimitiveArray<f32>>,
+	/// Raw joystick y-position
 	pub raw_analog_y: Option<PrimitiveArray<i8>>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<Bitmap>,
 }
 
@@ -439,8 +502,11 @@ impl From<mutable::Pre> for Pre {
 
 #[derive(Debug)]
 pub struct Start {
+	/// Random seed
 	pub random_seed: PrimitiveArray<u32>,
+	/// Scene frame counter. Starts at 0, and increments every frame (even when paused)
 	pub scene_frame_counter: Option<PrimitiveArray<u32>>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<Bitmap>,
 }
 
@@ -494,6 +560,7 @@ impl From<mutable::StateFlags> for StateFlags {
 pub struct TriggersPhysical {
 	pub l: PrimitiveArray<f32>,
 	pub r: PrimitiveArray<f32>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<Bitmap>,
 }
 
@@ -518,11 +585,17 @@ impl From<mutable::TriggersPhysical> for TriggersPhysical {
 
 #[derive(Debug)]
 pub struct Velocities {
+	/// Self-induced x-velocity (airborne)
 	pub self_x_air: PrimitiveArray<f32>,
+	/// Self-induced y-velocity
 	pub self_y: PrimitiveArray<f32>,
+	/// Knockback-induced x-velocity
 	pub knockback_x: PrimitiveArray<f32>,
+	/// Knockback-induced y-velocity
 	pub knockback_y: PrimitiveArray<f32>,
+	/// Self-induced x-velocity (grounded)
 	pub self_x_ground: PrimitiveArray<f32>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<Bitmap>,
 }
 
@@ -555,6 +628,7 @@ impl From<mutable::Velocities> for Velocities {
 pub struct Velocity {
 	pub x: PrimitiveArray<f32>,
 	pub y: PrimitiveArray<f32>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<Bitmap>,
 }
 
