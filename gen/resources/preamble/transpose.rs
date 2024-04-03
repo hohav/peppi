@@ -1,3 +1,7 @@
+//! Single-frame representation using normal structs.
+//!
+//! Transposing frame data is fairly slow. Work with Arrow arrays when possible.
+
 use crate::game::Port;
 
 #[derive(PartialEq, Debug)]

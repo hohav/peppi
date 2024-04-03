@@ -1,3 +1,7 @@
+//! Mutable (in-progress) game data.
+//!
+//! You’ll only encounter mutable frame data if you’re parsing live games.
+
 use serde_json;
 
 use crate::{frame::mutable::Frame, game};

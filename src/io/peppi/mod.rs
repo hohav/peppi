@@ -1,3 +1,5 @@
+//! Peppi (`.slpp`) serialization.
+
 pub mod de;
 pub mod ser;
 

@@ -1,3 +1,11 @@
+//! Immutable (fully-parsed) frame data, as Arrow arrays.
+//!
+//! This is what you get when you parse a game in one shot using [`crate::io::slippi::read`] or
+//! [`crate::io::peppi::read`].
+//!
+//! These arrays can be shared, and cloning them is `O(1)`. See the
+//! [arrow2 docs](https://docs.rs/arrow2/latest/arrow2/array/index.html) for more.
+
 #![allow(unused_variables)]
 
 mod peppi;

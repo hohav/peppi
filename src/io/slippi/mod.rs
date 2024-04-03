@@ -1,3 +1,5 @@
+//! Slippi (`.slp`) serialization.
+
 pub mod de;
 pub mod ser;
 

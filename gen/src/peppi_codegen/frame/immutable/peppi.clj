@@ -130,7 +130,7 @@
         (named? fields) (append ["validity" "validity"]))]]])
 
 (defn struct-impl
-  [[nm fields]]
+  [[nm {:keys [fields]}]]
   [:impl nm [(data-type-fn fields)
              (into-struct-array-fn fields)
              (from-struct-array-fn fields)]])

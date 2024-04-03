@@ -5,7 +5,7 @@
 //! and enables simple serialization into a highly-compressible disk format.
 //!
 //! The mutable/immutable distinction is essentially an artifact of the underlying Arrow library.
-//! You'll only encounter mutable data if you're parsing live games.
+//! You'll only encounter mutable frame data if you're parsing live games.
 
 use crate::game::Port;
 

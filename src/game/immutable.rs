@@ -1,3 +1,8 @@
+//! Immutable (fully-parsed) game data.
+//!
+//! This is what you'll get when you parse a game in one shot using [`crate::io::slippi::read`] or
+//! [`crate::io::peppi::read`].
+
 use serde_json::{Map, Value};
 
 use crate::{
