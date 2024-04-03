@@ -201,7 +201,7 @@
 (defn struct-field
   [{nm :name, ty :type, ver :version, desc :description}]
   [:struct-field
-   {:docstring desc}
+   {:docstring (field-docstring desc ver)}
    nm
    (cond->> (array-type ty)
      ver (conj ["Option"]))])
@@ -213,23 +213,29 @@
      ver (conj ["Option"]))])
 
 (defmulti struct-decl
-  (fn [[nm fields]]
+  (fn [[nm {:keys [fields]}]]
     (named? fields)))
 
 (defmethod struct-decl true
-  [[nm fields]]
-  [:struct nm (->> (mapv struct-field fields)
-                   (append [:struct-field
-                            {:docstring "Indicates which indexes are valid (`None` means \"all valid\"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)"}
-                            "validity"
-                            ["Option" "MutableBitmap"]]))])
+  [[nm {:keys [description fields]}]]
+  [:struct
+   {:docstring description}
+   nm
+   (->> (mapv struct-field fields)
+        (append [:struct-field
+                 {:docstring "Indicates which indexes are valid (`None` means \"all valid\"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)"}
+                 "validity"
+                 ["Option" "MutableBitmap"]]))])
 
 (defmethod struct-decl false
-  [[nm fields]]
-  [:tuple-struct nm (mapv tuple-struct-field fields)])
+  [[nm {:keys [description fields]}]]
+  [:tuple-struct
+   {:docstring description}
+   nm
+   (mapv tuple-struct-field fields)])
 
 (defn struct-impl
-  [[nm fields]]
+  [[nm {:keys [fields]}]]
   [:impl nm [(with-capacity-fn fields)
              (len-fn fields)
              (push-null-fn fields)

@@ -18,11 +18,11 @@
      ver (conj ["Option"]))])
 
 (defmulti struct-decl
-  (fn [[nm fields]]
+  (fn [[nm {:keys [fields]}]]
     (named? fields)))
 
 (defmethod struct-decl true
-  [[nm fields]]
+  [[nm {:keys [fields]}]]
   [:struct
    {:attrs {:derive ["PartialEq" "Clone" "Copy" "Debug", "Default"]}}
    nm
@@ -31,7 +31,7 @@
         (mapv struct-field))])
 
 (defmethod struct-decl false
-  [[nm fields]]
+  [[nm {:keys [fields]}]]
   [:tuple-struct
    {:attrs {:derive ["PartialEq" "Clone" "Copy" "Debug", "Default"]}}
    nm

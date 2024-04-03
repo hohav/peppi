@@ -14,7 +14,7 @@
 (defn struct-field
   [{nm :name, ty :type, ver :version, desc :description}]
   [:struct-field
-   {:docstring desc}
+   {:docstring (field-docstring desc ver)}
    nm
    (cond->> (array-type ty)
      ver (conj ["Option"]))])
@@ -64,13 +64,14 @@
   (list "mutable" ty))
 
 (defmulti struct-decl
-  (fn [[nm fields]]
+  (fn [[nm {:keys [fields]}]]
     (named? fields)))
 
 (defmethod struct-decl true
-  [[nm fields]]
+  [[nm {:keys [description fields]}]]
   [:struct
-   {:attrs {:derive ["Debug"]}}
+   {:attrs {:derive ["Debug"]}
+    :docstring description}
    nm
    (->> (mapv struct-field fields)
         (append [:struct-field
@@ -79,18 +80,19 @@
                  ["Option" "Bitmap"]]))])
 
 (defmethod struct-decl false
-  [[nm fields]]
+  [[nm {:keys [description fields]}]]
   [:tuple-struct
-   {:attrs {:derive ["Debug"]}}
+   {:attrs {:derive ["Debug"]}
+    :docstring description}
    nm
    (mapv tuple-struct-field fields)])
 
 (defn struct-impl
-  [[nm fields]]
+  [[nm {:keys [fields]}]]
   [:impl nm [(transpose-one-fn nm fields)]])
 
 (defn struct-from-impl
-  [[nm fields]]
+  [[nm {:keys [fields]}]]
   [:impl
    {:for nm}
    ["From" (mutable nm)]

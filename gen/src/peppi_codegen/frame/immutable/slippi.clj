@@ -70,7 +70,7 @@
         (append "size"))])
 
 (defn struct-impl
-  [[nm fields]]
+  [[nm {:keys [fields]}]]
   [:impl nm [(write-fn fields)
              (size-fn fields)]])
 
