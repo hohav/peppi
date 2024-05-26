@@ -35,8 +35,7 @@ pub struct Debug {
 pub struct Opts {
 	/// Skip all frame data (faster when you only need start/end/metadata).
 	pub skip_frames: bool,
-	/// Don't compute a hash of the replay's contents.
-	/// Enabled automatically when `skip_frames` is on.
+	/// Compute a hash of the replay's contents.
 	pub compute_hash: bool,
 	/// Debug options.
 	pub debug: Option<Debug>,
