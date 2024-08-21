@@ -10,7 +10,9 @@ exclude = ["benches", "tests"]
 readme = "README.md"
 
 [dependencies]
-arrow2 = { version = "0.17", features = ["io_ipc", "io_ipc_compression", "io_json" ] }
+arrow = "53"
+arrow-buffer = "53"
+arrow-ipc = "53"
 byteorder = "1"
 encoding_rs = "0.8"
 log = "0.4"
@@ -22,7 +24,7 @@ thiserror = "1.0"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 
 [dev-dependencies]
-arrow2 = { version = "0.17", features = ["io_json"] }
+arrow-json = "53"
 criterion = "0.5"
 iai-callgrind = "0.11"
 pretty_assertions = "1.3"

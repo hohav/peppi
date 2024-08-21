@@ -126,9 +126,9 @@ fn frame_counts(frames: &Frame) -> FrameCounts {
 			.ports
 			.iter()
 			.map(|p| {
-				len - p.leader.validity.as_ref().map_or(0, |v| v.unset_bits())
+				len - p.leader.validity.as_ref().map_or(0, |v| v.null_count())
 					+ p.follower.as_ref().map_or(0, |f| {
-						len - f.validity.as_ref().map_or(0, |v| v.unset_bits())
+						len - f.validity.as_ref().map_or(0, |v| v.null_count())
 					})
 			})
 			.sum::<usize>()

@@ -1,37 +1,46 @@
 #![allow(unused_variables)]
 
-use arrow2::{
-	array::{ListArray, PrimitiveArray, StructArray},
-	datatypes::{DataType, Field},
+use std::sync::Arc;
+
+use arrow::{
+	array::{
+		types::{Float32Type, Int32Type, Int8Type, UInt16Type, UInt32Type, UInt8Type},
+		Array, ArrayRef, ListArray, PrimitiveArray, StructArray,
+	},
+	datatypes::{DataType, Field, Fields},
 };
 
 use crate::{
-	io::slippi::Version,
 	frame::{
 		immutable::{Data, Frame, PortData},
 		PortOccupancy,
 	},
 	game::{Port, NUM_PORTS},
+	io::slippi::Version,
 };
 
 impl Data {
-	fn data_type(version: Version) -> DataType {
-		DataType::Struct(vec![
+	fn fields(version: Version) -> Fields {
+		Fields::from(vec![
 			Field::new("pre", Pre::data_type(version).clone(), false),
 			Field::new("post", Post::data_type(version).clone(), false),
 		])
 	}
 
+	fn data_type(version: Version) -> DataType {
+		DataType::Struct(Self::fields(version))
+	}
+
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let values = vec![
-			self.pre.into_struct_array(version).boxed(),
-			self.post.into_struct_array(version).boxed(),
+			Arc::new(self.pre.into_struct_array(version)) as ArrayRef,
+			Arc::new(self.post.into_struct_array(version)) as ArrayRef,
 		];
-		StructArray::new(Self::data_type(version), values, self.validity)
+		StructArray::new(Self::fields(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, validity) = array.into_data();
+		let (_, values, validity) = array.into_parts();
 		Self {
 			pre: Pre::from_struct_array(
 				values[0]
@@ -55,7 +64,7 @@ impl Data {
 }
 
 impl PortData {
-	fn data_type(version: Version, port: PortOccupancy) -> DataType {
+	fn fields(version: Version, port: PortOccupancy) -> Fields {
 		let mut fields = vec![Field::new(
 			"leader",
 			Data::data_type(version).clone(),
@@ -68,21 +77,25 @@ impl PortData {
 				false,
 			));
 		}
-		DataType::Struct(fields)
+		Fields::from(fields)
+	}
+
+	fn data_type(version: Version, port: PortOccupancy) -> DataType {
+		DataType::Struct(Self::fields(version, port))
 	}
 
 	fn into_struct_array(self, version: Version, port: PortOccupancy) -> StructArray {
-		let mut values = vec![self.leader.into_struct_array(version).boxed()];
+		let mut values = vec![Arc::new(self.leader.into_struct_array(version)) as Arc<dyn Array>];
 		if let Some(follower) = self.follower {
-			values.push(follower.into_struct_array(version).boxed());
+			values.push(Arc::new(follower.into_struct_array(version)) as Arc<dyn Array>);
 		}
-		StructArray::new(Self::data_type(version, port), values, None)
+		StructArray::new(Self::fields(version, port), values, None)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version, port: Port) -> Self {
-		let (fields, values, _) = array.into_data();
-		assert_eq!("leader", fields[0].name);
-		fields.get(1).map(|f| assert_eq!("follower", f.name));
+		let (fields, values, _) = array.into_parts();
+		assert_eq!("leader", fields[0].name());
+		fields.get(1).map(|f| assert_eq!("follower", f.name()));
 		Self {
 			port: port,
 			leader: Data::from_struct_array(
@@ -104,78 +117,99 @@ impl PortData {
 }
 
 impl Frame {
-	fn port_data_type(version: Version, ports: &[PortOccupancy]) -> DataType {
-		DataType::Struct(
-			ports.iter().map(|p| {
-				Field::new(
-					format!("{}", p.port),
-					PortData::data_type(version, *p).clone(),
-					false,
-				)
-			})
-			.collect(),
+	fn port_fields(version: Version, ports: &[PortOccupancy]) -> Fields {
+		Fields::from(
+			ports
+				.iter()
+				.map(|p| {
+					Field::new(
+						format!("{}", p.port),
+						PortData::data_type(version, *p).clone(),
+						false,
+					)
+				})
+				.collect::<Vec<_>>(),
 		)
 	}
 
-	fn item_data_type(version: Version) -> DataType {
-		DataType::List(Box::new(Field::new(
-			"item",
-			Item::data_type(version),
-			false,
-		)))
+	fn port_data_type(version: Version, ports: &[PortOccupancy]) -> DataType {
+		DataType::Struct(Self::port_fields(version, ports))
 	}
 
-	fn data_type(version: Version, ports: &[PortOccupancy]) -> DataType {
+	fn item_field(version: Version) -> Field {
+		Field::new("item", Item::data_type(version), false)
+	}
+
+	fn item_data_type(version: Version) -> DataType {
+		DataType::List(Arc::new(Self::item_field(version)))
+	}
+
+	fn fields(version: Version, ports: &[PortOccupancy]) -> Fields {
 		let mut fields = vec![
 			Field::new("id", DataType::Int32, false),
-			Field::new("ports", Self::port_data_type(version, ports).clone(), false),
+			Field::new("ports", Self::port_data_type(version, ports), false),
 		];
 		if version.gte(2, 2) {
-			fields.push(Field::new("start", Start::data_type(version).clone(), false));
+			fields.push(Field::new(
+				"start",
+				Start::data_type(version).clone(),
+				false,
+			));
 			if version.gte(3, 0) {
 				fields.push(Field::new("end", End::data_type(version).clone(), false));
-				fields.push(Field::new("item", Self::item_data_type(version).clone(), false));
+				fields.push(Field::new(
+					"item",
+					Self::item_data_type(version).clone(),
+					false,
+				));
 			}
 		}
-		DataType::Struct(fields)
+		Fields::from(fields)
 	}
 
 	pub fn into_struct_array(self, version: Version, ports: &[PortOccupancy]) -> StructArray {
 		let values: Vec<_> = std::iter::zip(ports, self.ports)
-			.map(|(occupancy, data)| data.into_struct_array(version, *occupancy).boxed())
+			.map(|(occupancy, data)| {
+				Arc::new(data.into_struct_array(version, *occupancy)) as Arc<dyn Array>
+			})
 			.collect();
 
 		let mut arrays = vec![
-			self.id.boxed(),
-			StructArray::new(Self::port_data_type(version, ports), values, None).boxed(),
+			Arc::new(self.id) as Arc<dyn Array>,
+			Arc::new(StructArray::new(
+				Self::port_fields(version, ports),
+				values,
+				None,
+			)) as Arc<dyn Array>,
 		];
 
 		if version.gte(2, 2) {
-			arrays.push(self.start.unwrap().into_struct_array(version).boxed());
+			arrays.push(Arc::new(self.start.unwrap().into_struct_array(version)) as Arc<dyn Array>);
 			if version.gte(3, 0) {
-				arrays.push(self.end.unwrap().into_struct_array(version).boxed());
-				let item_values = self.item.unwrap().into_struct_array(version).boxed();
-				arrays.push(ListArray::new(
-					Self::item_data_type(version),
+				arrays
+					.push(Arc::new(self.end.unwrap().into_struct_array(version)) as Arc<dyn Array>);
+				let item_values = Arc::new(self.item.unwrap().into_struct_array(version));
+				arrays.push(Arc::new(ListArray::new(
+					Arc::new(Self::item_field(version)),
 					self.item_offset.unwrap(),
 					item_values,
 					None,
-				).boxed());
+				)) as Arc<dyn Array>);
 			}
 		}
 
-		StructArray::new(Self::data_type(version, ports), arrays, None)
+		StructArray::new(Self::fields(version, ports), arrays, None)
 	}
 
 	fn port_data_from_struct_array(array: StructArray, version: Version) -> Vec<PortData> {
-		let (fields, values, _) = array.into_data();
+		let (fields, values, _) = array.into_parts();
 		let mut ports = vec![];
-		for i in 0 .. NUM_PORTS {
+		for i in 0..NUM_PORTS {
 			if let Some(a) = values.get(i as usize) {
 				ports.push(PortData::from_struct_array(
 					a.as_any().downcast_ref::<StructArray>().unwrap().clone(),
 					version,
-					Port::parse(&fields[i as usize].name).unwrap(),
+					Port::parse(&fields[i as usize].name()).unwrap(),
 				));
 			}
 		}
@@ -183,25 +217,23 @@ impl Frame {
 	}
 
 	pub fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (fields, values, _) = array.into_data();
-		assert_eq!("id", fields[0].name);
-		assert_eq!("ports", fields[1].name);
+		let (fields, values, _) = array.into_parts();
+		assert_eq!("id", fields[0].name());
+		assert_eq!("ports", fields[1].name());
 		if version.gte(2, 2) {
-			assert_eq!("start", fields[2].name);
+			assert_eq!("start", fields[2].name());
 			if version.gte(3, 0) {
-				assert_eq!("end", fields[3].name);
-				assert_eq!("item", fields[4].name);
+				assert_eq!("end", fields[3].name());
+				assert_eq!("item", fields[4].name());
 			}
 		}
 
 		let (item, item_offset) = values.get(4).map_or((None, None), |v| {
-			let arrays = v.as_any()
-				.downcast_ref::<ListArray<i32>>()
-				.unwrap()
-				.clone();
+			let arrays = v.as_any().downcast_ref::<ListArray>().unwrap().clone();
 			let item_offset = arrays.offsets().clone();
 			let item = Item::from_struct_array(
-				arrays.values()
+				arrays
+					.values()
 					.as_any()
 					.downcast_ref::<StructArray>()
 					.unwrap()
@@ -214,7 +246,7 @@ impl Frame {
 		Self {
 			id: values[0]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<i32>>()
+				.downcast_ref::<PrimitiveArray<Int32Type>>()
 				.unwrap()
 				.clone(),
 			ports: Self::port_data_from_struct_array(
@@ -225,24 +257,18 @@ impl Frame {
 					.clone(),
 				version,
 			),
-			start: values.get(2).map(|v|
+			start: values.get(2).map(|v| {
 				Start::from_struct_array(
-					v.as_any()
-						.downcast_ref::<StructArray>()
-						.unwrap()
-						.clone(),
-						version,
+					v.as_any().downcast_ref::<StructArray>().unwrap().clone(),
+					version,
 				)
-			),
-			end: values.get(3).map(|v|
+			}),
+			end: values.get(3).map(|v| {
 				End::from_struct_array(
-					v.as_any()
-						.downcast_ref::<StructArray>()
-						.unwrap()
-						.clone(),
-						version,
+					v.as_any().downcast_ref::<StructArray>().unwrap().clone(),
+					version,
 				)
-			),
+			}),
 			item_offset: item_offset,
 			item: item,
 		}

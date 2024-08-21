@@ -29,7 +29,7 @@ pub enum Error {
 	Io(#[from] std::io::Error),
 
 	#[error("invalid Arrow: {0}")]
-	Arrow(#[from] arrow2::error::Error),
+	Arrow(#[from] arrow::error::ArrowError),
 
 	#[error("invalid JSON: {0}")]
 	Json(#[from] serde_json::Error),

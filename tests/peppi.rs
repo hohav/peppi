@@ -701,11 +701,11 @@ fn v3_16() {
 		.instance_id
 		.as_ref()
 		.unwrap();
-	let mut id_set: HashSet<u16> = player1_ids.values_iter().cloned().collect();
+	let mut id_set: HashSet<u16> = player1_ids.values().iter().cloned().collect();
 	id_set.remove(&0);
 
 	// player1 and player2 ids should not share any instance ids
-	assert!(player2_ids.values_iter().all(|id| !id_set.contains(id)));
+	assert!(player2_ids.values().iter().all(|id| !id_set.contains(id)));
 
 	let player2_hit_bys = game.frames.ports[1]
 		.leader
@@ -716,7 +716,8 @@ fn v3_16() {
 
 	// player2 should be hit by player1 ids
 	assert!(player2_hit_bys
-		.values_iter()
+		.values()
+		.iter()
 		.all(|id| *id == 0 || id_set.contains(id)));
 
 	let items = game.frames.item.as_ref().unwrap();
@@ -726,8 +727,9 @@ fn v3_16() {
 	// Shy guy (210) should have instance id of 0
 	// The laser/gun should share instance id with the Fox player (P1)
 	assert!(item_instance_ids
-		.values_iter()
-		.zip(item_types.values_iter())
+		.values()
+		.iter()
+		.zip(item_types.values().iter())
 		.all(|(&id, &r#type)| (r#type == 210 && id == 0) || id_set.contains(&id)));
 }
 
@@ -878,7 +880,7 @@ fn rollbacks() {
 	let game = game("ics2");
 	assert_eq!(game.frames.len(), 9530);
 	assert_eq!(
-		game.frames.id.values().clone().sliced(473, 4).as_slice(),
+		*game.frames.id.values().clone().slice(473, 4),
 		[350, 351, 351, 352]
 	);
 	assert_eq!(

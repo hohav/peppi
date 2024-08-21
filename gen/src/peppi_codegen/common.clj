@@ -18,9 +18,7 @@
    "f64" "Float64"})
 
 (def types
-  (-> primitive-types
-      (update-vals #(str "DataType::" %))
-      (assoc nil "DataType::Null")))
+  (update-vals primitive-types #(str "DataType::" %)))
 
 (def reserved-idents
   #{"type"})
@@ -190,6 +188,10 @@
 (defmethod emit-expr* :op
   [_ op lhs rhs]
   (format "%s %s %s" (emit-expr lhs) op (emit-expr rhs)))
+
+(defmethod emit-expr* :cast
+  [_ expr ty]
+  (format "%s as %s" (emit-expr expr) (emit-type ty)))
 
 (defmethod emit-expr* :subscript
   [_ target idx]

@@ -1,10 +1,13 @@
-use std::{error::Error, io::Write, path::Path};
+use std::{error::Error, io::Write, path::Path, sync::Arc};
 
-use arrow2::{
-	array::Array,
-	chunk::Chunk,
-	datatypes::{Field, Schema},
-	io::ipc::write::{Compression, FileWriter, WriteOptions},
+use arrow::{
+	array::{Array, StructArray},
+	datatypes::{Field, Fields},
+	record_batch::RecordBatch,
+};
+use arrow_ipc::{
+	gen::Message::CompressionType,
+	writer::{FileWriter, IpcWriteOptions},
 };
 
 use crate::{
@@ -19,7 +22,7 @@ pub struct Opts {
 	///
 	/// Use this to maximize read speed while saving some disk space (e.g. for machine learning).
 	/// If you just want maximum compression, compress the entire `.slpp` file instead.
-	pub compression: Option<Compression>,
+	pub compression: Option<CompressionType>,
 }
 
 fn tar_append<W: Write, P: AsRef<Path>>(
@@ -33,6 +36,27 @@ fn tar_append<W: Write, P: AsRef<Path>>(
 	header.set_mode(0o644);
 	header.set_cksum();
 	builder.append(&header, buf)?;
+	Ok(())
+}
+
+fn write_frames(
+	frames: StructArray,
+	buf: &mut Vec<u8>,
+	opts: Option<&Opts>,
+) -> Result<(), Box<dyn Error>> {
+	let frames = StructArray::new(
+		Fields::from(vec![Field::new("frame", frames.data_type().clone(), false)]),
+		vec![Arc::new(frames) as Arc<dyn Array>],
+		None,
+	);
+	let batch = RecordBatch::from(frames);
+	let mut writer = FileWriter::try_new_with_options(
+		buf,
+		batch.schema_ref(),
+		IpcWriteOptions::default().try_with_compression(opts.and_then(|o| o.compression))?,
+	)?;
+	writer.write(&batch)?;
+	writer.finish()?;
 	Ok(())
 }
 
@@ -70,30 +94,14 @@ pub fn write<W: Write>(w: W, game: Game, opts: Option<&Opts>) -> Result<(), Box<
 		tar_append(&mut tar, &buf, "gecko_codes.raw")?;
 	}
 
-	if game.frames.id.len() > 0 {
+	if !game.frames.id.is_empty() {
 		let ports = port_occupancy(&game.start);
-		let batch = game
+		let frames = game
 			.frames
 			.into_struct_array(game.start.slippi.version, &ports);
-		let schema = Schema::from(vec![Field {
-			name: "frame".to_string(),
-			data_type: batch.data_type().clone(),
-			is_nullable: false,
-			metadata: Default::default(),
-		}]);
 
-		let chunk = Chunk::new(vec![Box::new(batch) as Box<dyn Array>]);
 		let mut buf = Vec::new();
-		let mut writer = FileWriter::try_new(
-			&mut buf,
-			schema,
-			None,
-			WriteOptions {
-				compression: opts.map_or(None, |o| o.compression),
-			},
-		)?;
-		writer.write(&chunk, None)?;
-		writer.finish()?;
+		write_frames(frames, &mut buf, opts)?;
 		tar_append(&mut tar, &buf, "frames.arrow")?;
 	}
 

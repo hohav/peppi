@@ -4,7 +4,7 @@
 //! [`crate::io::peppi::read`].
 //!
 //! These arrays can be shared, and cloning them is `O(1)`. See the
-//! [arrow2 docs](https://docs.rs/arrow2/latest/arrow2/array/index.html) for more.
+//! [arrow_array docs](https://docs.rs/arrow-array/latest/arrow_array/index.html) for more.
 
 #![allow(unused_variables)]
 
@@ -13,17 +13,18 @@ mod slippi;
 
 use std::fmt;
 
-use arrow2::{
-	array::PrimitiveArray,
-	bitmap::Bitmap,
-	buffer::Buffer,
-	offset::OffsetsBuffer,
+use arrow::{
+	array::{
+		types::{Float32Type, Int32Type, Int8Type, UInt16Type, UInt32Type, UInt8Type},
+		PrimitiveArray,
+	},
+	buffer::{NullBuffer, OffsetBuffer},
 };
 
 use crate::{
-	io::slippi::Version,
-	frame::{self, mutable, transpose, Rollbacks},
+	frame::{self, transpose, Rollbacks},
 	game::Port,
+	io::slippi::Version,
 };
 
 /// Frame data for a single character (ICs are two characters).
@@ -31,7 +32,7 @@ use crate::{
 pub struct Data {
 	pub pre: Pre,
 	pub post: Post,
-	pub validity: Option<Bitmap>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl Data {
@@ -39,16 +40,6 @@ impl Data {
 		transpose::Data {
 			pre: self.pre.transpose_one(i, version),
 			post: self.post.transpose_one(i, version),
-		}
-	}
-}
-
-impl From<mutable::Data> for Data {
-	fn from(d: mutable::Data) -> Self {
-		Self {
-			pre: d.pre.into(),
-			post: d.post.into(),
-			validity: d.validity.map(|v| v.into()),
 		}
 	}
 }
@@ -72,20 +63,10 @@ impl PortData {
 	}
 }
 
-impl From<mutable::PortData> for PortData {
-	fn from(p: mutable::PortData) -> Self {
-		Self {
-			port: p.port,
-			leader: p.leader.into(),
-			follower: p.follower.map(|f| f.into()),
-		}
-	}
-}
-
 /// All frame data for a single game, in struct-of-arrays format.
 pub struct Frame {
 	/// Frame IDs start at `-123` and increment each frame. May repeat in case of rollbacks
-	pub id: PrimitiveArray<i32>,
+	pub id: PrimitiveArray<Int32Type>,
 	/// Port-specific data
 	pub ports: Vec<PortData>,
 	/// Start-of-frame data
@@ -93,7 +74,7 @@ pub struct Frame {
 	/// End-of-frame data
 	pub end: Option<End>,
 	/// Logically, each frame has its own array of items. But we represent all item data in a flat array, with this field indicating the start of each sub-array
-	pub item_offset: Option<OffsetsBuffer<i32>>,
+	pub item_offset: Option<OffsetBuffer<i32>>,
 	/// Item data
 	pub item: Option<Item>,
 }
@@ -106,16 +87,23 @@ impl Frame {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Frame {
 		transpose::Frame {
 			id: self.id.values()[i],
-			ports: self.ports.iter().map(|p| p.transpose_one(i, version)).collect(),
-			start: version.gte(2, 2).then(||
-				self.start.as_ref().unwrap().transpose_one(i, version),
-			),
-			end: version.gte(3, 0).then(||
-				self.end.as_ref().unwrap().transpose_one(i, version),
-			),
+			ports: self
+				.ports
+				.iter()
+				.map(|p| p.transpose_one(i, version))
+				.collect(),
+			start: version
+				.gte(2, 2)
+				.then(|| self.start.as_ref().unwrap().transpose_one(i, version)),
+			end: version
+				.gte(3, 0)
+				.then(|| self.end.as_ref().unwrap().transpose_one(i, version)),
 			items: version.gte(3, 0).then(|| {
-				let (start, end) = self.item_offset.as_ref().unwrap().start_end(i);
-				(start..end)
+				let offsets = self.item_offset.as_ref().unwrap();
+				let [start, end] = (*offsets)[i..i + 2] else {
+					panic!("not enough item offsets: {}/{}", i, offsets.len());
+				};
+				(usize::try_from(start).unwrap()..usize::try_from(end).unwrap())
 					.map(|i| self.item.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
@@ -128,14 +116,14 @@ impl Frame {
 	pub fn rollbacks(&self, keep: Rollbacks) -> Vec<bool> {
 		use Rollbacks::*;
 		match keep {
-			ExceptFirst => self.rollbacks_(self.id.values_iter().enumerate()),
-			ExceptLast => self.rollbacks_(self.id.values_iter().enumerate().rev()),
+			ExceptFirst => self.rollbacks_(self.id.values().iter().cloned().enumerate()),
+			ExceptLast => self.rollbacks_(self.id.values().iter().cloned().enumerate().rev()),
 		}
 	}
 
-	fn rollbacks_<'a>(&self, ids: impl Iterator<Item = (usize, &'a i32)>) -> Vec<bool> {
+	fn rollbacks_<'a>(&self, ids: impl Iterator<Item = (usize, i32)>) -> Vec<bool> {
 		let mut result = vec![false; self.len()];
-		let unique_id_count = self.id.values_iter().max().map_or(0, |idx| {
+		let unique_id_count = arrow::compute::kernels::aggregate::max(&self.id).map_or(0, |idx| {
 			1 + usize::try_from(idx - frame::FIRST_INDEX).unwrap()
 		});
 		let mut seen = vec![false; unique_id_count];
@@ -149,21 +137,6 @@ impl Frame {
 			}
 		}
 		result
-	}
-}
-
-impl From<mutable::Frame> for Frame {
-	fn from(f: mutable::Frame) -> Self {
-		Self {
-			id: f.id.into(),
-			ports: f.ports.into_iter().map(|p| p.into()).collect(),
-			start: f.start.map(|x| x.into()),
-			end: f.end.map(|x| x.into()),
-			item_offset: f.item_offset.map(|x|
-				OffsetsBuffer::try_from(Buffer::from(x.into_inner())).unwrap()
-			),
-			item: f.item.map(|x| x.into()),
-		}
 	}
 }
 

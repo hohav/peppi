@@ -2,10 +2,8 @@ use std::io::Read;
 
 use log::debug;
 
-use arrow2::{
-	array::StructArray,
-	io::ipc::read::{read_stream_metadata, StreamReader, StreamState},
-};
+use arrow::array::StructArray;
+use arrow_ipc::reader::StreamReader;
 
 use crate::{
 	frame::{immutable::Frame, mutable::Frame as MutableFrame},
@@ -26,28 +24,16 @@ pub struct Opts {
 fn read_arrow_frames<R: Read>(mut r: R, version: slippi::Version) -> Result<Frame> {
 	// magic number `ARROW1\0\0`
 	expect_bytes(&mut r, &[65, 82, 82, 79, 87, 49, 0, 0])?;
-	let metadata = read_stream_metadata(&mut r)?;
-	let reader = StreamReader::new(r, metadata, None);
-	let mut frame: Option<Frame> = None;
-	for result in reader {
-		match result? {
-			StreamState::Some(chunk) => match frame {
-				None => {
-					let f = chunk.arrays()[0]
-						.as_any()
-						.downcast_ref::<StructArray>()
-						.expect("expected a `StructArray`");
-					frame = Some(Frame::from_struct_array(f.clone(), version))
-				}
-				Some(_) => return Err(err!("multiple batches")),
-			},
-			StreamState::Waiting => std::thread::sleep(std::time::Duration::from_millis(1000)),
-		}
-	}
-	match frame {
-		Some(f) => Ok(f),
-		_ => Err(err!("no batches")),
-	}
+	let mut reader = StreamReader::try_new(r, None)?;
+	let batch = reader.next().ok_or(err!("no batches"))??;
+	let frames = StructArray::from(batch);
+	assert_eq!(frames.column_names(), vec!["frame"]);
+	let frames = frames
+		.column(0)
+		.as_any()
+		.downcast_ref::<StructArray>()
+		.ok_or(err!("expected a StructArray"))?;
+	Ok(Frame::from_struct_array(frames.clone(), version))
 }
 
 fn read_peppi_start<R: Read>(mut r: R) -> Result<game::Start> {
@@ -113,7 +99,7 @@ pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<Game> {
 					true => {
 						let start = start.as_ref().ok_or(err!("missing start"))?;
 						MutableFrame::with_capacity(0, start.slippi.version, &port_occupancy(start))
-							.into()
+							.finish()
 					}
 					_ => read_arrow_frames(file, version)?,
 				});

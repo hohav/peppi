@@ -28,7 +28,7 @@ impl Data {
 		frame_id: i32,
 		port: PortOccupancy,
 	) -> Result<()> {
-		if self.validity.as_ref().map_or(true, |v| v.get_bit(idx)) {
+		if self.validity.as_ref().map_or(true, |v| v.is_valid(idx)) {
 			w.write_u8(Event::FramePre as u8)?;
 			w.write_i32::<BE>(frame_id)?;
 			w.write_u8(port.port as u8)?;
@@ -49,7 +49,7 @@ impl Data {
 		frame_id: i32,
 		port: PortOccupancy,
 	) -> Result<()> {
-		if self.validity.as_ref().map_or(true, |v| v.get_bit(idx)) {
+		if self.validity.as_ref().map_or(true, |v| v.is_valid(idx)) {
 			w.write_u8(Event::FramePost as u8)?;
 			w.write_i32::<BE>(frame_id)?;
 			w.write_u8(port.port as u8)?;
@@ -82,7 +82,7 @@ impl PortData {
 			},
 		)?;
 		self.follower.as_ref().map_or(Ok(()), |f| {
-			if f.validity.as_ref().map_or(true, |v| v.get_bit(idx)) {
+			if f.validity.as_ref().map_or(true, |v| v.is_valid(idx)) {
 				f.write_pre(
 					w,
 					version,
@@ -117,7 +117,7 @@ impl PortData {
 			},
 		)?;
 		self.follower.as_ref().map_or(Ok(()), |f| {
-			if f.validity.as_ref().map_or(true, |v| v.get_bit(idx)) {
+			if f.validity.as_ref().map_or(true, |v| v.is_valid(idx)) {
 				f.write_post(
 					w,
 					version,

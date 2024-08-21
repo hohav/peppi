@@ -7,7 +7,7 @@ use std::{
 	path::PathBuf,
 };
 
-use arrow2::array::MutableArray;
+use arrow::array::ArrayBuilder;
 use byteorder::ReadBytesExt;
 use log::{debug, info, trace, warn};
 
@@ -72,16 +72,17 @@ pub struct PartialGame {
 	pub quirks: Option<Quirks>,
 }
 
-impl From<PartialGame> for Game {
-	fn from(game: PartialGame) -> Game {
+impl PartialGame {
+	fn finish(mut self) -> Game {
+		let frames = self.frames.finish();
 		Game {
-			start: game.start,
-			end: game.end,
-			frames: game.frames.into(),
-			metadata: game.metadata,
-			gecko_codes: game.gecko_codes,
-			hash: game.hash,
-			quirks: game.quirks,
+			start: self.start,
+			end: self.end,
+			frames: frames,
+			metadata: self.metadata,
+			gecko_codes: self.gecko_codes,
+			hash: self.hash,
+			quirks: self.quirks,
 		}
 	}
 }
@@ -133,11 +134,11 @@ impl ParseState {
 	}
 
 	fn last_id(&self) -> Option<i32> {
-		self.game.frames.id.values().last().map(|id| *id)
+		self.game.frames.id.values_slice().last().map(|id| *id)
 	}
 
 	fn frame_open(&mut self, id: i32) {
-		self.game.frames.id.push(Some(id));
+		self.game.frames.id.append_value(id);
 	}
 
 	fn frame_close(&mut self) {
@@ -708,8 +709,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 						.as_mut()
 						.unwrap()
 						.validity
-						.as_mut()
-						.map(|v| v.push(true));
+						.append(true);
 					state.game.frames.ports[port_index]
 						.follower
 						.as_mut()
@@ -720,8 +720,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 					state.game.frames.ports[port_index]
 						.leader
 						.validity
-						.as_mut()
-						.map(|v| v.push(true));
+						.append(true);
 					state.game.frames.ports[port_index]
 						.leader
 						.pre
@@ -753,25 +752,22 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 				let id = r.read_i32::<BE>()?;
 				trace!("Frame end: {}", id);
 				assert_eq!(id, state.last_id().unwrap());
-				let old_len = *state.game.frames.item_offset.as_ref().unwrap().last();
-				let new_len: i32 = state
+				let old_len = *state
 					.game
 					.frames
-					.item
+					.item_offset
 					.as_ref()
 					.unwrap()
-					.r#type
-					.len()
-					.try_into()
+					.last()
 					.unwrap();
+				let new_len: usize = state.game.frames.item.as_ref().unwrap().r#type.len();
 				state
 					.game
 					.frames
 					.item_offset
 					.as_mut()
 					.unwrap()
-					.try_push(new_len.checked_sub(old_len).unwrap())
-					.unwrap();
+					.push_length(new_len.checked_sub(old_len.try_into().unwrap()).unwrap());
 				state
 					.game
 					.frames
@@ -902,5 +898,5 @@ pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
 	};
 
 	state.game.hash = r.into_digest();
-	Ok(Game::from(state.game))
+	Ok(state.game.finish())
 }

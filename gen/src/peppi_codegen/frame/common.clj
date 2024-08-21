@@ -3,6 +3,17 @@
    [peppi-codegen.common :refer [read-json]]
    [clojure.string :as str]))
 
+(defn arrow-type
+  [ty]
+  (case ty
+    "i8" "Int8Type"
+    "u8" "UInt8Type"
+    "i16" "Int16Type"
+    "u16" "UInt16Type"
+    "i32" "Int32Type"
+    "u32" "UInt32Type"
+    "f32" "Float32Type"))
+
 (defn field-docstring
   [desc ver]
   (some-> desc

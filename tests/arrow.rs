@@ -1,4 +1,5 @@
-use arrow2::io::json::write as json_write;
+use arrow::record_batch::RecordBatch;
+use arrow_json::writer::ArrayWriter as JsonWriter;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::io::BufWriter;
@@ -27,17 +28,18 @@ fn into_struct_array() {
 
 	assert_eq!(
 		vec![124; 5],
-		frames.values().iter().map(|v| v.len()).collect::<Vec<_>>(),
+		frames.columns().iter().map(|v| v.len()).collect::<Vec<_>>(),
 	);
 
-	let frames = frames.boxed();
+	let frames = RecordBatch::from(frames);
 	{
-		let mut serializer =
-			json_write::Serializer::new(vec![Ok(frames.sliced(0, 1))].into_iter(), vec![]);
-		let mut buf = BufWriter::new(Vec::new());
-		json_write::write(&mut buf, &mut serializer).unwrap();
+		let buf = BufWriter::new(Vec::new());
+		let mut writer = JsonWriter::new(buf);
+		writer.write(&frames.slice(0, 1)).unwrap();
+		writer.finish().unwrap();
 		assert_eq!(
-			serde_json::from_slice::<serde_json::Value>(&buf.into_inner().unwrap()).unwrap(),
+			serde_json::from_slice::<serde_json::Value>(&writer.into_inner().into_inner().unwrap())
+				.unwrap(),
 			json!([{
 				"id": -123,
 				"ports": {
@@ -189,12 +191,13 @@ fn into_struct_array() {
 	}
 
 	{
-		let mut serializer =
-			json_write::Serializer::new(vec![Ok(frames.sliced(123, 1))].into_iter(), vec![]);
-		let mut buf = BufWriter::new(Vec::new());
-		json_write::write(&mut buf, &mut serializer).unwrap();
+		let buf = BufWriter::new(Vec::new());
+		let mut writer = JsonWriter::new(buf);
+		writer.write(&frames.slice(123, 1)).unwrap();
+		writer.finish().unwrap();
 		assert_eq!(
-			serde_json::from_slice::<serde_json::Value>(&buf.into_inner().unwrap()).unwrap(),
+			serde_json::from_slice::<serde_json::Value>(&writer.into_inner().into_inner().unwrap())
+				.unwrap(),
 			json!([{
 				"id": 0,
 				"start": {

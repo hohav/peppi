@@ -10,15 +10,14 @@
 
 (defn array-type
   [ty]
-  (cond
-    (primitive-types ty) ["MutablePrimitiveArray" ty]
-    (nil? ty)            "MutableNullArray"
-    :else                ty))
+  (if (types ty)
+	["PrimitiveBuilder" (arrow-type ty)]
+	ty))
 
 (defn with-capacity-arrow
-  [arrow-type]
+  [array-type]
   [:fn-call
-   arrow-type
+   array-type
    "with_capacity"
    ["capacity"]])
 
@@ -29,19 +28,11 @@
    "with_capacity"
    ["capacity" "version"]])
 
-(defn with-capacity-null
-  []
-  [:fn-call
-   "MutableNullArray"
-   "new"
-   ["DataType::Null" 0]])
-
 (defn with-capacity
   [{ty :type, ver :version :as m}]
-  (let [expr (cond
-               (primitive-types ty) (-> ty array-type with-capacity-arrow)
-               ty                   (with-capacity-custom ty)
-               :else                (with-capacity-null))]
+  (let [expr (if (types ty)
+               (-> ty array-type with-capacity-arrow)
+               (with-capacity-custom ty))]
     (if ver
       [:method-call
        [:method-call "version" "gte" ver]
@@ -51,46 +42,63 @@
 
 (defn with-capacity-fn
   [fields]
-  (let [bitmap-init [:fn-call "MutableBitmap" "with_capacity" ["capacity"]]]
-    [:fn
-     {:ret "Self"}
-     "with_capacity"
-     [["capacity" "usize"]
-      ["version" "Version"]]
-     [:block
-      [:struct-init
-       "Self"
-       (cond->> (mapv (juxt :name with-capacity) fields)
-         (named? fields) (append ["validity"
-                                   (if (every? :version fields)
-                                     [:method-call
-                                      [:method-call "version" "lt" (:version (first fields))]
-                                      "then"
-                                      [[:closure
-                                        []
-                                        [[:fn-call "MutableBitmap" "with_capacity" ["capacity"]]]]]]
-                                     "None")]))]]]))
+  [:fn
+   {:ret "Self"}
+   "with_capacity"
+   [["capacity" "usize"]
+    ["version" "Version"]]
+   [:block
+    [:struct-init
+     "Self"
+     (cond->> (mapv (juxt :name with-capacity) fields)
+       (named? fields) (append ["validity"
+                                [:fn-call "NullBufferBuilder" "new" ["capacity"]]]))]]])
+
+(defn push-default-primitive
+  [target]
+  [:method-call target "append_value" [[:fn-call "Default" "default"]]])
+
+(defn push-default-composite
+  [target]
+  [:method-call target "push_default" ["version"]])
+
+(defn push-default
+  [{nm :name, ty :type, ver :version, idx :index}]
+  (let [target (cond-> [:field-get "self" (or nm idx)]
+                 ver ((comp unwrap as-mut)))]
+    (if (types ty)
+	  (push-default-primitive target)
+      (push-default-composite target))))
+
+(defn push-default-fn
+  [fields]
+  [:fn
+   {:visibility "pub"}
+   "push_default"
+   [["&mut self"]
+    ["version" "Version"]]
+   (cond-> [:block]
+     (named? fields) (conj [:method-call
+                            [:field-get "self" "validity"]
+                            "append"
+                            ["true"]])
+     true (into (nested-version-ifs push-default fields)))])
 
 (defn push-null-primitive
   [target]
-  [:method-call target "push_null"])
+  [:method-call target "append_null"])
 
 (defn push-null-composite
   [target]
   [:method-call target "push_null" ["version"]])
 
-(defn push-null-null
-  [target]
-  [:method-call target "push_null"])
-
 (defn push-null
   [{nm :name, ty :type, ver :version, idx :index}]
   (let [target (cond-> [:field-get "self" (or nm idx)]
                  ver ((comp unwrap as-mut)))]
-    (cond
-      (types ty) (push-null-primitive target)
-      ty         (push-null-composite target)
-      :else      (push-null-null target))))
+    (if (types ty)
+	  (push-null-primitive target)
+      (push-null-composite target))))
 
 (defn push-null-fn
   [fields]
@@ -100,18 +108,11 @@
    [["&mut self"]
     ["version" "Version"]]
    (cond-> [:block]
-     (named? fields) (conj [:let "len" [:method-call "self" "len"]])
      (named? fields) (conj [:method-call
-                            [:method-call
-                             [:field-get "self" "validity"]
-                             "get_or_insert_with"
-                             [[:closure
-                               []
-                               [[:fn-call "MutableBitmap" "from_len_set" ["len"]]]]]]
-                            "push"
+                            [:field-get "self" "validity"]
+                            "append"
                             ["false"]])
-     true (into (nested-version-ifs push-null fields)))])
-
+     true (into (nested-version-ifs push-default fields)))])
 
 (defn read-push-primitive
   [target ty]
@@ -124,10 +125,7 @@
    "map"
    [[:closure
      [["x"]]
-     [[:method-call
-       target
-       "push"
-       [[:struct-init "Some" [[nil "x"]]]]]]]]])
+     [[:method-call target "append_value" ["x"]]]]]])
 
 (defn read-push-composite
   [target]
@@ -137,46 +135,29 @@
    "read_push"
    ["r" "version"]])
 
-(defn read-push-null
-  [target]
-  [:method-call target "push_null"])
-
 (defn read-push
   [{nm :name, ty :type, ver :version, idx :index}]
   (let [target (cond-> [:field-get "self" (or nm idx)]
                  ver ((comp unwrap as-mut)))]
-    (cond
-      (primitive-types ty) (read-push-primitive target ty)
-      ty                   (read-push-composite target)
-      :else                (read-push-null target))))
+    (if (types ty)
+	  (read-push-primitive target ty)
+      (read-push-composite target))))
 
 (defn len-fn
-  [[{nm :name, idx :index} :as fields]]
+  [fields]
   [:fn
    {:visibility "pub"
     :ret "usize"}
    "len"
    [["&self"]]
    [:block
-    (if (every? :version fields)
+	(if (named? fields)
       [:method-call
-       [:method-call
-        [:method-call
-         [:field-get "self" "validity"]
-         "as_ref"]
-        "map"
-        [[:closure [["v"]] [[:method-call "v" "len"]]]]]
-       "unwrap_or_else"
-       [[:closure
-         []
-         [[:method-call
-           [:method-call
-            [:method-call
-             [:field-get "self" (or nm idx)]
-             "as_ref"]
-            "unwrap"]
-           "len"]]]]]
-      [:method-call [:field-get "self" (or nm idx)] "len"])]])
+       [:field-get "self" "validity"]
+       "len"]
+	  [:method-call
+	   [:field-get "self" "0"]
+	   "len"])]])
 
 (defn read-push-fn
   [fields]
@@ -189,14 +170,38 @@
     ["version" "Version"]]
    (cond->> (into [:block] (nested-version-ifs read-push fields))
      (named? fields) (append [:method-call
-                              [:method-call
-                               [:field-get "self" "validity"]
-                               "as_mut"]
-                              "map"
-                              [[:closure
-                                [["v"]]
-                                [[:method-call "v" "push" ["true"]]]]]])
+                              [:field-get "self" "validity"]
+                              "append"
+                              ["true"]])
      true (append [:struct-init "Ok" [[nil [:unit]]]]))])
+
+(defn immutable
+  [ty]
+  (list "immutable" ty))
+
+(defn finish
+  [{idx :index, nm :name, ver :version}]
+  (let [target [:field-get "self" (or nm idx)]]
+    (if ver
+      (wrap-map (as-mut target) "x" [:method-call "x" "finish" []])
+      [:method-call target "finish" []])))
+
+(defn finish-fn
+  [ty fields]
+  [:fn
+   {:ret (immutable ty)}
+   "finish"
+   [["&mut self"]]
+   [:block
+    [:struct-init
+     (immutable ty)
+     (cond->> (mapv (juxt :name finish) fields)
+       (named? fields)
+       (append ["validity"
+                [:method-call
+                 [:field-get "self" "validity"]
+                 "finish"
+                 []]]))]]])
 
 (defn struct-field
   [{nm :name, ty :type, ver :version, desc :description}]
@@ -225,7 +230,7 @@
         (append [:struct-field
                  {:docstring "Indicates which indexes are valid (`None` means \"all valid\"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)"}
                  "validity"
-                 ["Option" "MutableBitmap"]]))])
+                 "NullBufferBuilder"]))])
 
 (defmethod struct-decl false
   [[nm {:keys [description fields]}]]
@@ -238,8 +243,9 @@
   [[nm {:keys [fields]}]]
   [:impl nm [(with-capacity-fn fields)
              (len-fn fields)
-             (push-null-fn fields)
+             (push-default-fn fields)
              (read-push-fn fields)
+             (finish-fn nm fields)
              (immutable/transpose-one-fn nm fields)]])
 
 (defn -main []

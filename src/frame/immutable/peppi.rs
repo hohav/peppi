@@ -2,9 +2,14 @@
 
 #![allow(unused_variables)]
 
-use arrow2::{
-	array::{ListArray, PrimitiveArray, StructArray},
-	datatypes::{DataType, Field},
+use std::sync::Arc;
+
+use arrow::{
+	array::{
+		types::{Float32Type, Int32Type, Int8Type, UInt16Type, UInt32Type, UInt8Type},
+		Array, ArrayRef, ListArray, PrimitiveArray, StructArray,
+	},
+	datatypes::{DataType, Field, Fields},
 };
 
 use crate::{
@@ -17,23 +22,27 @@ use crate::{
 };
 
 impl Data {
-	fn data_type(version: Version) -> DataType {
-		DataType::Struct(vec![
+	fn fields(version: Version) -> Fields {
+		Fields::from(vec![
 			Field::new("pre", Pre::data_type(version).clone(), false),
 			Field::new("post", Post::data_type(version).clone(), false),
 		])
 	}
 
+	fn data_type(version: Version) -> DataType {
+		DataType::Struct(Self::fields(version))
+	}
+
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let values = vec![
-			self.pre.into_struct_array(version).boxed(),
-			self.post.into_struct_array(version).boxed(),
+			Arc::new(self.pre.into_struct_array(version)) as ArrayRef,
+			Arc::new(self.post.into_struct_array(version)) as ArrayRef,
 		];
-		StructArray::new(Self::data_type(version), values, self.validity)
+		StructArray::new(Self::fields(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, validity) = array.into_data();
+		let (_, values, validity) = array.into_parts();
 		Self {
 			pre: Pre::from_struct_array(
 				values[0]
@@ -57,7 +66,7 @@ impl Data {
 }
 
 impl PortData {
-	fn data_type(version: Version, port: PortOccupancy) -> DataType {
+	fn fields(version: Version, port: PortOccupancy) -> Fields {
 		let mut fields = vec![Field::new(
 			"leader",
 			Data::data_type(version).clone(),
@@ -70,21 +79,25 @@ impl PortData {
 				false,
 			));
 		}
-		DataType::Struct(fields)
+		Fields::from(fields)
+	}
+
+	fn data_type(version: Version, port: PortOccupancy) -> DataType {
+		DataType::Struct(Self::fields(version, port))
 	}
 
 	fn into_struct_array(self, version: Version, port: PortOccupancy) -> StructArray {
-		let mut values = vec![self.leader.into_struct_array(version).boxed()];
+		let mut values = vec![Arc::new(self.leader.into_struct_array(version)) as Arc<dyn Array>];
 		if let Some(follower) = self.follower {
-			values.push(follower.into_struct_array(version).boxed());
+			values.push(Arc::new(follower.into_struct_array(version)) as Arc<dyn Array>);
 		}
-		StructArray::new(Self::data_type(version, port), values, None)
+		StructArray::new(Self::fields(version, port), values, None)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version, port: Port) -> Self {
-		let (fields, values, _) = array.into_data();
-		assert_eq!("leader", fields[0].name);
-		fields.get(1).map(|f| assert_eq!("follower", f.name));
+		let (fields, values, _) = array.into_parts();
+		assert_eq!("leader", fields[0].name());
+		fields.get(1).map(|f| assert_eq!("follower", f.name()));
 		Self {
 			port: port,
 			leader: Data::from_struct_array(
@@ -106,8 +119,8 @@ impl PortData {
 }
 
 impl Frame {
-	fn port_data_type(version: Version, ports: &[PortOccupancy]) -> DataType {
-		DataType::Struct(
+	fn port_fields(version: Version, ports: &[PortOccupancy]) -> Fields {
+		Fields::from(
 			ports
 				.iter()
 				.map(|p| {
@@ -117,22 +130,26 @@ impl Frame {
 						false,
 					)
 				})
-				.collect(),
+				.collect::<Vec<_>>(),
 		)
 	}
 
-	fn item_data_type(version: Version) -> DataType {
-		DataType::List(Box::new(Field::new(
-			"item",
-			Item::data_type(version),
-			false,
-		)))
+	fn port_data_type(version: Version, ports: &[PortOccupancy]) -> DataType {
+		DataType::Struct(Self::port_fields(version, ports))
 	}
 
-	fn data_type(version: Version, ports: &[PortOccupancy]) -> DataType {
+	fn item_field(version: Version) -> Field {
+		Field::new("item", Item::data_type(version), false)
+	}
+
+	fn item_data_type(version: Version) -> DataType {
+		DataType::List(Arc::new(Self::item_field(version)))
+	}
+
+	fn fields(version: Version, ports: &[PortOccupancy]) -> Fields {
 		let mut fields = vec![
 			Field::new("id", DataType::Int32, false),
-			Field::new("ports", Self::port_data_type(version, ports).clone(), false),
+			Field::new("ports", Self::port_data_type(version, ports), false),
 		];
 		if version.gte(2, 2) {
 			fields.push(Field::new(
@@ -149,48 +166,52 @@ impl Frame {
 				));
 			}
 		}
-		DataType::Struct(fields)
+		Fields::from(fields)
 	}
 
 	pub fn into_struct_array(self, version: Version, ports: &[PortOccupancy]) -> StructArray {
 		let values: Vec<_> = std::iter::zip(ports, self.ports)
-			.map(|(occupancy, data)| data.into_struct_array(version, *occupancy).boxed())
+			.map(|(occupancy, data)| {
+				Arc::new(data.into_struct_array(version, *occupancy)) as Arc<dyn Array>
+			})
 			.collect();
 
 		let mut arrays = vec![
-			self.id.boxed(),
-			StructArray::new(Self::port_data_type(version, ports), values, None).boxed(),
+			Arc::new(self.id) as Arc<dyn Array>,
+			Arc::new(StructArray::new(
+				Self::port_fields(version, ports),
+				values,
+				None,
+			)) as Arc<dyn Array>,
 		];
 
 		if version.gte(2, 2) {
-			arrays.push(self.start.unwrap().into_struct_array(version).boxed());
+			arrays.push(Arc::new(self.start.unwrap().into_struct_array(version)) as Arc<dyn Array>);
 			if version.gte(3, 0) {
-				arrays.push(self.end.unwrap().into_struct_array(version).boxed());
-				let item_values = self.item.unwrap().into_struct_array(version).boxed();
-				arrays.push(
-					ListArray::new(
-						Self::item_data_type(version),
-						self.item_offset.unwrap(),
-						item_values,
-						None,
-					)
-					.boxed(),
-				);
+				arrays
+					.push(Arc::new(self.end.unwrap().into_struct_array(version)) as Arc<dyn Array>);
+				let item_values = Arc::new(self.item.unwrap().into_struct_array(version));
+				arrays.push(Arc::new(ListArray::new(
+					Arc::new(Self::item_field(version)),
+					self.item_offset.unwrap(),
+					item_values,
+					None,
+				)) as Arc<dyn Array>);
 			}
 		}
 
-		StructArray::new(Self::data_type(version, ports), arrays, None)
+		StructArray::new(Self::fields(version, ports), arrays, None)
 	}
 
 	fn port_data_from_struct_array(array: StructArray, version: Version) -> Vec<PortData> {
-		let (fields, values, _) = array.into_data();
+		let (fields, values, _) = array.into_parts();
 		let mut ports = vec![];
 		for i in 0..NUM_PORTS {
 			if let Some(a) = values.get(i as usize) {
 				ports.push(PortData::from_struct_array(
 					a.as_any().downcast_ref::<StructArray>().unwrap().clone(),
 					version,
-					Port::parse(&fields[i as usize].name).unwrap(),
+					Port::parse(&fields[i as usize].name()).unwrap(),
 				));
 			}
 		}
@@ -198,19 +219,19 @@ impl Frame {
 	}
 
 	pub fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (fields, values, _) = array.into_data();
-		assert_eq!("id", fields[0].name);
-		assert_eq!("ports", fields[1].name);
+		let (fields, values, _) = array.into_parts();
+		assert_eq!("id", fields[0].name());
+		assert_eq!("ports", fields[1].name());
 		if version.gte(2, 2) {
-			assert_eq!("start", fields[2].name);
+			assert_eq!("start", fields[2].name());
 			if version.gte(3, 0) {
-				assert_eq!("end", fields[3].name);
-				assert_eq!("item", fields[4].name);
+				assert_eq!("end", fields[3].name());
+				assert_eq!("item", fields[4].name());
 			}
 		}
 
 		let (item, item_offset) = values.get(4).map_or((None, None), |v| {
-			let arrays = v.as_any().downcast_ref::<ListArray<i32>>().unwrap().clone();
+			let arrays = v.as_any().downcast_ref::<ListArray>().unwrap().clone();
 			let item_offset = arrays.offsets().clone();
 			let item = Item::from_struct_array(
 				arrays
@@ -227,7 +248,7 @@ impl Frame {
 		Self {
 			id: values[0]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<i32>>()
+				.downcast_ref::<PrimitiveArray<Int32Type>>()
 				.unwrap()
 				.clone(),
 			ports: Self::port_data_from_struct_array(
@@ -259,30 +280,34 @@ impl Frame {
 use crate::frame::immutable::End;
 
 impl End {
-	fn data_type(version: Version) -> DataType {
+	fn fields(version: Version) -> Fields {
 		let mut fields = vec![];
 		{
 			if version.gte(3, 7) {
 				fields.push(Field::new("latest_finalized_frame", DataType::Int32, false))
 			}
 		};
-		DataType::Struct(fields)
+		Fields::from(fields)
+	}
+
+	fn data_type(version: Version) -> DataType {
+		DataType::Struct(Self::fields(version))
 	}
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
 		if version.gte(3, 7) {
-			values.push(self.latest_finalized_frame.unwrap().boxed())
+			values.push(Arc::new(self.latest_finalized_frame.unwrap()) as Arc<dyn Array>)
 		};
-		StructArray::new(Self::data_type(version), values, self.validity)
+		StructArray::new(Self::fields(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, validity) = array.into_data();
+		let (_, values, validity) = array.into_parts();
 		Self {
 			latest_finalized_frame: values.get(0).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<i32>>()
+					.downcast_ref::<PrimitiveArray<Int32Type>>()
 					.unwrap()
 					.clone()
 			}),
@@ -294,7 +319,7 @@ impl End {
 use crate::frame::immutable::Item;
 
 impl Item {
-	fn data_type(version: Version) -> DataType {
+	fn fields(version: Version) -> Fields {
 		let mut fields = vec![];
 		{
 			fields.push(Field::new("type", DataType::UInt16, false));
@@ -315,47 +340,51 @@ impl Item {
 				}
 			}
 		};
-		DataType::Struct(fields)
+		Fields::from(fields)
+	}
+
+	fn data_type(version: Version) -> DataType {
+		DataType::Struct(Self::fields(version))
 	}
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		values.push(self.r#type.boxed());
-		values.push(self.state.boxed());
-		values.push(self.direction.boxed());
-		values.push(self.velocity.into_struct_array(version).boxed());
-		values.push(self.position.into_struct_array(version).boxed());
-		values.push(self.damage.boxed());
-		values.push(self.timer.boxed());
-		values.push(self.id.boxed());
+		values.push(Arc::new(self.r#type) as Arc<dyn Array>);
+		values.push(Arc::new(self.state) as Arc<dyn Array>);
+		values.push(Arc::new(self.direction) as Arc<dyn Array>);
+		values.push(Arc::new(self.velocity.into_struct_array(version)) as Arc<dyn Array>);
+		values.push(Arc::new(self.position.into_struct_array(version)) as Arc<dyn Array>);
+		values.push(Arc::new(self.damage) as Arc<dyn Array>);
+		values.push(Arc::new(self.timer) as Arc<dyn Array>);
+		values.push(Arc::new(self.id) as Arc<dyn Array>);
 		if version.gte(3, 2) {
-			values.push(self.misc.unwrap().into_struct_array(version).boxed());
+			values.push(Arc::new(self.misc.unwrap().into_struct_array(version)) as Arc<dyn Array>);
 			if version.gte(3, 6) {
-				values.push(self.owner.unwrap().boxed());
+				values.push(Arc::new(self.owner.unwrap()) as Arc<dyn Array>);
 				if version.gte(3, 16) {
-					values.push(self.instance_id.unwrap().boxed())
+					values.push(Arc::new(self.instance_id.unwrap()) as Arc<dyn Array>)
 				}
 			}
 		};
-		StructArray::new(Self::data_type(version), values, self.validity)
+		StructArray::new(Self::fields(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, validity) = array.into_data();
+		let (_, values, validity) = array.into_parts();
 		Self {
 			r#type: values[0]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u16>>()
+				.downcast_ref::<PrimitiveArray<UInt16Type>>()
 				.unwrap()
 				.clone(),
 			state: values[1]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 			direction: values[2]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			velocity: Velocity::from_struct_array(
@@ -376,17 +405,17 @@ impl Item {
 			),
 			damage: values[5]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u16>>()
+				.downcast_ref::<PrimitiveArray<UInt16Type>>()
 				.unwrap()
 				.clone(),
 			timer: values[6]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			id: values[7]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u32>>()
+				.downcast_ref::<PrimitiveArray<UInt32Type>>()
 				.unwrap()
 				.clone(),
 			misc: values.get(8).map(|x| {
@@ -397,13 +426,13 @@ impl Item {
 			}),
 			owner: values.get(9).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<i8>>()
+					.downcast_ref::<PrimitiveArray<Int8Type>>()
 					.unwrap()
 					.clone()
 			}),
 			instance_id: values.get(10).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<u16>>()
+					.downcast_ref::<PrimitiveArray<UInt16Type>>()
 					.unwrap()
 					.clone()
 			}),
@@ -415,7 +444,7 @@ impl Item {
 use crate::frame::immutable::ItemMisc;
 
 impl ItemMisc {
-	fn data_type(version: Version) -> DataType {
+	fn fields(version: Version) -> Fields {
 		let mut fields = vec![];
 		{
 			fields.push(Field::new("0", DataType::UInt8, false));
@@ -423,39 +452,43 @@ impl ItemMisc {
 			fields.push(Field::new("2", DataType::UInt8, false));
 			fields.push(Field::new("3", DataType::UInt8, false))
 		};
-		DataType::Struct(fields)
+		Fields::from(fields)
+	}
+
+	fn data_type(version: Version) -> DataType {
+		DataType::Struct(Self::fields(version))
 	}
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		values.push(self.0.boxed());
-		values.push(self.1.boxed());
-		values.push(self.2.boxed());
-		values.push(self.3.boxed());
-		StructArray::new(Self::data_type(version), values, None)
+		values.push(Arc::new(self.0) as Arc<dyn Array>);
+		values.push(Arc::new(self.1) as Arc<dyn Array>);
+		values.push(Arc::new(self.2) as Arc<dyn Array>);
+		values.push(Arc::new(self.3) as Arc<dyn Array>);
+		StructArray::new(Self::fields(version), values, None)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, validity) = array.into_data();
+		let (_, values, validity) = array.into_parts();
 		Self(
 			values[0]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 			values[1]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 			values[2]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 			values[3]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 		)
@@ -465,33 +498,37 @@ impl ItemMisc {
 use crate::frame::immutable::Position;
 
 impl Position {
-	fn data_type(version: Version) -> DataType {
+	fn fields(version: Version) -> Fields {
 		let mut fields = vec![];
 		{
 			fields.push(Field::new("x", DataType::Float32, false));
 			fields.push(Field::new("y", DataType::Float32, false))
 		};
-		DataType::Struct(fields)
+		Fields::from(fields)
+	}
+
+	fn data_type(version: Version) -> DataType {
+		DataType::Struct(Self::fields(version))
 	}
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		values.push(self.x.boxed());
-		values.push(self.y.boxed());
-		StructArray::new(Self::data_type(version), values, self.validity)
+		values.push(Arc::new(self.x) as Arc<dyn Array>);
+		values.push(Arc::new(self.y) as Arc<dyn Array>);
+		StructArray::new(Self::fields(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, validity) = array.into_data();
+		let (_, values, validity) = array.into_parts();
 		Self {
 			x: values[0]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			y: values[1]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			validity: validity,
@@ -502,7 +539,7 @@ impl Position {
 use crate::frame::immutable::Post;
 
 impl Post {
-	fn data_type(version: Version) -> DataType {
+	fn fields(version: Version) -> Fields {
 		let mut fields = vec![];
 		{
 			fields.push(Field::new("character", DataType::UInt8, false));
@@ -563,41 +600,54 @@ impl Post {
 				}
 			}
 		};
-		DataType::Struct(fields)
+		Fields::from(fields)
+	}
+
+	fn data_type(version: Version) -> DataType {
+		DataType::Struct(Self::fields(version))
 	}
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		values.push(self.character.boxed());
-		values.push(self.state.boxed());
-		values.push(self.position.into_struct_array(version).boxed());
-		values.push(self.direction.boxed());
-		values.push(self.percent.boxed());
-		values.push(self.shield.boxed());
-		values.push(self.last_attack_landed.boxed());
-		values.push(self.combo_count.boxed());
-		values.push(self.last_hit_by.boxed());
-		values.push(self.stocks.boxed());
+		values.push(Arc::new(self.character) as Arc<dyn Array>);
+		values.push(Arc::new(self.state) as Arc<dyn Array>);
+		values.push(Arc::new(self.position.into_struct_array(version)) as Arc<dyn Array>);
+		values.push(Arc::new(self.direction) as Arc<dyn Array>);
+		values.push(Arc::new(self.percent) as Arc<dyn Array>);
+		values.push(Arc::new(self.shield) as Arc<dyn Array>);
+		values.push(Arc::new(self.last_attack_landed) as Arc<dyn Array>);
+		values.push(Arc::new(self.combo_count) as Arc<dyn Array>);
+		values.push(Arc::new(self.last_hit_by) as Arc<dyn Array>);
+		values.push(Arc::new(self.stocks) as Arc<dyn Array>);
 		if version.gte(0, 2) {
-			values.push(self.state_age.unwrap().boxed());
+			values.push(Arc::new(self.state_age.unwrap()) as Arc<dyn Array>);
 			if version.gte(2, 0) {
-				values.push(self.state_flags.unwrap().into_struct_array(version).boxed());
-				values.push(self.misc_as.unwrap().boxed());
-				values.push(self.airborne.unwrap().boxed());
-				values.push(self.ground.unwrap().boxed());
-				values.push(self.jumps.unwrap().boxed());
-				values.push(self.l_cancel.unwrap().boxed());
+				values.push(
+					Arc::new(self.state_flags.unwrap().into_struct_array(version))
+						as Arc<dyn Array>,
+				);
+				values.push(Arc::new(self.misc_as.unwrap()) as Arc<dyn Array>);
+				values.push(Arc::new(self.airborne.unwrap()) as Arc<dyn Array>);
+				values.push(Arc::new(self.ground.unwrap()) as Arc<dyn Array>);
+				values.push(Arc::new(self.jumps.unwrap()) as Arc<dyn Array>);
+				values.push(Arc::new(self.l_cancel.unwrap()) as Arc<dyn Array>);
 				if version.gte(2, 1) {
-					values.push(self.hurtbox_state.unwrap().boxed());
+					values.push(Arc::new(self.hurtbox_state.unwrap()) as Arc<dyn Array>);
 					if version.gte(3, 5) {
-						values.push(self.velocities.unwrap().into_struct_array(version).boxed());
+						values.push(
+							Arc::new(self.velocities.unwrap().into_struct_array(version))
+								as Arc<dyn Array>,
+						);
 						if version.gte(3, 8) {
-							values.push(self.hitlag.unwrap().boxed());
+							values.push(Arc::new(self.hitlag.unwrap()) as Arc<dyn Array>);
 							if version.gte(3, 11) {
-								values.push(self.animation_index.unwrap().boxed());
+								values
+									.push(Arc::new(self.animation_index.unwrap()) as Arc<dyn Array>);
 								if version.gte(3, 16) {
-									values.push(self.last_hit_by_instance.unwrap().boxed());
-									values.push(self.instance_id.unwrap().boxed())
+									values.push(Arc::new(self.last_hit_by_instance.unwrap())
+										as Arc<dyn Array>);
+									values
+										.push(Arc::new(self.instance_id.unwrap()) as Arc<dyn Array>)
 								}
 							}
 						}
@@ -605,20 +655,20 @@ impl Post {
 				}
 			}
 		};
-		StructArray::new(Self::data_type(version), values, self.validity)
+		StructArray::new(Self::fields(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, validity) = array.into_data();
+		let (_, values, validity) = array.into_parts();
 		Self {
 			character: values[0]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 			state: values[1]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u16>>()
+				.downcast_ref::<PrimitiveArray<UInt16Type>>()
 				.unwrap()
 				.clone(),
 			position: Position::from_struct_array(
@@ -631,42 +681,42 @@ impl Post {
 			),
 			direction: values[3]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			percent: values[4]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			shield: values[5]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			last_attack_landed: values[6]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 			combo_count: values[7]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 			last_hit_by: values[8]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 			stocks: values[9]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 			state_age: values.get(10).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<f32>>()
+					.downcast_ref::<PrimitiveArray<Float32Type>>()
 					.unwrap()
 					.clone()
 			}),
@@ -678,37 +728,37 @@ impl Post {
 			}),
 			misc_as: values.get(12).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<f32>>()
+					.downcast_ref::<PrimitiveArray<Float32Type>>()
 					.unwrap()
 					.clone()
 			}),
 			airborne: values.get(13).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<u8>>()
+					.downcast_ref::<PrimitiveArray<UInt8Type>>()
 					.unwrap()
 					.clone()
 			}),
 			ground: values.get(14).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<u16>>()
+					.downcast_ref::<PrimitiveArray<UInt16Type>>()
 					.unwrap()
 					.clone()
 			}),
 			jumps: values.get(15).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<u8>>()
+					.downcast_ref::<PrimitiveArray<UInt8Type>>()
 					.unwrap()
 					.clone()
 			}),
 			l_cancel: values.get(16).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<u8>>()
+					.downcast_ref::<PrimitiveArray<UInt8Type>>()
 					.unwrap()
 					.clone()
 			}),
 			hurtbox_state: values.get(17).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<u8>>()
+					.downcast_ref::<PrimitiveArray<UInt8Type>>()
 					.unwrap()
 					.clone()
 			}),
@@ -720,25 +770,25 @@ impl Post {
 			}),
 			hitlag: values.get(19).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<f32>>()
+					.downcast_ref::<PrimitiveArray<Float32Type>>()
 					.unwrap()
 					.clone()
 			}),
 			animation_index: values.get(20).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<u32>>()
+					.downcast_ref::<PrimitiveArray<UInt32Type>>()
 					.unwrap()
 					.clone()
 			}),
 			last_hit_by_instance: values.get(21).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<u16>>()
+					.downcast_ref::<PrimitiveArray<UInt16Type>>()
 					.unwrap()
 					.clone()
 			}),
 			instance_id: values.get(22).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<u16>>()
+					.downcast_ref::<PrimitiveArray<UInt16Type>>()
 					.unwrap()
 					.clone()
 			}),
@@ -750,7 +800,7 @@ impl Post {
 use crate::frame::immutable::Pre;
 
 impl Pre {
-	fn data_type(version: Version) -> DataType {
+	fn fields(version: Version) -> Fields {
 		let mut fields = vec![];
 		{
 			fields.push(Field::new("random_seed", DataType::UInt32, false));
@@ -777,44 +827,48 @@ impl Pre {
 				}
 			}
 		};
-		DataType::Struct(fields)
+		Fields::from(fields)
+	}
+
+	fn data_type(version: Version) -> DataType {
+		DataType::Struct(Self::fields(version))
 	}
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		values.push(self.random_seed.boxed());
-		values.push(self.state.boxed());
-		values.push(self.position.into_struct_array(version).boxed());
-		values.push(self.direction.boxed());
-		values.push(self.joystick.into_struct_array(version).boxed());
-		values.push(self.cstick.into_struct_array(version).boxed());
-		values.push(self.triggers.boxed());
-		values.push(self.buttons.boxed());
-		values.push(self.buttons_physical.boxed());
-		values.push(self.triggers_physical.into_struct_array(version).boxed());
+		values.push(Arc::new(self.random_seed) as Arc<dyn Array>);
+		values.push(Arc::new(self.state) as Arc<dyn Array>);
+		values.push(Arc::new(self.position.into_struct_array(version)) as Arc<dyn Array>);
+		values.push(Arc::new(self.direction) as Arc<dyn Array>);
+		values.push(Arc::new(self.joystick.into_struct_array(version)) as Arc<dyn Array>);
+		values.push(Arc::new(self.cstick.into_struct_array(version)) as Arc<dyn Array>);
+		values.push(Arc::new(self.triggers) as Arc<dyn Array>);
+		values.push(Arc::new(self.buttons) as Arc<dyn Array>);
+		values.push(Arc::new(self.buttons_physical) as Arc<dyn Array>);
+		values.push(Arc::new(self.triggers_physical.into_struct_array(version)) as Arc<dyn Array>);
 		if version.gte(1, 2) {
-			values.push(self.raw_analog_x.unwrap().boxed());
+			values.push(Arc::new(self.raw_analog_x.unwrap()) as Arc<dyn Array>);
 			if version.gte(1, 4) {
-				values.push(self.percent.unwrap().boxed());
+				values.push(Arc::new(self.percent.unwrap()) as Arc<dyn Array>);
 				if version.gte(3, 15) {
-					values.push(self.raw_analog_y.unwrap().boxed())
+					values.push(Arc::new(self.raw_analog_y.unwrap()) as Arc<dyn Array>)
 				}
 			}
 		};
-		StructArray::new(Self::data_type(version), values, self.validity)
+		StructArray::new(Self::fields(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, validity) = array.into_data();
+		let (_, values, validity) = array.into_parts();
 		Self {
 			random_seed: values[0]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u32>>()
+				.downcast_ref::<PrimitiveArray<UInt32Type>>()
 				.unwrap()
 				.clone(),
 			state: values[1]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u16>>()
+				.downcast_ref::<PrimitiveArray<UInt16Type>>()
 				.unwrap()
 				.clone(),
 			position: Position::from_struct_array(
@@ -827,7 +881,7 @@ impl Pre {
 			),
 			direction: values[3]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			joystick: Position::from_struct_array(
@@ -848,17 +902,17 @@ impl Pre {
 			),
 			triggers: values[6]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			buttons: values[7]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u32>>()
+				.downcast_ref::<PrimitiveArray<UInt32Type>>()
 				.unwrap()
 				.clone(),
 			buttons_physical: values[8]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u16>>()
+				.downcast_ref::<PrimitiveArray<UInt16Type>>()
 				.unwrap()
 				.clone(),
 			triggers_physical: TriggersPhysical::from_struct_array(
@@ -871,19 +925,19 @@ impl Pre {
 			),
 			raw_analog_x: values.get(10).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<i8>>()
+					.downcast_ref::<PrimitiveArray<Int8Type>>()
 					.unwrap()
 					.clone()
 			}),
 			percent: values.get(11).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<f32>>()
+					.downcast_ref::<PrimitiveArray<Float32Type>>()
 					.unwrap()
 					.clone()
 			}),
 			raw_analog_y: values.get(12).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<i8>>()
+					.downcast_ref::<PrimitiveArray<Int8Type>>()
 					.unwrap()
 					.clone()
 			}),
@@ -895,7 +949,7 @@ impl Pre {
 use crate::frame::immutable::Start;
 
 impl Start {
-	fn data_type(version: Version) -> DataType {
+	fn fields(version: Version) -> Fields {
 		let mut fields = vec![];
 		{
 			fields.push(Field::new("random_seed", DataType::UInt32, false));
@@ -903,29 +957,33 @@ impl Start {
 				fields.push(Field::new("scene_frame_counter", DataType::UInt32, false))
 			}
 		};
-		DataType::Struct(fields)
+		Fields::from(fields)
+	}
+
+	fn data_type(version: Version) -> DataType {
+		DataType::Struct(Self::fields(version))
 	}
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		values.push(self.random_seed.boxed());
+		values.push(Arc::new(self.random_seed) as Arc<dyn Array>);
 		if version.gte(3, 10) {
-			values.push(self.scene_frame_counter.unwrap().boxed())
+			values.push(Arc::new(self.scene_frame_counter.unwrap()) as Arc<dyn Array>)
 		};
-		StructArray::new(Self::data_type(version), values, self.validity)
+		StructArray::new(Self::fields(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, validity) = array.into_data();
+		let (_, values, validity) = array.into_parts();
 		Self {
 			random_seed: values[0]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u32>>()
+				.downcast_ref::<PrimitiveArray<UInt32Type>>()
 				.unwrap()
 				.clone(),
 			scene_frame_counter: values.get(1).map(|x| {
 				x.as_any()
-					.downcast_ref::<PrimitiveArray<u32>>()
+					.downcast_ref::<PrimitiveArray<UInt32Type>>()
 					.unwrap()
 					.clone()
 			}),
@@ -937,7 +995,7 @@ impl Start {
 use crate::frame::immutable::StateFlags;
 
 impl StateFlags {
-	fn data_type(version: Version) -> DataType {
+	fn fields(version: Version) -> Fields {
 		let mut fields = vec![];
 		{
 			fields.push(Field::new("0", DataType::UInt8, false));
@@ -946,45 +1004,49 @@ impl StateFlags {
 			fields.push(Field::new("3", DataType::UInt8, false));
 			fields.push(Field::new("4", DataType::UInt8, false))
 		};
-		DataType::Struct(fields)
+		Fields::from(fields)
+	}
+
+	fn data_type(version: Version) -> DataType {
+		DataType::Struct(Self::fields(version))
 	}
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		values.push(self.0.boxed());
-		values.push(self.1.boxed());
-		values.push(self.2.boxed());
-		values.push(self.3.boxed());
-		values.push(self.4.boxed());
-		StructArray::new(Self::data_type(version), values, None)
+		values.push(Arc::new(self.0) as Arc<dyn Array>);
+		values.push(Arc::new(self.1) as Arc<dyn Array>);
+		values.push(Arc::new(self.2) as Arc<dyn Array>);
+		values.push(Arc::new(self.3) as Arc<dyn Array>);
+		values.push(Arc::new(self.4) as Arc<dyn Array>);
+		StructArray::new(Self::fields(version), values, None)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, validity) = array.into_data();
+		let (_, values, validity) = array.into_parts();
 		Self(
 			values[0]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 			values[1]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 			values[2]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 			values[3]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 			values[4]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<u8>>()
+				.downcast_ref::<PrimitiveArray<UInt8Type>>()
 				.unwrap()
 				.clone(),
 		)
@@ -994,33 +1056,37 @@ impl StateFlags {
 use crate::frame::immutable::TriggersPhysical;
 
 impl TriggersPhysical {
-	fn data_type(version: Version) -> DataType {
+	fn fields(version: Version) -> Fields {
 		let mut fields = vec![];
 		{
 			fields.push(Field::new("l", DataType::Float32, false));
 			fields.push(Field::new("r", DataType::Float32, false))
 		};
-		DataType::Struct(fields)
+		Fields::from(fields)
+	}
+
+	fn data_type(version: Version) -> DataType {
+		DataType::Struct(Self::fields(version))
 	}
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		values.push(self.l.boxed());
-		values.push(self.r.boxed());
-		StructArray::new(Self::data_type(version), values, self.validity)
+		values.push(Arc::new(self.l) as Arc<dyn Array>);
+		values.push(Arc::new(self.r) as Arc<dyn Array>);
+		StructArray::new(Self::fields(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, validity) = array.into_data();
+		let (_, values, validity) = array.into_parts();
 		Self {
 			l: values[0]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			r: values[1]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			validity: validity,
@@ -1031,7 +1097,7 @@ impl TriggersPhysical {
 use crate::frame::immutable::Velocities;
 
 impl Velocities {
-	fn data_type(version: Version) -> DataType {
+	fn fields(version: Version) -> Fields {
 		let mut fields = vec![];
 		{
 			fields.push(Field::new("self_x_air", DataType::Float32, false));
@@ -1040,45 +1106,49 @@ impl Velocities {
 			fields.push(Field::new("knockback_y", DataType::Float32, false));
 			fields.push(Field::new("self_x_ground", DataType::Float32, false))
 		};
-		DataType::Struct(fields)
+		Fields::from(fields)
+	}
+
+	fn data_type(version: Version) -> DataType {
+		DataType::Struct(Self::fields(version))
 	}
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		values.push(self.self_x_air.boxed());
-		values.push(self.self_y.boxed());
-		values.push(self.knockback_x.boxed());
-		values.push(self.knockback_y.boxed());
-		values.push(self.self_x_ground.boxed());
-		StructArray::new(Self::data_type(version), values, self.validity)
+		values.push(Arc::new(self.self_x_air) as Arc<dyn Array>);
+		values.push(Arc::new(self.self_y) as Arc<dyn Array>);
+		values.push(Arc::new(self.knockback_x) as Arc<dyn Array>);
+		values.push(Arc::new(self.knockback_y) as Arc<dyn Array>);
+		values.push(Arc::new(self.self_x_ground) as Arc<dyn Array>);
+		StructArray::new(Self::fields(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, validity) = array.into_data();
+		let (_, values, validity) = array.into_parts();
 		Self {
 			self_x_air: values[0]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			self_y: values[1]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			knockback_x: values[2]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			knockback_y: values[3]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			self_x_ground: values[4]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			validity: validity,
@@ -1089,33 +1159,37 @@ impl Velocities {
 use crate::frame::immutable::Velocity;
 
 impl Velocity {
-	fn data_type(version: Version) -> DataType {
+	fn fields(version: Version) -> Fields {
 		let mut fields = vec![];
 		{
 			fields.push(Field::new("x", DataType::Float32, false));
 			fields.push(Field::new("y", DataType::Float32, false))
 		};
-		DataType::Struct(fields)
+		Fields::from(fields)
+	}
+
+	fn data_type(version: Version) -> DataType {
+		DataType::Struct(Self::fields(version))
 	}
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
-		values.push(self.x.boxed());
-		values.push(self.y.boxed());
-		StructArray::new(Self::data_type(version), values, self.validity)
+		values.push(Arc::new(self.x) as Arc<dyn Array>);
+		values.push(Arc::new(self.y) as Arc<dyn Array>);
+		StructArray::new(Self::fields(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
-		let (_, values, validity) = array.into_data();
+		let (_, values, validity) = array.into_parts();
 		Self {
 			x: values[0]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			y: values[1]
 				.as_any()
-				.downcast_ref::<PrimitiveArray<f32>>()
+				.downcast_ref::<PrimitiveArray<Float32Type>>()
 				.unwrap()
 				.clone(),
 			validity: validity,

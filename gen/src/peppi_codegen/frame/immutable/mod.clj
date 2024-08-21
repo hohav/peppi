@@ -7,7 +7,7 @@
 (defn array-type
   [ty]
   (cond
-    (primitive-types ty) ["PrimitiveArray" ty]
+    (primitive-types ty) ["PrimitiveArray" (arrow-type ty)]
     (nil? ty)            "NullArray"
     :else                ty))
 
@@ -31,7 +31,7 @@
   (let [real-target [:field-get "self" (or nm idx)]
         target (if ver "x" real-target)
         value (if (primitive-types ty)
-                [:subscript [:method-call target "values"] "i"]
+                [:method-call target "value" ["i"]]
                 [:method-call target "transpose_one" ["i" "version"]])]
     (if ver
       (wrap-map (as-ref real-target) "x" value)
@@ -52,17 +52,6 @@
                                (filterv :type)
                                (mapv (juxt :name transpose-one-field-init)))]]]))
 
-(defn into-immutable
-  [{idx :index, nm :name, ver :version}]
-  (let [target [:field-get "x" (or nm idx)]]
-    (if ver
-      (wrap-map target "x" [:method-call "x" "into" []])
-      [:method-call target "into" []])))
-
-(defn mutable
-  [ty]
-  (list "mutable" ty))
-
 (defmulti struct-decl
   (fn [[nm {:keys [fields]}]]
     (named? fields)))
@@ -77,7 +66,7 @@
         (append [:struct-field
                  {:docstring "Indicates which indexes are valid (`None` means \"all valid\"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)"}
                  "validity"
-                 ["Option" "Bitmap"]]))])
+                 ["Option" "NullBuffer"]]))])
 
 (defmethod struct-decl false
   [[nm {:keys [description fields]}]]
@@ -91,7 +80,18 @@
   [[nm {:keys [fields]}]]
   [:impl nm [(transpose-one-fn nm fields)]])
 
-(defn struct-from-impl
+#_(defn mutable
+  [ty]
+  (list "mutable" ty))
+
+#_(defn into-immutable
+  [{idx :index, nm :name, ver :version}]
+  (let [target [:field-get "x" (or nm idx)]]
+    (if ver
+      (wrap-map target "x" [:method-call "x" "finish" []])
+      [:method-call target "finish" []])))
+
+#_(defn struct-from-impl
   [[nm {:keys [fields]}]]
   [:impl
    {:for nm}
@@ -101,15 +101,16 @@
      "from"
      [["x" (mutable nm)]]
      [:block
-      [:struct-init "Self" (cond->> (mapv (juxt :name into-immutable) fields)
-                             (named? fields) (append ["validity"
-                                                      [:method-call
-                                                       [:field-get "x" "validity"]
-                                                       "map"
-                                                       [[:closure
-                                                         [["v"]]
-                                                         [[:method-call "v" "into" []]]]]]]))]]]]])
+      [:struct-init
+       "Self"
+       (cond->> (mapv (juxt :name into-immutable) fields)
+         (named? fields)
+         (append ["validity"
+                  [:method-call
+                   [:field-get "x" "validity"]
+                   "finish"
+                   []]]))]]]]])
 
 (defn -main []
-  (doseq [decl (mapcat (juxt struct-decl struct-impl struct-from-impl) (read-structs))]
+  (doseq [decl (mapcat (juxt struct-decl struct-impl) (read-structs))]
     (println (emit-expr decl) "\n")))
