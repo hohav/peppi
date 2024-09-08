@@ -74,7 +74,7 @@ impl PortData {
 			fields.push(Field::new(
 				"follower",
 				Data::data_type(version).clone(),
-				false,
+				true,
 			));
 		}
 		Fields::from(fields)
