@@ -23,7 +23,18 @@ pub struct Opts {
 
 fn read_arrow_frames<R: Read>(mut r: R, version: slippi::Version) -> Result<Frame> {
 	// magic number `ARROW1\0\0`
-	expect_bytes(&mut r, &[65, 82, 82, 79, 87, 49, 0, 0])?;
+	//expect_bytes(&mut r, &[65, 82, 82, 79, 87, 49, 0, 0])?;
+	// temp hack to work around https://github.com/apache/arrow-rs/issues/6311
+	expect_bytes(&mut r, &[
+		65, 82, 82, 79, 87, 49, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0,
+	])?;
 	let mut reader = StreamReader::try_new(r, None)?;
 	let batch = reader.next().ok_or(err!("no batches"))??;
 	let frames = StructArray::from(batch);
