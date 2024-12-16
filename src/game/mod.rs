@@ -162,7 +162,14 @@ pub struct Player {
 	/// miscellaneous flags (metal, stamina mode, etc)
 	pub bitfield: u8,
 
+	/// CPU level
 	pub cpu_level: Option<u8>,
+
+	/// percent the player's first stock will start at
+	pub damage_start: u16,
+
+	/// percent the player's stocks will start at (including the first, if `damage_start` is zero)
+	pub damage_spawn: u16,
 
 	/// knockback multiplier when this player hits another
 	pub offense_ratio: f32,

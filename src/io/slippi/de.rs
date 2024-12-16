@@ -176,7 +176,7 @@ fn player(
 	v3_11: Option<[u8; 29]>,
 ) -> Result<Option<Player>> {
 	let mut r = &v0[..];
-	let mut unmapped = [0; 15];
+	let mut unmapped = [0; 11];
 
 	let character = r.read_u8()?;
 	let r#type = PlayerType::try_from(r.read_u8()?).ok();
@@ -205,7 +205,9 @@ fn player(
 			_ => None,
 		}
 	};
-	r.read_exact(&mut unmapped[7..15])?;
+	let damage_start = r.read_u16::<BE>()?;
+	let damage_spawn = r.read_u16::<BE>()?;
+	r.read_exact(&mut unmapped[7..11])?;
 	let offense_ratio = r.read_f32::<BE>()?;
 	let defense_ratio = r.read_f32::<BE>()?;
 	let model_scale = r.read_f32::<BE>()?;
@@ -271,6 +273,8 @@ fn player(
 		handicap,
 		bitfield,
 		cpu_level,
+		damage_start,
+		damage_spawn,
 		offense_ratio,
 		defense_ratio,
 		model_scale,
