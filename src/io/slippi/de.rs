@@ -1,6 +1,5 @@
 use std::{
 	collections::HashMap,
-	error,
 	fs::{self, File},
 	io::{self, Read, Seek, SeekFrom, Write},
 	num::NonZeroU16,
@@ -165,10 +164,6 @@ where
 	})
 }
 
-fn invalid_data<E: Into<Box<dyn error::Error + Send + Sync>>>(err: E) -> io::Error {
-	io::Error::new(io::ErrorKind::InvalidData, err)
-}
-
 #[allow(clippy::too_many_arguments)]
 fn player(
 	port: Port,
@@ -223,11 +218,17 @@ fn player(
 			Some(game::Ucf {
 				dash_back: match r.read_u32::<BE>()? {
 					0 => None,
-					x => Some(game::DashBack::try_from(x).map_err(invalid_data)?),
+					x => Some(
+						game::DashBack::try_from(x)
+							.map_err(|_| err!("invalid UCF dashback: {}", x))?,
+					),
 				},
 				shield_drop: match r.read_u32::<BE>()? {
 					0 => None,
-					x => Some(game::ShieldDrop::try_from(x).map_err(invalid_data)?),
+					x => Some(
+						game::ShieldDrop::try_from(x)
+							.map_err(|_| err!("invalid UCF shield drop: {}", x))?,
+					),
 				},
 			})
 		}
@@ -247,7 +248,9 @@ fn player(
 				.map(|v3_11| {
 					let first_null = v3_11.iter().position(|&x| x == 0).unwrap_or(28);
 					let result = std::str::from_utf8(&v3_11[0..first_null]);
-					result.map(String::from).map_err(invalid_data)
+					result
+						.map(String::from)
+						.map_err(|_| err!("invalid netplay SUID: {:?}", v3_11))
 				})
 				.transpose()?;
 			Result::Ok(Netplay {
@@ -364,9 +367,11 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 		_ => None,
 	};
 
-	let language = match ver.gte(3, 12) {
-		true => Some(game::Language::try_from(r.read_u8()?).map_err(invalid_data)?),
-		_ => None,
+	let language = if ver.gte(3, 12) {
+		let b = r.read_u8()?;
+		Some(game::Language::try_from(b).map_err(|_| err!("invalid language: {}", b))?)
+	} else {
+		None
 	};
 
 	let r#match = if ver.gte(3, 14) {
@@ -375,7 +380,9 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 			r.read_exact(&mut buf)?;
 			let first_null = buf.iter().position(|&x| x == 0).unwrap_or(50);
 			let result = std::str::from_utf8(&buf[0..first_null]);
-			result.map(String::from).map_err(invalid_data)
+			result
+				.map(String::from)
+				.map_err(|_| err!("invalid match ID: {:?}", buf))
 		}?;
 		let game = r.read_u32::<BE>()?;
 		let tiebreaker = r.read_u32::<BE>()?;
@@ -443,13 +450,16 @@ pub fn player_end(port: Port, placement: i8) -> Result<Option<game::PlayerEnd>> 
 
 pub(crate) fn game_end(r: &mut &[u8]) -> Result<game::End> {
 	let bytes = game::Bytes(r.to_vec());
-	let method = game::EndMethod::try_from(r.read_u8()?).map_err(invalid_data)?;
+	let method = {
+		let b = r.read_u8()?;
+		game::EndMethod::try_from(b).map_err(|_| err!("invalid game end method: {}", b))?
+	};
 
 	// v2.0
 	let lras_initiator = if_more(r, |r| {
 		Ok(match r.read_u8()? {
 			255 => None,
-			x => Some(Port::try_from(x).map_err(invalid_data)?),
+			x => Some(Port::try_from(x).map_err(|_| err!("invalid LRAS initiator: {}", x))?),
 		})
 	})?;
 
@@ -857,7 +867,10 @@ pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
 		if hash {
 			io::copy(&mut r.by_ref().take(skip as u64), &mut io::sink())?;
 		} else {
-			r.seek(SeekFrom::Current(skip.try_into().map_err(invalid_data)?))?;
+			r.seek(SeekFrom::Current(
+				skip.try_into()
+					.map_err(|_| err!("invalid skip value: {}", skip))?,
+			))?;
 		}
 		state.bytes_read += skip;
 	}
