@@ -5,8 +5,9 @@
 
 use std::fmt::{self, Debug, Display, Formatter};
 
+use base64::prelude::{Engine, BASE64_STANDARD};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{Map, Value};
 
 use crate::{
@@ -31,7 +32,17 @@ pub const ICE_CLIMBERS: u8 = 14;
 /// A slot that can be occupied by a player.
 #[repr(u8)]
 #[derive(
-	Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, IntoPrimitive, TryFromPrimitive,
+	Clone,
+	Copy,
+	Debug,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Serialize,
+	Deserialize,
+	IntoPrimitive,
+	TryFromPrimitive,
 )]
 pub enum Port {
 	P1 = 0,
@@ -72,7 +83,7 @@ impl Default for Port {
 
 /// How a player is controlled.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TryFromPrimitive)]
 pub enum PlayerType {
 	Human = 0,
 	Cpu = 1,
@@ -80,7 +91,7 @@ pub enum PlayerType {
 }
 
 /// Information about the team a player belongs to.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Team {
 	pub color: u8,
 	pub shade: u8,
@@ -88,7 +99,7 @@ pub struct Team {
 
 /// Dashback fix type.
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TryFromPrimitive)]
 pub enum DashBack {
 	Ucf = 1,
 	Arduino = 2,
@@ -96,7 +107,7 @@ pub enum DashBack {
 
 /// Shield drop fix type.
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TryFromPrimitive)]
 pub enum ShieldDrop {
 	Ucf = 1,
 	Arduino = 2,
@@ -104,21 +115,21 @@ pub enum ShieldDrop {
 
 /// The language the game is set to.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TryFromPrimitive)]
 pub enum Language {
 	Japanese = 0,
 	English = 1,
 }
 
 /// Information about the "Universal Controller Fix" mod.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ucf {
 	pub dash_back: Option<DashBack>,
 	pub shield_drop: Option<ShieldDrop>,
 }
 
 /// Netplay name, connect code, and Slippi UID.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Netplay {
 	pub name: MeleeString,
 
@@ -130,7 +141,7 @@ pub struct Netplay {
 }
 
 /// Information about each player such as character, team, stock count, etc.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Player {
 	pub port: Port,
 
@@ -175,15 +186,45 @@ pub struct Player {
 }
 
 /// Major & minor scene numbers.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Scene {
 	pub minor: u8,
 	pub major: u8,
 }
 
 /// Container for raw bytes of `Start` & `End` events.
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Default)]
 pub struct Bytes(pub Vec<u8>);
+
+impl Serialize for Bytes {
+	fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+		serializer.serialize_str(&BASE64_STANDARD.encode(&self.0))
+	}
+}
+
+struct BytesVisitor;
+
+impl<'de> de::Visitor<'de> for BytesVisitor {
+	type Value = Bytes;
+
+	fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+		formatter.write_str("a base64-encoded string")
+	}
+
+	fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+		Ok(Bytes(
+			BASE64_STANDARD
+				.decode(value)
+				.map_err(|_| E::custom("invalid base64"))?,
+		))
+	}
+}
+
+impl<'de> Deserialize<'de> for Bytes {
+	fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+		deserializer.deserialize_string(BytesVisitor)
+	}
+}
 
 impl Debug for Bytes {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
@@ -192,7 +233,7 @@ impl Debug for Bytes {
 }
 
 /// Information about the match a game belongs to.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Match {
 	pub id: String,
 	pub game: u32,
@@ -200,7 +241,7 @@ pub struct Match {
 }
 
 /// Information used to initialize the game such as the game mode, settings, characters & stage.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Start {
 	pub slippi: slippi::Slippi,
 
@@ -226,9 +267,7 @@ pub struct Start {
 
 	pub random_seed: u32,
 
-	/// mostly-redundant copy of the raw start block, for round-tripping
-	#[serde(skip)]
-	#[doc(hidden)]
+	/// Partly-redundant copy of the raw start block, for round-tripping
 	pub bytes: Bytes,
 
 	/// (added: v1.5)
@@ -254,7 +293,7 @@ pub struct Start {
 
 /// How the game ended.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TryFromPrimitive)]
 pub enum EndMethod {
 	Unresolved = 0,
 	Time = 1,
@@ -264,21 +303,19 @@ pub enum EndMethod {
 }
 
 /// Player placements.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlayerEnd {
 	pub port: Port,
 	pub placement: u8,
 }
 
 /// Information about the end of the game.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct End {
 	/// how the game ended
 	pub method: EndMethod,
 
-	/// mostly-redundant copy of the raw end block, for round-tripping
-	#[serde(skip)]
-	#[doc(hidden)]
+	/// Partly-redundant copy of the raw end block, for round-tripping
 	pub bytes: Bytes,
 
 	/// player who LRAS'd, if any (added: v2.0)

@@ -11,6 +11,7 @@ readme = "README.md"
 
 [dependencies]
 arrow2 = { version = "0.17", features = ["io_ipc", "io_ipc_compression", "io_json" ] }
+base64 = "0.22"
 byteorder = "1"
 encoding_rs = "0.8"
 log = "0.4"

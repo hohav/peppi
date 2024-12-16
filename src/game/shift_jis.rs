@@ -1,7 +1,7 @@
 //! Melee's internal string encoding.
 
 use encoding_rs::SHIFT_JIS;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::io::{err, Error, Result};
 
@@ -11,7 +11,7 @@ use crate::io::{err, Error, Result};
 /// unusually or inconsistently. For that reason, most users should use
 /// [to_normalized](crate::game::shift_jis::MeleeString::to_normalized) when
 /// working with this type.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MeleeString(pub String);
 
 impl MeleeString {

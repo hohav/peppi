@@ -22,7 +22,7 @@ pub const FILE_SIGNATURE: [u8; 11] = [
 ];
 
 /// Slippi format version.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Version(pub u8, pub u8, pub u8);
 
 impl Version {
@@ -57,7 +57,7 @@ impl fmt::Display for Version {
 }
 
 /// Slippi format options.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Slippi {
 	pub version: Version,
 }
