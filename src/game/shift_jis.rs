@@ -1,6 +1,7 @@
 //! Melee's internal string encoding.
 
 use encoding_rs::SHIFT_JIS;
+use log::warn;
 use serde::{Deserialize, Serialize};
 
 use crate::io::{err, Error, Result};
@@ -29,6 +30,15 @@ impl MeleeString {
 	/// ascii equivalents
 	pub fn to_normalized(&self) -> String {
 		self.0.clone().chars().map(fix_char).collect::<String>()
+	}
+
+	pub fn bytes(&self) -> std::borrow::Cow<[u8]> {
+		let (result, encoding, unmapped) = SHIFT_JIS.encode(&self.0);
+		assert_eq!(encoding, SHIFT_JIS);
+		if unmapped {
+			warn!("unsupported chars in MeleeString: {}", self.0);
+		}
+		result
 	}
 }
 

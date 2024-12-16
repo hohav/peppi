@@ -4,7 +4,7 @@ use byteorder::WriteBytesExt;
 
 use crate::{
 	frame::immutable::{End, Frame, Item, Post, Pre, Start},
-	game::{self, immutable::Game, GeckoCodes},
+	game::{self, immutable::Game, GeckoCodes, Player, PlayerType, Port, MAX_PLAYERS, NUM_PORTS},
 	io::{
 		slippi::{self, de::Event},
 		ubjson, Result,
@@ -100,15 +100,231 @@ fn gecko_codes<W: Write>(w: &mut W, codes: &GeckoCodes) -> Result<()> {
 	Ok(())
 }
 
+fn bool(b: bool) -> u8 {
+	if b {
+		1
+	} else {
+		0
+	}
+}
+
+fn player(start: &game::Start, port: usize) -> Option<&Player> {
+	if let Some(port) = Port::try_from(port as u8).ok() {
+		start.players.iter().find(|p| p.port == port)
+	} else {
+		None
+	}
+}
+
+fn _game_start(s: &game::Start) -> Result<Vec<u8>> {
+	let mut buf = s.bytes.0.clone();
+	let mut b = &mut buf[..];
+
+	let ver = s.slippi.version;
+	b.write_u8(ver.0)?;
+	b.write_u8(ver.1)?;
+	b.write_u8(ver.2)?;
+	b = &mut b[1..]; // unused (build number)
+
+	// Game Info block
+
+	b.write_all(&s.bitfield)?;
+	b = &mut b[2..]; // 0x04..0x06 (unmapped)
+	b.write_u8(bool(s.is_raining_bombs))?; // 0x06
+	b = &mut b[1..]; // 0x07 (unmapped)
+	b.write_u8(bool(s.is_teams))?; // 0x08
+	b = &mut b[2..]; // 0x09..0x0B (unmapped)
+	b.write_i8(s.item_spawn_frequency)?; // 0x0B
+	b.write_i8(s.self_destruct_score)?; // 0x0C
+	b = &mut b[1..]; // 0x0D (unmapped)
+	b.write_u16::<BE>(s.stage)?; // 0x0E
+	b.write_u32::<BE>(s.timer)?; // 0x10..0x14
+	b = &mut b[15..]; // 0x14..0x23 (unmapped)
+	b.write_all(&s.item_spawn_bitfield)?; // 0x23..0x28
+	b = &mut b[8..]; // 0x28..0x30 (unmapped)
+	b.write_f32::<BE>(s.damage_ratio)?; // 0x30..0x34
+	b = &mut b[44..]; // 0x34..0x60 (unmapped)
+	for n in 0..MAX_PLAYERS {
+		if let Some(p) = player(s, n) {
+			b.write_u8(p.character)?; // 0x24n + 0x60
+			b.write_u8(p.r#type as u8)?; // 0x24n + 0x61
+			b.write_u8(p.stocks)?; // 0x24n + 0x62
+			b.write_u8(p.costume)?; // 0x24n + 0x63
+			b = &mut b[3..]; // 0x24n + 0x64..0x67 (unmapped)
+			match p.team {
+				// 0x24n + 0x67
+				Some(t) => b.write_u8(t.shade)?,
+				_ => b = &mut b[1..],
+			}
+			b.write_u8(p.handicap)?; // 0x24n + 0x68
+			match p.team {
+				// 0x24n + 0x69
+				Some(t) => b.write_u8(t.color)?,
+				_ => b = &mut b[1..],
+			}
+			b = &mut b[2..]; // 0x24n + 0x6A..0x6C (unmapped)
+			b.write_u8(p.bitfield)?; // 0x24n + 0x6C
+			b = &mut b[2..]; // 0x24n + 0x6D..0x6F (unmapped)
+			match p.r#type {
+				// 0x24n + 0x6F
+				PlayerType::Cpu => b.write_u8(p.cpu_level.unwrap())?,
+				_ => b = &mut b[1..],
+			}
+			b.write_u16::<BE>(p.damage_start)?; // 0x24n + 0x70..0x72
+			b.write_u16::<BE>(p.damage_spawn)?; // 0x24n + 0x72..0x74
+			b = &mut b[4..]; // 0x24n + 0x74..0x78 (unmapped)
+			b.write_f32::<BE>(p.offense_ratio)?; // 0x24n + 0x78..0x7C
+			b.write_f32::<BE>(p.defense_ratio)?; // 0x24n + 0x7C..0x80
+			b.write_f32::<BE>(p.model_scale)?; // 0x24n + 0x80..0x84
+		} else {
+			b = &mut b[36..];
+		}
+	}
+	b.write_u32::<BE>(s.random_seed)?; // 0x13D
+
+	if ver.gte(1, 0) {
+		for n in 0..NUM_PORTS {
+			if let Some(p) = player(s, n) {
+				let ucf = p.ucf.unwrap();
+				b.write_u32::<BE>(ucf.dash_back.map_or(0, |x| x as u32))?; // 0x08n + 0x141
+				b.write_u32::<BE>(ucf.shield_drop.map_or(0, |x| x as u32))?; // 0x08n + 0x145
+			} else {
+				b = &mut b[8..];
+			}
+		}
+	}
+
+	if ver.gte(1, 3) {
+		for n in 0..NUM_PORTS {
+			if let Some(p) = player(s, n) {
+				let name_tag = p.name_tag.as_ref().unwrap().bytes();
+				b.write_all(&name_tag.to_owned())?; // 0x10n + 0x161
+				b.write_all(&vec![0; 16 - name_tag.len()])?;
+			} else {
+				b = &mut b[16..];
+			}
+		}
+	}
+
+	if ver.gte(1, 5) {
+		b.write_u8(match s.is_pal.unwrap() {
+			true => 1,
+			false => 0,
+		})?; // 0x1A1
+	}
+
+	if ver.gte(2, 0) {
+		b.write_u8(match s.is_frozen_ps.unwrap() {
+			true => 1,
+			false => 0,
+		})?; // 0x1A2
+	}
+
+	if ver.gte(3, 7) {
+		let scene = s.scene.unwrap();
+		b.write_u8(scene.minor)?; // 0x1A3
+		b.write_u8(scene.major)?; // 0x1A4
+	}
+
+	if ver.gte(3, 9) {
+		for n in 0..NUM_PORTS {
+			// 0x1Fn + 0x1A5
+			if let Some(p) = player(s, n) {
+				let bytes = p.netplay.as_ref().unwrap().name.bytes();
+				if bytes.len() > 30 {
+					return Err(err!("netplay name must be no more than 30 bytes"));
+				}
+				b.write_all(&bytes.to_owned())?;
+				b.write_all(&vec![0; 31 - bytes.len()])?;
+			} else {
+				b = &mut b[31..];
+			}
+		}
+		for n in 0..NUM_PORTS {
+			// 0xAn + 0x221
+			if let Some(p) = player(s, n) {
+				let bytes = p.netplay.as_ref().unwrap().code.bytes();
+				if bytes.len() > 9 {
+					return Err(err!("netplay code must be no more than 9 bytes"));
+				}
+				b.write_all(&bytes.to_owned())?;
+				b.write_all(&vec![0; 10 - bytes.len()])?;
+			} else {
+				b = &mut b[10..];
+			}
+		}
+	}
+
+	if ver.gte(3, 11) {
+		for n in 0..NUM_PORTS {
+			// 0x1Dn + 0x249
+			if let Some(p) = player(s, n) {
+				let bytes = p
+					.netplay
+					.as_ref()
+					.unwrap()
+					.suid
+					.as_ref()
+					.unwrap()
+					.as_bytes();
+				if bytes.len() > 28 {
+					return Err(err!("netplay SUID must be no more than 28 bytes"));
+				}
+				b.write_all(&bytes)?;
+				b.write_all(&vec![0; 29 - bytes.len()])?;
+			} else {
+				b = &mut b[29..];
+			}
+		}
+	}
+
+	if ver.gte(3, 12) {
+		b.write_u8(s.language.unwrap() as u8)?;
+	}
+
+	if ver.gte(3, 14) {
+		let m = s.r#match.as_ref().unwrap();
+		let bytes = m.id.as_bytes();
+		if bytes.len() > 50 {
+			return Err(err!("match ID must be no more than 50 bytes"));
+		}
+		b.write_all(&bytes)?;
+		b.write_u8(0)?; // null terminator
+		b = &mut b[(50 - bytes.len())..];
+		b.write_u32::<BE>(m.game)?;
+		b.write_u32::<BE>(m.tiebreaker)?;
+	}
+
+	Ok(buf)
+}
+
 fn game_start<W: Write>(w: &mut W, s: &game::Start, ver: slippi::Version) -> Result<()> {
 	assert_eq!(ver, s.slippi.version);
 	w.write_u8(Event::GameStart as u8)?;
-	Ok(w.write_all(&s.bytes.0)?)
+	Ok(w.write_all(&_game_start(s)?)?)
 }
 
-fn game_end<W: Write>(w: &mut W, e: &game::End, _ver: slippi::Version) -> Result<()> {
+fn game_end<W: Write>(w: &mut W, e: &game::End, ver: slippi::Version) -> Result<()> {
 	w.write_u8(Event::GameEnd as u8)?;
-	Ok(w.write_all(&e.bytes.0)?)
+	w.write_u8(e.method as u8)?;
+	if ver.gte(2, 0) {
+		w.write_i8(match e.lras_initiator.unwrap() {
+			Some(x) => x as i8,
+			None => -1,
+		})?;
+		if ver.gte(3, 13) {
+			let players = e.players.as_ref().unwrap();
+			for n in 0..NUM_PORTS {
+				w.write_i8(
+					players
+						.iter()
+						.find(|p| p.port == Port::try_from(n as u8).unwrap())
+						.map_or(-1, |p| p.placement as i8),
+				)?;
+			}
+		}
+	}
+	Ok(())
 }
 
 #[derive(Debug)]
