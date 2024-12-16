@@ -288,9 +288,8 @@ fn player_bytes<const N: usize, const M: usize>(r: &mut &[u8]) -> Result<[[u8; N
 
 pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 	let bytes = game::Bytes(r.to_vec());
-	let slippi = slippi::Slippi {
-		version: slippi::Version(r.read_u8()?, r.read_u8()?, r.read_u8()?),
-	};
+	let ver = slippi::Version(r.read_u8()?, r.read_u8()?, r.read_u8()?);
+	let slippi = slippi::Slippi { version: ver };
 	r.read_u8()?; // unused (build number)
 
 	let mut unmapped = [0; 73];
@@ -323,44 +322,54 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 	// @0x13d
 	let random_seed = r.read_u32::<BE>()?;
 
-	// v1.0
-	let players_v1_0 = if_more(r, |r| player_bytes::<8, NUM_PORTS>(r))?;
+	// note the shift from `MAX_PLAYERS` to `NUM_PORTS`: Slippi only supports 4 players!
+	let players_v1_0 = match ver.gte(1, 0) {
+		true => Some(player_bytes::<8, NUM_PORTS>(r)?),
+		_ => None,
+	};
 
-	// v1.3
-	let players_v1_3 = if_more(r, |r| player_bytes::<16, NUM_PORTS>(r))?;
+	let players_v1_3 = match ver.gte(1, 3) {
+		true => Some(player_bytes::<16, NUM_PORTS>(r)?),
+		_ => None,
+	};
 
-	// v1.5
-	let is_pal = if_more(r, |r| Ok(r.read_u8()? != 0))?;
+	let is_pal = match ver.gte(1, 5) {
+		true => Some(r.read_u8()? != 0),
+		_ => None,
+	};
 
-	// v2.0
-	let is_frozen_ps = if_more(r, |r| Ok(r.read_u8()? != 0))?;
+	let is_frozen_ps = match ver.gte(2, 0) {
+		true => Some(r.read_u8()? != 0),
+		_ => None,
+	};
 
-	// v3.7
-	let scene = if_more(r, |r| {
-		Ok(game::Scene {
+	let scene = match ver.gte(3, 7) {
+		true => Some(game::Scene {
 			minor: r.read_u8()?,
 			major: r.read_u8()?,
-		})
-	})?;
+		}),
+		_ => None,
+	};
 
-	// v3.9
-	let players_v3_9 = if_more(r, |r| {
-		Ok((
+	let players_v3_9 = match ver.gte(3, 9) {
+		true => Some((
 			player_bytes::<31, NUM_PORTS>(r)?,
 			player_bytes::<10, NUM_PORTS>(r)?,
-		))
-	})?;
+		)),
+		_ => None,
+	};
 
-	// v3.11
-	let players_v3_11 = if_more(r, |r| player_bytes::<29, NUM_PORTS>(r))?;
+	let players_v3_11 = match ver.gte(3, 11) {
+		true => Some(player_bytes::<29, NUM_PORTS>(r)?),
+		_ => None,
+	};
 
-	// v3.12
-	let language = if_more(r, |r| {
-		Ok(game::Language::try_from(r.read_u8()?).map_err(invalid_data)?)
-	})?;
+	let language = match ver.gte(3, 12) {
+		true => Some(game::Language::try_from(r.read_u8()?).map_err(invalid_data)?),
+		_ => None,
+	};
 
-	// v3.14
-	let r#match = if_more(r, |r| {
+	let r#match = if ver.gte(3, 14) {
 		let id = {
 			let mut buf = [0u8; 51];
 			r.read_exact(&mut buf)?;
@@ -370,12 +379,14 @@ pub(crate) fn game_start(r: &mut &[u8]) -> Result<game::Start> {
 		}?;
 		let game = r.read_u32::<BE>()?;
 		let tiebreaker = r.read_u32::<BE>()?;
-		Ok(Match {
+		Some(Match {
 			id,
 			game,
 			tiebreaker,
 		})
-	})?;
+	} else {
+		None
+	};
 
 	let players = (0..NUM_PORTS)
 		.filter_map(|n| {
