@@ -19,18 +19,32 @@ pub struct PortData {
 	pub follower: Option<Data>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Default)]
 pub struct Frame {
 	pub id: i32,
 	pub ports: Vec<PortData>,
 	pub start: Option<Start>,
 	pub end: Option<End>,
 	pub items: Option<Vec<Item>>,
+	pub fod_platforms: Option<Vec<FodPlatform>>,
+	pub dreamland_whispys: Option<Vec<DreamlandWhispy>>,
+	pub stadium_transformations: Option<Vec<StadiumTransformation>>,
+}
+
+#[derive(PartialEq, Clone, Copy, Debug, Default)]
+pub struct DreamlandWhispy {
+	pub direction: u8,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 pub struct End {
 	pub latest_finalized_frame: Option<i32>,
+}
+
+#[derive(PartialEq, Clone, Copy, Debug, Default)]
+pub struct FodPlatform {
+	pub platform: u8,
+	pub height: f32,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
@@ -101,6 +115,12 @@ pub struct Pre {
 	pub raw_analog_y: Option<i8>,
 	pub raw_analog_cstick_x: Option<i8>,
 	pub raw_analog_cstick_y: Option<i8>,
+}
+
+#[derive(PartialEq, Clone, Copy, Debug, Default)]
+pub struct StadiumTransformation {
+	pub event: u16,
+	pub r#type: u16,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]

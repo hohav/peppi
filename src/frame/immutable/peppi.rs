@@ -3,8 +3,9 @@
 #![allow(unused_variables)]
 
 use arrow2::{
-	array::{ListArray, PrimitiveArray, StructArray},
+	array::{Array, ListArray, PrimitiveArray, StructArray},
 	datatypes::{DataType, Field},
+	offset::OffsetsBuffer,
 };
 
 use crate::{
@@ -15,6 +16,12 @@ use crate::{
 	game::{Port, NUM_PORTS},
 	io::slippi::Version,
 };
+
+trait StructArrayConvertible {
+	fn data_type(version: Version) -> DataType;
+	fn into_struct_array(self, version: Version) -> StructArray;
+	fn from_struct_array(array: StructArray, version: Version) -> Self;
+}
 
 impl Data {
 	fn data_type(version: Version) -> DataType {
@@ -129,6 +136,30 @@ impl Frame {
 		)))
 	}
 
+	fn fod_platform_data_type(version: Version) -> DataType {
+		DataType::List(Box::new(Field::new(
+			"fod_platform",
+			FodPlatform::data_type(version),
+			false,
+		)))
+	}
+
+	fn dreamland_whispy_data_type(version: Version) -> DataType {
+		DataType::List(Box::new(Field::new(
+			"dreamland_whispy",
+			DreamlandWhispy::data_type(version),
+			false,
+		)))
+	}
+
+	fn stadium_transformation_data_type(version: Version) -> DataType {
+		DataType::List(Box::new(Field::new(
+			"stadium_transformation",
+			StadiumTransformation::data_type(version),
+			false,
+		)))
+	}
+
 	fn data_type(version: Version, ports: &[PortOccupancy]) -> DataType {
 		let mut fields = vec![
 			Field::new("id", DataType::Int32, false),
@@ -147,6 +178,23 @@ impl Frame {
 					Self::item_data_type(version).clone(),
 					false,
 				));
+				if version.gte(3, 18) {
+					fields.push(Field::new(
+						"fod_platform",
+						Self::fod_platform_data_type(version).clone(),
+						false,
+					));
+					fields.push(Field::new(
+						"dreamland_whispy",
+						Self::dreamland_whispy_data_type(version).clone(),
+						false,
+					));
+					fields.push(Field::new(
+						"stadium_transformation",
+						Self::stadium_transformation_data_type(version).clone(),
+						false,
+					));
+				}
 			}
 		}
 		DataType::Struct(fields)
@@ -176,6 +224,50 @@ impl Frame {
 					)
 					.boxed(),
 				);
+				if version.gte(3, 18) {
+					let fod_platform_values = self
+						.fod_platform
+						.unwrap()
+						.into_struct_array(version)
+						.boxed();
+					arrays.push(
+						ListArray::new(
+							Self::fod_platform_data_type(version),
+							self.fod_platform_offset.unwrap(),
+							fod_platform_values,
+							None,
+						)
+						.boxed(),
+					);
+					let dreamland_whispy_values = self
+						.dreamland_whispy
+						.unwrap()
+						.into_struct_array(version)
+						.boxed();
+					arrays.push(
+						ListArray::new(
+							Self::dreamland_whispy_data_type(version),
+							self.dreamland_whispy_offset.unwrap(),
+							dreamland_whispy_values,
+							None,
+						)
+						.boxed(),
+					);
+					let stadium_transformation_values = self
+						.stadium_transformation
+						.unwrap()
+						.into_struct_array(version)
+						.boxed();
+					arrays.push(
+						ListArray::new(
+							Self::stadium_transformation_data_type(version),
+							self.stadium_transformation_offset.unwrap(),
+							stadium_transformation_values,
+							None,
+						)
+						.boxed(),
+					);
+				}
 			}
 		}
 
@@ -197,6 +289,28 @@ impl Frame {
 		ports
 	}
 
+	fn values_and_offsets<T: StructArrayConvertible>(
+		arr: &Box<dyn Array>,
+		version: Version,
+	) -> (Option<T>, Option<OffsetsBuffer<i32>>) {
+		let arrays = arr
+			.as_any()
+			.downcast_ref::<ListArray<i32>>()
+			.unwrap()
+			.clone();
+		let offsets = arrays.offsets().clone();
+		let values = T::from_struct_array(
+			arrays
+				.values()
+				.as_any()
+				.downcast_ref::<StructArray>()
+				.unwrap()
+				.clone(),
+			version,
+		);
+		(Some(values), Some(offsets))
+	}
+
 	pub fn from_struct_array(array: StructArray, version: Version) -> Self {
 		let (fields, values, _) = array.into_data();
 		assert_eq!("id", fields[0].name);
@@ -206,23 +320,26 @@ impl Frame {
 			if version.gte(3, 0) {
 				assert_eq!("end", fields[3].name);
 				assert_eq!("item", fields[4].name);
+				if version.gte(3, 18) {
+					assert_eq!("fod_platform", fields[5].name);
+					assert_eq!("dreamland_whispy", fields[6].name);
+					assert_eq!("stadium_transformation", fields[7].name);
+				}
 			}
 		}
 
-		let (item, item_offset) = values.get(4).map_or((None, None), |v| {
-			let arrays = v.as_any().downcast_ref::<ListArray<i32>>().unwrap().clone();
-			let item_offset = arrays.offsets().clone();
-			let item = Item::from_struct_array(
-				arrays
-					.values()
-					.as_any()
-					.downcast_ref::<StructArray>()
-					.unwrap()
-					.clone(),
-				version,
-			);
-			(Some(item), Some(item_offset))
-		});
+		let (item, item_offset) = values
+			.get(4)
+			.map_or((None, None), |arr| Frame::values_and_offsets(arr, version));
+		let (fod_platform, fod_platform_offset) = values
+			.get(5)
+			.map_or((None, None), |arr| Frame::values_and_offsets(arr, version));
+		let (dreamland_whispy, dreamland_whispy_offset) = values
+			.get(6)
+			.map_or((None, None), |arr| Frame::values_and_offsets(arr, version));
+		let (stadium_transformation, stadium_transformation_offset) = values
+			.get(7)
+			.map_or((None, None), |arr| Frame::values_and_offsets(arr, version));
 
 		Self {
 			id: values[0]
@@ -250,15 +367,51 @@ impl Frame {
 					version,
 				)
 			}),
-			item_offset: item_offset,
-			item: item,
+			item,
+			item_offset,
+			fod_platform,
+			fod_platform_offset,
+			dreamland_whispy,
+			dreamland_whispy_offset,
+			stadium_transformation,
+			stadium_transformation_offset,
+		}
+	}
+}
+
+use crate::frame::immutable::DreamlandWhispy;
+
+impl StructArrayConvertible for DreamlandWhispy {
+	fn data_type(version: Version) -> DataType {
+		let mut fields = vec![];
+		{
+			fields.push(Field::new("direction", DataType::UInt8, false))
+		};
+		DataType::Struct(fields)
+	}
+
+	fn into_struct_array(self, version: Version) -> StructArray {
+		let mut values = vec![];
+		values.push(self.direction.boxed());
+		StructArray::new(Self::data_type(version), values, self.validity)
+	}
+
+	fn from_struct_array(array: StructArray, version: Version) -> Self {
+		let (_, values, validity) = array.into_data();
+		Self {
+			direction: values[0]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u8>>()
+				.unwrap()
+				.clone(),
+			validity: validity,
 		}
 	}
 }
 
 use crate::frame::immutable::End;
 
-impl End {
+impl StructArrayConvertible for End {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
@@ -291,9 +444,46 @@ impl End {
 	}
 }
 
+use crate::frame::immutable::FodPlatform;
+
+impl StructArrayConvertible for FodPlatform {
+	fn data_type(version: Version) -> DataType {
+		let mut fields = vec![];
+		{
+			fields.push(Field::new("platform", DataType::UInt8, false));
+			fields.push(Field::new("height", DataType::Float32, false))
+		};
+		DataType::Struct(fields)
+	}
+
+	fn into_struct_array(self, version: Version) -> StructArray {
+		let mut values = vec![];
+		values.push(self.platform.boxed());
+		values.push(self.height.boxed());
+		StructArray::new(Self::data_type(version), values, self.validity)
+	}
+
+	fn from_struct_array(array: StructArray, version: Version) -> Self {
+		let (_, values, validity) = array.into_data();
+		Self {
+			platform: values[0]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u8>>()
+				.unwrap()
+				.clone(),
+			height: values[1]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<f32>>()
+				.unwrap()
+				.clone(),
+			validity: validity,
+		}
+	}
+}
+
 use crate::frame::immutable::Item;
 
-impl Item {
+impl StructArrayConvertible for Item {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
@@ -414,7 +604,7 @@ impl Item {
 
 use crate::frame::immutable::ItemMisc;
 
-impl ItemMisc {
+impl StructArrayConvertible for ItemMisc {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
@@ -464,7 +654,7 @@ impl ItemMisc {
 
 use crate::frame::immutable::Position;
 
-impl Position {
+impl StructArrayConvertible for Position {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
@@ -501,7 +691,7 @@ impl Position {
 
 use crate::frame::immutable::Post;
 
-impl Post {
+impl StructArrayConvertible for Post {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
@@ -749,7 +939,7 @@ impl Post {
 
 use crate::frame::immutable::Pre;
 
-impl Pre {
+impl StructArrayConvertible for Pre {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
@@ -912,9 +1102,46 @@ impl Pre {
 	}
 }
 
+use crate::frame::immutable::StadiumTransformation;
+
+impl StructArrayConvertible for StadiumTransformation {
+	fn data_type(version: Version) -> DataType {
+		let mut fields = vec![];
+		{
+			fields.push(Field::new("event", DataType::UInt16, false));
+			fields.push(Field::new("type", DataType::UInt16, false))
+		};
+		DataType::Struct(fields)
+	}
+
+	fn into_struct_array(self, version: Version) -> StructArray {
+		let mut values = vec![];
+		values.push(self.event.boxed());
+		values.push(self.r#type.boxed());
+		StructArray::new(Self::data_type(version), values, self.validity)
+	}
+
+	fn from_struct_array(array: StructArray, version: Version) -> Self {
+		let (_, values, validity) = array.into_data();
+		Self {
+			event: values[0]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u16>>()
+				.unwrap()
+				.clone(),
+			r#type: values[1]
+				.as_any()
+				.downcast_ref::<PrimitiveArray<u16>>()
+				.unwrap()
+				.clone(),
+			validity: validity,
+		}
+	}
+}
+
 use crate::frame::immutable::Start;
 
-impl Start {
+impl StructArrayConvertible for Start {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
@@ -956,7 +1183,7 @@ impl Start {
 
 use crate::frame::immutable::StateFlags;
 
-impl StateFlags {
+impl StructArrayConvertible for StateFlags {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
@@ -1013,7 +1240,7 @@ impl StateFlags {
 
 use crate::frame::immutable::TriggersPhysical;
 
-impl TriggersPhysical {
+impl StructArrayConvertible for TriggersPhysical {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
@@ -1050,7 +1277,7 @@ impl TriggersPhysical {
 
 use crate::frame::immutable::Velocities;
 
-impl Velocities {
+impl StructArrayConvertible for Velocities {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{
@@ -1108,7 +1335,7 @@ impl Velocities {
 
 use crate::frame::immutable::Velocity;
 
-impl Velocity {
+impl StructArrayConvertible for Velocity {
 	fn data_type(version: Version) -> DataType {
 		let mut fields = vec![];
 		{

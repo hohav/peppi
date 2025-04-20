@@ -89,10 +89,20 @@ pub struct Frame {
 	pub start: Option<Start>,
 	/// End-of-frame data
 	pub end: Option<End>,
-	/// Logically, each frame has its own array of items. But we represent all item data in a flat array, with this field indicating the start of each sub-array
-	pub item_offset: Option<OffsetsBuffer<i32>>,
+
 	/// Item data
 	pub item: Option<Item>,
+	/// Logically, each frame has its own array of items. But we represent all item data in a flat array, with this field indicating the start of each sub-array
+	pub item_offset: Option<OffsetsBuffer<i32>>,
+
+	pub fod_platform: Option<FodPlatform>,
+	pub fod_platform_offset: Option<OffsetsBuffer<i32>>,
+
+	pub dreamland_whispy: Option<DreamlandWhispy>,
+	pub dreamland_whispy_offset: Option<OffsetsBuffer<i32>>,
+
+	pub stadium_transformation: Option<StadiumTransformation>,
+	pub stadium_transformation_offset: Option<OffsetsBuffer<i32>>,
 }
 
 impl Frame {
@@ -118,6 +128,43 @@ impl Frame {
 				let (start, end) = self.item_offset.as_ref().unwrap().start_end(i);
 				(start..end)
 					.map(|i| self.item.as_ref().unwrap().transpose_one(i, version))
+					.collect()
+			}),
+			fod_platforms: version.gte(3, 18).then(|| {
+				let (start, end) = self.fod_platform_offset.as_ref().unwrap().start_end(i);
+				(start..end)
+					.map(|i| {
+						self.fod_platform
+							.as_ref()
+							.unwrap()
+							.transpose_one(i, version)
+					})
+					.collect()
+			}),
+			dreamland_whispys: version.gte(3, 18).then(|| {
+				let (start, end) = self.dreamland_whispy_offset.as_ref().unwrap().start_end(i);
+				(start..end)
+					.map(|i| {
+						self.dreamland_whispy
+							.as_ref()
+							.unwrap()
+							.transpose_one(i, version)
+					})
+					.collect()
+			}),
+			stadium_transformations: version.gte(3, 18).then(|| {
+				let (start, end) = self
+					.stadium_transformation_offset
+					.as_ref()
+					.unwrap()
+					.start_end(i);
+				(start..end)
+					.map(|i| {
+						self.stadium_transformation
+							.as_ref()
+							.unwrap()
+							.transpose_one(i, version)
+					})
 					.collect()
 			}),
 		}
@@ -160,10 +207,22 @@ impl From<mutable::Frame> for Frame {
 			ports: f.ports.into_iter().map(|p| p.into()).collect(),
 			start: f.start.map(|x| x.into()),
 			end: f.end.map(|x| x.into()),
+			item: f.item.map(|x| x.into()),
 			item_offset: f
 				.item_offset
 				.map(|x| OffsetsBuffer::try_from(Buffer::from(x.into_inner())).unwrap()),
-			item: f.item.map(|x| x.into()),
+			fod_platform: f.fod_platform.map(|x| x.into()),
+			fod_platform_offset: f
+				.fod_platform_offset
+				.map(|x| OffsetsBuffer::try_from(Buffer::from(x.into_inner())).unwrap()),
+			dreamland_whispy: f.dreamland_whispy.map(|x| x.into()),
+			dreamland_whispy_offset: f
+				.dreamland_whispy_offset
+				.map(|x| OffsetsBuffer::try_from(Buffer::from(x.into_inner())).unwrap()),
+			stadium_transformation: f.stadium_transformation.map(|x| x.into()),
+			stadium_transformation_offset: f
+				.stadium_transformation_offset
+				.map(|x| OffsetsBuffer::try_from(Buffer::from(x.into_inner())).unwrap()),
 		}
 	}
 }
@@ -171,6 +230,32 @@ impl From<mutable::Frame> for Frame {
 impl fmt::Debug for Frame {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
 		write!(f, "Frame {{ len: {} }}", self.id.len())
+	}
+}
+
+/// This event only occurs on Dreamland 64, and is sent whenever Whispy changes blow directions.
+#[derive(Debug)]
+pub struct DreamlandWhispy {
+	/// Which direction Whispy is blowing (0 = None, 1 = Left, 2 = Right)
+	pub direction: PrimitiveArray<u8>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
+	pub validity: Option<Bitmap>,
+}
+
+impl DreamlandWhispy {
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::DreamlandWhispy {
+		transpose::DreamlandWhispy {
+			direction: self.direction.values()[i],
+		}
+	}
+}
+
+impl From<mutable::DreamlandWhispy> for DreamlandWhispy {
+	fn from(x: mutable::DreamlandWhispy) -> Self {
+		Self {
+			direction: x.direction.into(),
+			validity: x.validity.map(|v| v.into()),
+		}
 	}
 }
 
@@ -195,6 +280,36 @@ impl From<mutable::End> for End {
 	fn from(x: mutable::End) -> Self {
 		Self {
 			latest_finalized_frame: x.latest_finalized_frame.map(|x| x.into()),
+			validity: x.validity.map(|v| v.into()),
+		}
+	}
+}
+
+/// This event only occurs on Fountain of Dreams, and is sent for each change in platform height. If both platforms are moving, there will be two events per frame.
+#[derive(Debug)]
+pub struct FodPlatform {
+	/// Which platform has moved. (0 = Right, 1 = Left)
+	pub platform: PrimitiveArray<u8>,
+	/// The platform's new height
+	pub height: PrimitiveArray<f32>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
+	pub validity: Option<Bitmap>,
+}
+
+impl FodPlatform {
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::FodPlatform {
+		transpose::FodPlatform {
+			platform: self.platform.values()[i],
+			height: self.height.values()[i],
+		}
+	}
+}
+
+impl From<mutable::FodPlatform> for FodPlatform {
+	fn from(x: mutable::FodPlatform) -> Self {
+		Self {
+			platform: x.platform.into(),
+			height: x.height.into(),
 			validity: x.validity.map(|v| v.into()),
 		}
 	}
@@ -521,6 +636,36 @@ impl From<mutable::Pre> for Pre {
 			raw_analog_y: x.raw_analog_y.map(|x| x.into()),
 			raw_analog_cstick_x: x.raw_analog_cstick_x.map(|x| x.into()),
 			raw_analog_cstick_y: x.raw_analog_cstick_y.map(|x| x.into()),
+			validity: x.validity.map(|v| v.into()),
+		}
+	}
+}
+
+/// This event only occurs on Pokemon Stadium, and is sent whenever the transformation event or transformation type changes.
+#[derive(Debug)]
+pub struct StadiumTransformation {
+	/// The subevent for each transformation. (2 = Initialize, 3 = On monitor, 4 = Previous transformation receding, 5 = New transformation rising, 6 = Finalize, 0 = Finished)
+	pub event: PrimitiveArray<u16>,
+	/// The current or upcoming transformation. (3 = Fire, 4 = Grass, 5 = Normal, 6 = Rock, 9 = Water)
+	pub r#type: PrimitiveArray<u16>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
+	pub validity: Option<Bitmap>,
+}
+
+impl StadiumTransformation {
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::StadiumTransformation {
+		transpose::StadiumTransformation {
+			event: self.event.values()[i],
+			r#type: self.r#type.values()[i],
+		}
+	}
+}
+
+impl From<mutable::StadiumTransformation> for StadiumTransformation {
+	fn from(x: mutable::StadiumTransformation) -> Self {
+		Self {
+			event: x.event.into(),
+			r#type: x.r#type.into(),
 			validity: x.validity.map(|v| v.into()),
 		}
 	}

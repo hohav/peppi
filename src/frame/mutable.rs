@@ -104,10 +104,20 @@ pub struct Frame {
 	pub start: Option<Start>,
 	/// End-of-frame data
 	pub end: Option<End>,
-	/// Logically, each frame has its own array of items. But we represent all item data in a flat array, with this field indicating the start of each sub-array
-	pub item_offset: Option<Offsets<i32>>,
+
 	/// Item data
 	pub item: Option<Item>,
+	/// Logically, each frame has its own array of items. But we represent all item data in a flat array, with this field indicating the start of each sub-array
+	pub item_offset: Option<Offsets<i32>>,
+
+	pub fod_platform: Option<FodPlatform>,
+	pub fod_platform_offset: Option<Offsets<i32>>,
+
+	pub dreamland_whispy: Option<DreamlandWhispy>,
+	pub dreamland_whispy_offset: Option<Offsets<i32>>,
+
+	pub stadium_transformation: Option<StadiumTransformation>,
+	pub stadium_transformation_offset: Option<Offsets<i32>>,
 }
 
 impl Frame {
@@ -124,10 +134,28 @@ impl Frame {
 			end: version
 				.gte(3, 0)
 				.then(|| End::with_capacity(capacity, version)),
+			item: version.gte(3, 0).then(|| Item::with_capacity(0, version)),
 			item_offset: version
 				.gte(3, 0)
 				.then(|| Offsets::<i32>::with_capacity(capacity)),
-			item: version.gte(3, 0).then(|| Item::with_capacity(0, version)),
+			fod_platform: version
+				.gte(3, 18)
+				.then(|| FodPlatform::with_capacity(0, version)),
+			fod_platform_offset: version
+				.gte(3, 18)
+				.then(|| Offsets::<i32>::with_capacity(capacity)),
+			dreamland_whispy: version
+				.gte(3, 18)
+				.then(|| DreamlandWhispy::with_capacity(0, version)),
+			dreamland_whispy_offset: version
+				.gte(3, 18)
+				.then(|| Offsets::<i32>::with_capacity(capacity)),
+			stadium_transformation: version
+				.gte(3, 18)
+				.then(|| StadiumTransformation::with_capacity(0, version)),
+			stadium_transformation_offset: version
+				.gte(3, 18)
+				.then(|| Offsets::<i32>::with_capacity(capacity)),
 		}
 	}
 
@@ -155,6 +183,85 @@ impl Frame {
 					.map(|i| self.item.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
+			fod_platforms: version.gte(3, 18).then(|| {
+				let (start, end) = self.fod_platform_offset.as_ref().unwrap().start_end(i);
+				(start..end)
+					.map(|i| {
+						self.fod_platform
+							.as_ref()
+							.unwrap()
+							.transpose_one(i, version)
+					})
+					.collect()
+			}),
+			dreamland_whispys: version.gte(3, 18).then(|| {
+				let (start, end) = self.dreamland_whispy_offset.as_ref().unwrap().start_end(i);
+				(start..end)
+					.map(|i| {
+						self.dreamland_whispy
+							.as_ref()
+							.unwrap()
+							.transpose_one(i, version)
+					})
+					.collect()
+			}),
+			stadium_transformations: version.gte(3, 18).then(|| {
+				let (start, end) = self
+					.stadium_transformation_offset
+					.as_ref()
+					.unwrap()
+					.start_end(i);
+				(start..end)
+					.map(|i| {
+						self.stadium_transformation
+							.as_ref()
+							.unwrap()
+							.transpose_one(i, version)
+					})
+					.collect()
+			}),
+		}
+	}
+}
+
+/// This event only occurs on Dreamland 64, and is sent whenever Whispy changes blow directions.
+
+pub struct DreamlandWhispy {
+	/// Which direction Whispy is blowing (0 = None, 1 = Left, 2 = Right)
+	pub direction: MutablePrimitiveArray<u8>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
+	pub validity: Option<MutableBitmap>,
+}
+
+impl DreamlandWhispy {
+	fn with_capacity(capacity: usize, version: Version) -> Self {
+		Self {
+			direction: MutablePrimitiveArray::<u8>::with_capacity(capacity),
+			validity: None,
+		}
+	}
+
+	pub fn len(&self) -> usize {
+		self.direction.len()
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		let len = self.len();
+		self.validity
+			.get_or_insert_with(|| MutableBitmap::from_len_set(len))
+			.push(false);
+		self.direction.push_null()
+	}
+
+	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u8().map(|x| self.direction.push(Some(x)))?;
+		self.validity.as_mut().map(|v| v.push(true));
+		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::DreamlandWhispy {
+		transpose::DreamlandWhispy {
+			direction: self.direction.values()[i],
 		}
 	}
 }
@@ -209,6 +316,54 @@ impl End {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::End {
 		transpose::End {
 			latest_finalized_frame: self.latest_finalized_frame.as_ref().map(|x| x.values()[i]),
+		}
+	}
+}
+
+/// This event only occurs on Fountain of Dreams, and is sent for each change in platform height. If both platforms are moving, there will be two events per frame.
+
+pub struct FodPlatform {
+	/// Which platform has moved. (0 = Right, 1 = Left)
+	pub platform: MutablePrimitiveArray<u8>,
+	/// The platform's new height
+	pub height: MutablePrimitiveArray<f32>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
+	pub validity: Option<MutableBitmap>,
+}
+
+impl FodPlatform {
+	fn with_capacity(capacity: usize, version: Version) -> Self {
+		Self {
+			platform: MutablePrimitiveArray::<u8>::with_capacity(capacity),
+			height: MutablePrimitiveArray::<f32>::with_capacity(capacity),
+			validity: None,
+		}
+	}
+
+	pub fn len(&self) -> usize {
+		self.platform.len()
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		let len = self.len();
+		self.validity
+			.get_or_insert_with(|| MutableBitmap::from_len_set(len))
+			.push(false);
+		self.platform.push_null();
+		self.height.push_null()
+	}
+
+	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u8().map(|x| self.platform.push(Some(x)))?;
+		r.read_f32::<BE>().map(|x| self.height.push(Some(x)))?;
+		self.validity.as_mut().map(|v| v.push(true));
+		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::FodPlatform {
+		transpose::FodPlatform {
+			platform: self.platform.values()[i],
+			height: self.height.values()[i],
 		}
 	}
 }
@@ -834,6 +989,54 @@ impl Pre {
 			raw_analog_y: self.raw_analog_y.as_ref().map(|x| x.values()[i]),
 			raw_analog_cstick_x: self.raw_analog_cstick_x.as_ref().map(|x| x.values()[i]),
 			raw_analog_cstick_y: self.raw_analog_cstick_y.as_ref().map(|x| x.values()[i]),
+		}
+	}
+}
+
+/// This event only occurs on Pokemon Stadium, and is sent whenever the transformation event or transformation type changes.
+
+pub struct StadiumTransformation {
+	/// The subevent for each transformation. (2 = Initialize, 3 = On monitor, 4 = Previous transformation receding, 5 = New transformation rising, 6 = Finalize, 0 = Finished)
+	pub event: MutablePrimitiveArray<u16>,
+	/// The current or upcoming transformation. (3 = Fire, 4 = Grass, 5 = Normal, 6 = Rock, 9 = Water)
+	pub r#type: MutablePrimitiveArray<u16>,
+	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
+	pub validity: Option<MutableBitmap>,
+}
+
+impl StadiumTransformation {
+	fn with_capacity(capacity: usize, version: Version) -> Self {
+		Self {
+			event: MutablePrimitiveArray::<u16>::with_capacity(capacity),
+			r#type: MutablePrimitiveArray::<u16>::with_capacity(capacity),
+			validity: None,
+		}
+	}
+
+	pub fn len(&self) -> usize {
+		self.event.len()
+	}
+
+	pub fn push_null(&mut self, version: Version) {
+		let len = self.len();
+		self.validity
+			.get_or_insert_with(|| MutableBitmap::from_len_set(len))
+			.push(false);
+		self.event.push_null();
+		self.r#type.push_null()
+	}
+
+	pub fn read_push(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u16::<BE>().map(|x| self.event.push(Some(x)))?;
+		r.read_u16::<BE>().map(|x| self.r#type.push(Some(x)))?;
+		self.validity.as_mut().map(|v| v.push(true));
+		Ok(())
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::StadiumTransformation {
+		transpose::StadiumTransformation {
+			event: self.event.values()[i],
+			r#type: self.r#type.values()[i],
 		}
 	}
 }

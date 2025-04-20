@@ -92,10 +92,20 @@ pub struct Frame {
 	pub start: Option<Start>,
 	/// End-of-frame data
 	pub end: Option<End>,
-	/// Logically, each frame has its own array of items. But we represent all item data in a flat array, with this field indicating the start of each sub-array
-	pub item_offset: Option<OffsetsBuffer<i32>>,
+
 	/// Item data
 	pub item: Option<Item>,
+	/// Logically, each frame has its own array of items. But we represent all item data in a flat array, with this field indicating the start of each sub-array
+	pub item_offset: Option<OffsetsBuffer<i32>>,
+
+	pub fod_platform: Option<FodPlatform>,
+	pub fod_platform_offset: Option<OffsetsBuffer<i32>>,
+
+	pub dreamland_whispy: Option<DreamlandWhispy>,
+	pub dreamland_whispy_offset: Option<OffsetsBuffer<i32>>,
+
+	pub stadium_transformation: Option<StadiumTransformation>,
+	pub stadium_transformation_offset: Option<OffsetsBuffer<i32>>,
 }
 
 impl Frame {
@@ -117,6 +127,24 @@ impl Frame {
 				let (start, end) = self.item_offset.as_ref().unwrap().start_end(i);
 				(start..end)
 					.map(|i| self.item.as_ref().unwrap().transpose_one(i, version))
+					.collect()
+			}),
+			fod_platforms: version.gte(3, 18).then(|| {
+				let (start, end) = self.fod_platform_offset.as_ref().unwrap().start_end(i);
+				(start..end)
+					.map(|i| self.fod_platform.as_ref().unwrap().transpose_one(i, version))
+					.collect()
+			}),
+			dreamland_whispys: version.gte(3, 18).then(|| {
+				let (start, end) = self.dreamland_whispy_offset.as_ref().unwrap().start_end(i);
+				(start..end)
+					.map(|i| self.dreamland_whispy.as_ref().unwrap().transpose_one(i, version))
+					.collect()
+			}),
+			stadium_transformations: version.gte(3, 18).then(|| {
+				let (start, end) = self.stadium_transformation_offset.as_ref().unwrap().start_end(i);
+				(start..end)
+					.map(|i| self.stadium_transformation.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
 		}
@@ -159,10 +187,22 @@ impl From<mutable::Frame> for Frame {
 			ports: f.ports.into_iter().map(|p| p.into()).collect(),
 			start: f.start.map(|x| x.into()),
 			end: f.end.map(|x| x.into()),
+			item: f.item.map(|x| x.into()),
 			item_offset: f.item_offset.map(|x|
 				OffsetsBuffer::try_from(Buffer::from(x.into_inner())).unwrap()
 			),
-			item: f.item.map(|x| x.into()),
+			fod_platform: f.fod_platform.map(|x| x.into()),
+			fod_platform_offset: f.fod_platform_offset.map(|x|
+				OffsetsBuffer::try_from(Buffer::from(x.into_inner())).unwrap()
+			),
+			dreamland_whispy: f.dreamland_whispy.map(|x| x.into()),
+			dreamland_whispy_offset: f.dreamland_whispy_offset.map(|x|
+				OffsetsBuffer::try_from(Buffer::from(x.into_inner())).unwrap()
+			),
+			stadium_transformation: f.stadium_transformation.map(|x| x.into()),
+			stadium_transformation_offset: f.stadium_transformation_offset.map(|x|
+				OffsetsBuffer::try_from(Buffer::from(x.into_inner())).unwrap()
+			),
 		}
 	}
 }

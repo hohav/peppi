@@ -148,6 +148,31 @@ impl Frame {
 			for port in &self.ports {
 				port.write_pre(w, version, idx, frame_id)?;
 			}
+			if version.gte(3, 18) {
+				// FOD platform
+				let offset = self.fod_platform_offset.as_ref().unwrap();
+				for evt_idx in (offset[idx] as usize)..(offset[idx + 1] as usize) {
+					w.write_u8(Event::FodPlatform as u8)?;
+					w.write_i32::<BE>(frame_id)?;
+					self.fod_platform.as_ref().unwrap().write(w, version, evt_idx)?;
+				}
+
+				// Dreamland Whispy
+				let offset = self.dreamland_whispy_offset.as_ref().unwrap();
+				for evt_idx in (offset[idx] as usize)..(offset[idx + 1] as usize) {
+					w.write_u8(Event::DreamlandWhispy as u8)?;
+					w.write_i32::<BE>(frame_id)?;
+					self.dreamland_whispy.as_ref().unwrap().write(w, version, evt_idx)?;
+				}
+
+				// Stadium transformation
+				let offset = self.stadium_transformation_offset.as_ref().unwrap();
+				for evt_idx in (offset[idx] as usize)..(offset[idx + 1] as usize) {
+					w.write_u8(Event::StadiumTransformation as u8)?;
+					w.write_i32::<BE>(frame_id)?;
+					self.stadium_transformation.as_ref().unwrap().write(w, version, evt_idx)?;
+				}
+			}
 			if version.gte(3, 0) {
 				let offset = self.item_offset.as_ref().unwrap();
 				for item_idx in (offset[idx] as usize)..(offset[idx + 1] as usize) {

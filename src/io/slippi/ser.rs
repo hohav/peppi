@@ -3,7 +3,9 @@ use std::io::Write;
 use byteorder::WriteBytesExt;
 
 use crate::{
-	frame::immutable::{End, Frame, Item, Post, Pre, Start},
+	frame::immutable::{
+		DreamlandWhispy, End, FodPlatform, Frame, Item, Post, Pre, StadiumTransformation, Start,
+	},
 	game::{self, immutable::Game, GeckoCodes, Player, PlayerType, Port, MAX_PLAYERS, NUM_PORTS},
 	io::{
 		slippi::{self, de::Event},
@@ -42,9 +44,12 @@ impl PayloadSizes {
 			}
 			+ counts.frame_data * (1 + sizes[&(FramePre as u8)] as u32) // FramePre
 			+ counts.frame_data * (1 + sizes[&(FramePost as u8)] as u32) // FramePost
-			+ sizes.get(&(FrameStart as u8)).map_or(0, |s| counts.frames * (1 + *s as u32)) // FrameStart
-			+ sizes.get(&(FrameEnd as u8)).map_or(0, |s| counts.frames * (1 + *s as u32)) // FrameEnd
-			+ sizes.get(&(Item as u8)).map_or(0, |s| counts.items * (1 + *s as u32)) // Item
+			+ sizes.get(&(FrameStart as u8)).map_or(0, |s| counts.frame * (1 + *s as u32)) // FrameStart
+			+ sizes.get(&(FrameEnd as u8)).map_or(0, |s| counts.frame * (1 + *s as u32)) // FrameEnd
+			+ sizes.get(&(Item as u8)).map_or(0, |s| counts.item * (1 + *s as u32)) // Item
+			+ sizes.get(&(FodPlatform as u8)).map_or(0, |s| counts.fod_platform * (1 + *s as u32)) // FodPlatform
+			+ sizes.get(&(DreamlandWhispy as u8)).map_or(0, |s| counts.dreamland_whispy * (1 + *s as u32)) // DreamlandWhispy
+			+ sizes.get(&(StadiumTransformation as u8)).map_or(0, |s| counts.stadium_transformation * (1 + *s as u32)) // StadiumTransformation
 			+ game.gecko_codes.as_ref().map_or(0, gecko_codes_size)
 	}
 }
@@ -77,6 +82,17 @@ fn payload_sizes(game: &Game) -> PayloadSizes {
 						// discard higher-order bits of actual_size, matching Slippi's behavior
 						sizes.push(Event::GeckoCodes, codes.actual_size as u16 as usize);
 						sizes.push(Event::MessageSplitter, 516);
+					}
+					if ver.gte(3, 18) {
+						sizes.push(Event::FodPlatform, FRAME_NUMBER + FodPlatform::size(ver));
+						sizes.push(
+							Event::DreamlandWhispy,
+							FRAME_NUMBER + DreamlandWhispy::size(ver),
+						);
+						sizes.push(
+							Event::StadiumTransformation,
+							FRAME_NUMBER + StadiumTransformation::size(ver),
+						);
 					}
 				}
 			}
@@ -329,15 +345,18 @@ fn game_end<W: Write>(w: &mut W, e: &game::End, ver: slippi::Version) -> Result<
 
 #[derive(Debug)]
 struct FrameCounts {
-	frames: u32,
+	frame: u32,
 	frame_data: u32,
-	items: u32,
+	item: u32,
+	fod_platform: u32,
+	dreamland_whispy: u32,
+	stadium_transformation: u32,
 }
 
 fn frame_counts(frames: &Frame) -> FrameCounts {
 	let len = frames.len();
 	FrameCounts {
-		frames: len.try_into().unwrap(),
+		frame: len.try_into().unwrap(),
 		frame_data: frames
 			.ports
 			.iter()
@@ -350,7 +369,19 @@ fn frame_counts(frames: &Frame) -> FrameCounts {
 			.sum::<usize>()
 			.try_into()
 			.unwrap(),
-		items: frames.item.as_ref().map_or(0, |i| i.id.len() as u32),
+		item: frames.item.as_ref().map_or(0, |i| i.id.len() as u32),
+		fod_platform: frames
+			.fod_platform
+			.as_ref()
+			.map_or(0, |i| i.platform.len() as u32),
+		dreamland_whispy: frames
+			.dreamland_whispy
+			.as_ref()
+			.map_or(0, |i| i.direction.len() as u32),
+		stadium_transformation: frames
+			.stadium_transformation
+			.as_ref()
+			.map_or(0, |i| i.event.len() as u32),
 	}
 }
 

@@ -17,11 +17,14 @@ pub struct PortData {
 	pub follower: Option<Data>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Default)]
 pub struct Frame {
 	pub id: i32,
 	pub ports: Vec<PortData>,
 	pub start: Option<Start>,
 	pub end: Option<End>,
 	pub items: Option<Vec<Item>>,
+	pub fod_platforms: Option<Vec<FodPlatform>>,
+	pub dreamland_whispys: Option<Vec<DreamlandWhispy>>,
+	pub stadium_transformations: Option<Vec<StadiumTransformation>>,
 }

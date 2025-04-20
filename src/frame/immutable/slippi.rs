@@ -146,6 +146,40 @@ impl Frame {
 			for port in &self.ports {
 				port.write_pre(w, version, idx, frame_id)?;
 			}
+			if version.gte(3, 18) {
+				// FOD platform
+				let offset = self.fod_platform_offset.as_ref().unwrap();
+				for evt_idx in (offset[idx] as usize)..(offset[idx + 1] as usize) {
+					w.write_u8(Event::FodPlatform as u8)?;
+					w.write_i32::<BE>(frame_id)?;
+					self.fod_platform
+						.as_ref()
+						.unwrap()
+						.write(w, version, evt_idx)?;
+				}
+
+				// Dreamland Whispy
+				let offset = self.dreamland_whispy_offset.as_ref().unwrap();
+				for evt_idx in (offset[idx] as usize)..(offset[idx + 1] as usize) {
+					w.write_u8(Event::DreamlandWhispy as u8)?;
+					w.write_i32::<BE>(frame_id)?;
+					self.dreamland_whispy
+						.as_ref()
+						.unwrap()
+						.write(w, version, evt_idx)?;
+				}
+
+				// Stadium transformation
+				let offset = self.stadium_transformation_offset.as_ref().unwrap();
+				for evt_idx in (offset[idx] as usize)..(offset[idx + 1] as usize) {
+					w.write_u8(Event::StadiumTransformation as u8)?;
+					w.write_i32::<BE>(frame_id)?;
+					self.stadium_transformation
+						.as_ref()
+						.unwrap()
+						.write(w, version, evt_idx)?;
+				}
+			}
 			if version.gte(3, 0) {
 				let offset = self.item_offset.as_ref().unwrap();
 				for item_idx in (offset[idx] as usize)..(offset[idx + 1] as usize) {
@@ -167,6 +201,21 @@ impl Frame {
 	}
 }
 
+use crate::frame::immutable::DreamlandWhispy;
+
+impl DreamlandWhispy {
+	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
+		w.write_u8(self.direction.value(i))?;
+		Ok(())
+	}
+
+	pub(crate) fn size(version: Version) -> usize {
+		let mut size = 0usize;
+		size += size_of::<u8>();
+		size
+	}
+}
+
 use crate::frame::immutable::End;
 
 impl End {
@@ -182,6 +231,23 @@ impl End {
 		if version.gte(3, 7) {
 			size += size_of::<i32>()
 		};
+		size
+	}
+}
+
+use crate::frame::immutable::FodPlatform;
+
+impl FodPlatform {
+	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
+		w.write_u8(self.platform.value(i))?;
+		w.write_f32::<BE>(self.height.value(i))?;
+		Ok(())
+	}
+
+	pub(crate) fn size(version: Version) -> usize {
+		let mut size = 0usize;
+		size += size_of::<u8>();
+		size += size_of::<f32>();
 		size
 	}
 }
@@ -415,6 +481,23 @@ impl Pre {
 				}
 			}
 		};
+		size
+	}
+}
+
+use crate::frame::immutable::StadiumTransformation;
+
+impl StadiumTransformation {
+	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
+		w.write_u16::<BE>(self.event.value(i))?;
+		w.write_u16::<BE>(self.r#type.value(i))?;
+		Ok(())
+	}
+
+	pub(crate) fn size(version: Version) -> usize {
+		let mut size = 0usize;
+		size += size_of::<u16>();
+		size += size_of::<u16>();
 		size
 	}
 }

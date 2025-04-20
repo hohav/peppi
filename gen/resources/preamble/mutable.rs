@@ -102,10 +102,20 @@ pub struct Frame {
 	pub start: Option<Start>,
 	/// End-of-frame data
 	pub end: Option<End>,
-	/// Logically, each frame has its own array of items. But we represent all item data in a flat array, with this field indicating the start of each sub-array
-	pub item_offset: Option<Offsets<i32>>,
+
 	/// Item data
 	pub item: Option<Item>,
+	/// Logically, each frame has its own array of items. But we represent all item data in a flat array, with this field indicating the start of each sub-array
+	pub item_offset: Option<Offsets<i32>>,
+
+	pub fod_platform: Option<FodPlatform>,
+	pub fod_platform_offset: Option<Offsets<i32>>,
+
+	pub dreamland_whispy: Option<DreamlandWhispy>,
+	pub dreamland_whispy_offset: Option<Offsets<i32>>,
+
+	pub stadium_transformation: Option<StadiumTransformation>,
+	pub stadium_transformation_offset: Option<Offsets<i32>>,
 }
 
 impl Frame {
@@ -118,8 +128,14 @@ impl Frame {
 				.collect(),
 			start: version.gte(2, 2).then(|| Start::with_capacity(capacity, version)),
 			end: version.gte(3, 0).then(|| End::with_capacity(capacity, version)),
-			item_offset: version.gte(3, 0).then(|| Offsets::<i32>::with_capacity(capacity)),
 			item: version.gte(3, 0).then(|| Item::with_capacity(0, version)),
+			item_offset: version.gte(3, 0).then(|| Offsets::<i32>::with_capacity(capacity)),
+			fod_platform: version.gte(3, 18).then(|| FodPlatform::with_capacity(0, version)),
+			fod_platform_offset: version.gte(3, 18).then(|| Offsets::<i32>::with_capacity(capacity)),
+			dreamland_whispy: version.gte(3, 18).then(|| DreamlandWhispy::with_capacity(0, version)),
+			dreamland_whispy_offset: version.gte(3, 18).then(|| Offsets::<i32>::with_capacity(capacity)),
+			stadium_transformation: version.gte(3, 18).then(|| StadiumTransformation::with_capacity(0, version)),
+			stadium_transformation_offset: version.gte(3, 18).then(|| Offsets::<i32>::with_capacity(capacity)),
 		}
 	}
 
@@ -137,6 +153,24 @@ impl Frame {
 				let (start, end) = self.item_offset.as_ref().unwrap().start_end(i);
 				(start..end)
 					.map(|i| self.item.as_ref().unwrap().transpose_one(i, version))
+					.collect()
+			}),
+			fod_platforms: version.gte(3, 18).then(|| {
+				let (start, end) = self.fod_platform_offset.as_ref().unwrap().start_end(i);
+				(start..end)
+					.map(|i| self.fod_platform.as_ref().unwrap().transpose_one(i, version))
+					.collect()
+			}),
+			dreamland_whispys: version.gte(3, 18).then(|| {
+				let (start, end) = self.dreamland_whispy_offset.as_ref().unwrap().start_end(i);
+				(start..end)
+					.map(|i| self.dreamland_whispy.as_ref().unwrap().transpose_one(i, version))
+					.collect()
+			}),
+			stadium_transformations: version.gte(3, 18).then(|| {
+				let (start, end) = self.stadium_transformation_offset.as_ref().unwrap().start_end(i);
+				(start..end)
+					.map(|i| self.stadium_transformation.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
 		}

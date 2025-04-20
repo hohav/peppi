@@ -281,9 +281,7 @@ fn basic_game() {
 					follower: None,
 				},
 			],
-			start: None,
-			end: None,
-			items: None,
+			..Default::default()
 		}
 	);
 }
@@ -737,6 +735,26 @@ fn v3_16() {
 		.values_iter()
 		.zip(item_types.values_iter())
 		.all(|(&id, &r#type)| (r#type == 210 && id == 0) || id_set.contains(&id)));
+}
+
+#[test]
+fn v3_18() {
+	let game = game("v3.18");
+	assert_eq!(
+		game.frames
+			.transpose_one(822, game.start.slippi.version)
+			.fod_platforms,
+		Some(vec![])
+	);
+	assert_eq!(
+		game.frames
+			.transpose_one(823, game.start.slippi.version)
+			.fod_platforms,
+		Some(vec![transpose::FodPlatform {
+			platform: 1,
+			height: 20.15f32,
+		}])
+	);
 }
 
 #[test]

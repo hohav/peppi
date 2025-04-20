@@ -131,9 +131,12 @@
 
 (defn struct-impl
   [[nm {:keys [fields]}]]
-  [:impl nm [(data-type-fn fields)
-             (into-struct-array-fn fields)
-             (from-struct-array-fn fields)]])
+  [:impl
+   {:for nm}
+   "StructArrayConvertible"
+   [(data-type-fn fields)
+    (into-struct-array-fn fields)
+    (from-struct-array-fn fields)]])
 
 (defn -main []
   (doseq [decl (mapcat (juxt use-statement struct-impl) (read-structs))]

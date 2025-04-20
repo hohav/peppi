@@ -6,7 +6,7 @@ use std::{
 	path::PathBuf,
 };
 
-use arrow2::array::MutableArray;
+use arrow2::{array::MutableArray, offset::Offsets};
 use byteorder::ReadBytesExt;
 use log::{debug, info, trace, warn};
 
@@ -53,6 +53,9 @@ pub enum Event {
 	Item = 0x3B,
 	FrameEnd = 0x3C,
 	GeckoCodes = 0x3D,
+	FodPlatform = 0x3F,
+	DreamlandWhispy = 0x40,
+	StadiumTransformation = 0x41,
 }
 
 #[derive(Debug, Default)]
@@ -651,6 +654,15 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 	})
 }
 
+fn push_offset<T>(offsets: &mut Option<Offsets<i32>>, new_len: i32) {
+	let old_len = *offsets.as_ref().unwrap().last();
+	offsets
+		.as_mut()
+		.unwrap()
+		.try_push(new_len.checked_sub(old_len).unwrap())
+		.unwrap();
+}
+
 /// Parses a single event from `r`.
 ///
 /// Returns the event code that was parsed.
@@ -778,25 +790,60 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 				let id = r.read_i32::<BE>()?;
 				trace!("Frame end: {}", id);
 				assert_eq!(id, state.last_id().unwrap());
-				let old_len = *state.game.frames.item_offset.as_ref().unwrap().last();
-				let new_len: i32 = state
-					.game
-					.frames
-					.item
-					.as_ref()
-					.unwrap()
-					.r#type
-					.len()
-					.try_into()
-					.unwrap();
-				state
-					.game
-					.frames
-					.item_offset
-					.as_mut()
-					.unwrap()
-					.try_push(new_len.checked_sub(old_len).unwrap())
-					.unwrap();
+				push_offset::<u32>(
+					&mut state.game.frames.item_offset,
+					state
+						.game
+						.frames
+						.item
+						.as_ref()
+						.unwrap()
+						.id
+						.len()
+						.try_into()
+						.unwrap(),
+				);
+				if state.game.start.slippi.version.gte(3, 18) {
+					push_offset::<u8>(
+						&mut state.game.frames.fod_platform_offset,
+						state
+							.game
+							.frames
+							.fod_platform
+							.as_ref()
+							.unwrap()
+							.platform
+							.len()
+							.try_into()
+							.unwrap(),
+					);
+					push_offset::<u8>(
+						&mut state.game.frames.dreamland_whispy_offset,
+						state
+							.game
+							.frames
+							.dreamland_whispy
+							.as_ref()
+							.unwrap()
+							.direction
+							.len()
+							.try_into()
+							.unwrap(),
+					);
+					push_offset::<u16>(
+						&mut state.game.frames.stadium_transformation_offset,
+						state
+							.game
+							.frames
+							.stadium_transformation
+							.as_ref()
+							.unwrap()
+							.event
+							.len()
+							.try_into()
+							.unwrap(),
+					);
+				}
 				state
 					.game
 					.frames
@@ -815,6 +862,45 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 					.game
 					.frames
 					.item
+					.as_mut()
+					.unwrap()
+					.read_push(r, state.game.start.slippi.version)?;
+			}
+			FodPlatform => {
+				let r = &mut &*buf;
+				let id = r.read_i32::<BE>()?;
+				trace!("FOD platform: {}", id);
+				assert_eq!(id, state.last_id().unwrap());
+				state
+					.game
+					.frames
+					.fod_platform
+					.as_mut()
+					.unwrap()
+					.read_push(r, state.game.start.slippi.version)?;
+			}
+			DreamlandWhispy => {
+				let r = &mut &*buf;
+				let id = r.read_i32::<BE>()?;
+				trace!("Dreamland Whispy: {}", id);
+				assert_eq!(id, state.last_id().unwrap());
+				state
+					.game
+					.frames
+					.dreamland_whispy
+					.as_mut()
+					.unwrap()
+					.read_push(r, state.game.start.slippi.version)?;
+			}
+			StadiumTransformation => {
+				let r = &mut &*buf;
+				let id = r.read_i32::<BE>()?;
+				trace!("Stadium transformation: {}", id);
+				assert_eq!(id, state.last_id().unwrap());
+				state
+					.game
+					.frames
+					.stadium_transformation
 					.as_mut()
 					.unwrap()
 					.read_push(r, state.game.start.slippi.version)?;
