@@ -709,6 +709,10 @@ pub struct Pre {
 	pub percent: Option<MutablePrimitiveArray<f32>>,
 	/// *Added: v3.15* Raw joystick y-position
 	pub raw_analog_y: Option<MutablePrimitiveArray<i8>>,
+	/// *Added: v3.17* Raw c-stick x-position
+	pub raw_analog_cstick_x: Option<MutablePrimitiveArray<i8>>,
+	/// *Added: v3.17* Raw c-stick y-position
+	pub raw_analog_cstick_y: Option<MutablePrimitiveArray<i8>>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<MutableBitmap>,
 }
@@ -734,6 +738,12 @@ impl Pre {
 				.then(|| MutablePrimitiveArray::<f32>::with_capacity(capacity)),
 			raw_analog_y: version
 				.gte(3, 15)
+				.then(|| MutablePrimitiveArray::<i8>::with_capacity(capacity)),
+			raw_analog_cstick_x: version
+				.gte(3, 17)
+				.then(|| MutablePrimitiveArray::<i8>::with_capacity(capacity)),
+			raw_analog_cstick_y: version
+				.gte(3, 17)
 				.then(|| MutablePrimitiveArray::<i8>::with_capacity(capacity)),
 			validity: None,
 		}
@@ -763,7 +773,11 @@ impl Pre {
 			if version.gte(1, 4) {
 				self.percent.as_mut().unwrap().push_null();
 				if version.gte(3, 15) {
-					self.raw_analog_y.as_mut().unwrap().push_null()
+					self.raw_analog_y.as_mut().unwrap().push_null();
+					if version.gte(3, 17) {
+						self.raw_analog_cstick_x.as_mut().unwrap().push_null();
+						self.raw_analog_cstick_y.as_mut().unwrap().push_null()
+					}
 				}
 			}
 		}
@@ -789,7 +803,13 @@ impl Pre {
 					.map(|x| self.percent.as_mut().unwrap().push(Some(x)))?;
 				if version.gte(3, 15) {
 					r.read_i8()
-						.map(|x| self.raw_analog_y.as_mut().unwrap().push(Some(x)))?
+						.map(|x| self.raw_analog_y.as_mut().unwrap().push(Some(x)))?;
+					if version.gte(3, 17) {
+						r.read_i8()
+							.map(|x| self.raw_analog_cstick_x.as_mut().unwrap().push(Some(x)))?;
+						r.read_i8()
+							.map(|x| self.raw_analog_cstick_y.as_mut().unwrap().push(Some(x)))?
+					}
 				}
 			}
 		};
@@ -812,6 +832,8 @@ impl Pre {
 			raw_analog_x: self.raw_analog_x.as_ref().map(|x| x.values()[i]),
 			percent: self.percent.as_ref().map(|x| x.values()[i]),
 			raw_analog_y: self.raw_analog_y.as_ref().map(|x| x.values()[i]),
+			raw_analog_cstick_x: self.raw_analog_cstick_x.as_ref().map(|x| x.values()[i]),
+			raw_analog_cstick_y: self.raw_analog_cstick_y.as_ref().map(|x| x.values()[i]),
 		}
 	}
 }

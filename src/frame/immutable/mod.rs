@@ -473,6 +473,10 @@ pub struct Pre {
 	pub percent: Option<PrimitiveArray<f32>>,
 	/// *Added: v3.15* Raw joystick y-position
 	pub raw_analog_y: Option<PrimitiveArray<i8>>,
+	/// *Added: v3.17* Raw c-stick x-position
+	pub raw_analog_cstick_x: Option<PrimitiveArray<i8>>,
+	/// *Added: v3.17* Raw c-stick y-position
+	pub raw_analog_cstick_y: Option<PrimitiveArray<i8>>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<Bitmap>,
 }
@@ -493,6 +497,8 @@ impl Pre {
 			raw_analog_x: self.raw_analog_x.as_ref().map(|x| x.values()[i]),
 			percent: self.percent.as_ref().map(|x| x.values()[i]),
 			raw_analog_y: self.raw_analog_y.as_ref().map(|x| x.values()[i]),
+			raw_analog_cstick_x: self.raw_analog_cstick_x.as_ref().map(|x| x.values()[i]),
+			raw_analog_cstick_y: self.raw_analog_cstick_y.as_ref().map(|x| x.values()[i]),
 		}
 	}
 }
@@ -513,6 +519,8 @@ impl From<mutable::Pre> for Pre {
 			raw_analog_x: x.raw_analog_x.map(|x| x.into()),
 			percent: x.percent.map(|x| x.into()),
 			raw_analog_y: x.raw_analog_y.map(|x| x.into()),
+			raw_analog_cstick_x: x.raw_analog_cstick_x.map(|x| x.into()),
+			raw_analog_cstick_y: x.raw_analog_cstick_y.map(|x| x.into()),
 			validity: x.validity.map(|v| v.into()),
 		}
 	}

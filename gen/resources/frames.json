@@ -158,6 +158,18 @@
 				"type": "i8",
 				"version": "3.15",
 				"description": "Raw joystick y-position"
+			},
+			{
+				"name": "raw_analog_cstick_x",
+				"type": "i8",
+				"version": "3.17",
+				"description": "Raw c-stick x-position"
+			},
+			{
+				"name": "raw_analog_cstick_y",
+				"type": "i8",
+				"version": "3.17",
+				"description": "Raw c-stick y-position"
 			}
 		]
 	},
@@ -398,6 +410,46 @@
 				"type": "u16",
 				"version": "3.16",
 				"description": "Inherited instance ID of the owner (0 when unowned)"
+			}
+		]
+	},
+	"FodPlatform": {
+		"description": "This event only occurs on Fountain of Dreams, and is sent for each change in platform height. If both platforms are moving, there will be two events per frame.",
+		"fields": [
+			{
+				"name": "platform",
+				"type": "u8",
+				"description": "Which platform has moved. (0 = Right, 1 = Left)"
+			},
+			{
+				"name": "height",
+				"type": "f32",
+				"description": "The platform's new height"
+			}
+		]
+	},
+	"DreamlandWhispy": {
+		"description": "This event only occurs on Dreamland 64, and is sent whenever Whispy changes blow directions.",
+		"fields": [
+			{
+				"name": "direction",
+				"type": "u8",
+				"description": "Which direction Whispy is blowing (0 = None, 1 = Left, 2 = Right)"
+			}
+		]
+	},
+	"StadiumTransformation": {
+		"description": "This event only occurs on Pokemon Stadium, and is sent whenever the transformation event or transformation type changes.",
+		"fields": [
+			{
+				"name": "event",
+				"type": "u16",
+				"description": "The subevent for each transformation. (2 = Initialize, 3 = On monitor, 4 = Previous transformation receding, 5 = New transformation rising, 6 = Finalize, 0 = Finished)"
+			},
+			{
+				"name": "type",
+				"type": "u16",
+				"description": "The current or upcoming transformation. (3 = Fire, 4 = Grass, 5 = Normal, 6 = Rock, 9 = Water)"
 			}
 		]
 	}

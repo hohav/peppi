@@ -99,6 +99,8 @@ pub struct Pre {
 	pub raw_analog_x: Option<i8>,
 	pub percent: Option<f32>,
 	pub raw_analog_y: Option<i8>,
+	pub raw_analog_cstick_x: Option<i8>,
+	pub raw_analog_cstick_y: Option<i8>,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]

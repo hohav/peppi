@@ -379,7 +379,11 @@ impl Pre {
 			if version.gte(1, 4) {
 				w.write_f32::<BE>(self.percent.as_ref().unwrap().value(i))?;
 				if version.gte(3, 15) {
-					w.write_i8(self.raw_analog_y.as_ref().unwrap().value(i))?
+					w.write_i8(self.raw_analog_y.as_ref().unwrap().value(i))?;
+					if version.gte(3, 17) {
+						w.write_i8(self.raw_analog_cstick_x.as_ref().unwrap().value(i))?;
+						w.write_i8(self.raw_analog_cstick_y.as_ref().unwrap().value(i))?
+					}
 				}
 			}
 		};
@@ -403,7 +407,11 @@ impl Pre {
 			if version.gte(1, 4) {
 				size += size_of::<f32>();
 				if version.gte(3, 15) {
-					size += size_of::<i8>()
+					size += size_of::<i8>();
+					if version.gte(3, 17) {
+						size += size_of::<i8>();
+						size += size_of::<i8>()
+					}
 				}
 			}
 		};

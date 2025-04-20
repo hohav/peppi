@@ -772,7 +772,11 @@ impl Pre {
 				if version.gte(1, 4) {
 					fields.push(Field::new("percent", DataType::Float32, false));
 					if version.gte(3, 15) {
-						fields.push(Field::new("raw_analog_y", DataType::Int8, false))
+						fields.push(Field::new("raw_analog_y", DataType::Int8, false));
+						if version.gte(3, 17) {
+							fields.push(Field::new("raw_analog_cstick_x", DataType::Int8, false));
+							fields.push(Field::new("raw_analog_cstick_y", DataType::Int8, false))
+						}
 					}
 				}
 			}
@@ -797,7 +801,11 @@ impl Pre {
 			if version.gte(1, 4) {
 				values.push(self.percent.unwrap().boxed());
 				if version.gte(3, 15) {
-					values.push(self.raw_analog_y.unwrap().boxed())
+					values.push(self.raw_analog_y.unwrap().boxed());
+					if version.gte(3, 17) {
+						values.push(self.raw_analog_cstick_x.unwrap().boxed());
+						values.push(self.raw_analog_cstick_y.unwrap().boxed())
+					}
 				}
 			}
 		};
@@ -882,6 +890,18 @@ impl Pre {
 					.clone()
 			}),
 			raw_analog_y: values.get(12).map(|x| {
+				x.as_any()
+					.downcast_ref::<PrimitiveArray<i8>>()
+					.unwrap()
+					.clone()
+			}),
+			raw_analog_cstick_x: values.get(13).map(|x| {
+				x.as_any()
+					.downcast_ref::<PrimitiveArray<i8>>()
+					.unwrap()
+					.clone()
+			}),
+			raw_analog_cstick_y: values.get(14).map(|x| {
 				x.as_any()
 					.downcast_ref::<PrimitiveArray<i8>>()
 					.unwrap()
