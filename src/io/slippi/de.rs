@@ -1023,11 +1023,14 @@ pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
 
 	// Some replays have no `metadata` (e.g. Fizzi's anonymized Ranked dataset),
 	// in which case the next char should be the final UBSJON `}`.
+
+	// Programs like slippi nintendont or rwing add custom fields after the metadata.
+	// So sometimes we can't expect the closing '}' byte after the metadata.
+	// As of 7.2.0, the official parser is robust to this and ignores bytes after metadata.
+	// https://github.com/project-slippi/slippi-js/blob/v7.2.0/src/utils/slpReader.ts#L115
+	// We can ignore them safely.
 	match r.read_u8()? {
-		0x55 => {
-			parse_metadata(r.by_ref(), &mut state, opts)?;
-			expect_bytes(&mut r, &[0x7d])?;
-		}
+		0x55 => parse_metadata(r.by_ref(), &mut state, opts)?,
 		0x7d => {} // top-level closing brace ("}")
 		x => return Err(err!("expected: 0x55 or 0x7d, got: {:#02x}", x)),
 	};
