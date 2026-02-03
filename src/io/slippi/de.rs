@@ -711,6 +711,11 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 			Payloads => return Err(err!("Duplicate payloads event")),
 			MessageSplitter => {}
 			GeckoCodes => {
+				if state.game.gecko_codes.is_some() {
+					return Err(err!(
+						"Multiple Gecko List events found. This is not supported."
+					));
+				}
 				state.game.gecko_codes = Some(game::GeckoCodes {
 					bytes: buf.to_vec(),
 					actual_size: state.split_accumulator.actual_size,

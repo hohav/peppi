@@ -774,6 +774,16 @@ fn corrupt_replay() {
 }
 
 #[test]
+fn multi_gecko_list() {
+	let err = read_game(get_path("multi_gecko_list"), false).unwrap_err();
+	assert!(
+		err.to_string().contains("Multiple Gecko List"),
+		"Expected error about multiple Gecko List events, got: {}",
+		err
+	);
+}
+
+#[test]
 fn zelda_sheik_transformation() {
 	let game = game("transform");
 	assert_eq!(
@@ -895,7 +905,7 @@ fn round_trip() {
 		.into_iter()
 		.map(|e| e.unwrap())
 		.filter(|e| match e.file_name().to_str().unwrap() {
-			"unknown_event.slp" | "corrupt.slp" => false,
+			"unknown_event.slp" | "corrupt.slp" | "multi_gecko_list.slp" => false,
 			_ => true,
 		}) {
 		println!("{:?}", entry.file_name());
