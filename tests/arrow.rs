@@ -8,6 +8,28 @@ use peppi::{frame::PortOccupancy, game::Port};
 mod common;
 use common::game;
 
+/// Test that v3.6 replays can be converted to Arrow.
+/// v3.6 predates the `latest_finalized_frame` field (added in v3.7),
+/// so the `End` struct has no fields for this version.
+#[test]
+fn v3_6_into_struct_array() {
+	let game = game("v3.6");
+	let ports = vec![
+		PortOccupancy {
+			port: Port::P1,
+			follower: false,
+		},
+		PortOccupancy {
+			port: Port::P2,
+			follower: false,
+		},
+	];
+	// This should not panic
+	let _frames = game
+		.frames
+		.into_struct_array(game.start.slippi.version, &ports);
+}
+
 #[test]
 fn into_struct_array() {
 	let game = game("v3.12");

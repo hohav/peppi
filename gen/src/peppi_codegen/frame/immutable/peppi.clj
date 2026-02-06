@@ -36,6 +36,14 @@
              "push"
              [(arrow-field f)]]))
          (into [:block]))
+    ;; Arrow2 requires at least one field in a StructArray
+    [:if
+     [:method-call "fields" "is_empty"]
+     [:block
+      [:method-call
+       "fields"
+       "push"
+       [[:fn-call "Field" "new" [[:string "_dummy"] "DataType::Null" "true"]]]]]]
     [:struct-init
      (list "DataType" "Struct")
      [[nil "fields"]]]]])
@@ -63,6 +71,24 @@
 (defn into-struct-array-fn
   [fields]
   (let [let-values [:let {:mutable true} "values" [:vec! []]]
+        ;; Arrow2 requires at least one field in a StructArray.
+        ;; Get length from validity bitmap if present (named structs only), otherwise 0.
+        push-dummy [:if
+                    [:method-call "values" "is_empty"]
+                    [:block
+                     [:let "len"
+                      (if (named? fields)
+                        [:method-call
+                         [:method-call "self.validity" "as_ref"]
+                         "map_or"
+                         ["0" [:closure [["b"]] [[:method-call "b" "len"]]]]]
+                        "0")]
+                     [:method-call
+                      "values"
+                      "push"
+                      [[:method-call
+                        [:fn-call "arrow2::array::NullArray" "new" ["DataType::Null" "len"]]
+                        "boxed"]]]]]
         struct-init [:fn-call
                      "StructArray"
                      "new"
@@ -76,6 +102,7 @@
       ["version" "Version"]]
      (->> (nested-version-ifs push-call fields)
           (into [:block let-values])
+          (append push-dummy)
           (append struct-init))]))
 
 (defn downcast-clone
@@ -91,27 +118,30 @@
     "unwrap"]
    "clone"])
 
+;; For versioned fields, we use explicit version checks rather than
+;; `values.get(idx).map(...)`. The latter would fail because structs
+;; with all-versioned fields (like `End`) have a dummy NullArray at
+;; index 0 to satisfy Arrow2's requirement for at least one field,
+;; causing the downcast to fail.
 (defn from-struct-array
   [{ty :type, ver :version, idx :index, :as field}]
-  (let [target (if ver
-                 [:method-call "values" "get" [idx]]
-                 [:subscript "values" idx])
-        ver-target (if ver "x" target)
+  (let [target [:subscript "values" idx]
         body (cond
                (primitive-types ty)
-               (downcast-clone ver-target ["PrimitiveArray" ty])
+               (downcast-clone target ["PrimitiveArray" ty])
 
                (nil? ty)
-               (downcast-clone ver-target "NullArray")
+               (downcast-clone target "NullArray")
 
                :else
                [:fn-call
                 ty
                 "from_struct_array"
-                [(downcast-clone ver-target "StructArray")
+                [(downcast-clone target "StructArray")
                  "version"]])]
-    (cond->> body
-      ver (wrap-map target "x"))))
+    (if ver
+      (if-ver ver [:fn-call nil "Some" [body]] "None")
+      body)))
 
 (defn from-struct-array-fn
   [fields]

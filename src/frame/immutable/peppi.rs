@@ -387,12 +387,19 @@ impl StructArrayConvertible for DreamlandWhispy {
 		{
 			fields.push(Field::new("direction", DataType::UInt8, false))
 		};
+		if fields.is_empty() {
+			fields.push(Field::new("_dummy", DataType::Null, true))
+		};
 		DataType::Struct(fields)
 	}
 
 	fn into_struct_array(self, version: Version) -> StructArray {
 		let mut values = vec![];
 		values.push(self.direction.boxed());
+		if values.is_empty() {
+			let len = self.validity.as_ref().map_or(0, |b| b.len());
+			values.push(arrow2::array::NullArray::new(DataType::Null, len).boxed())
+		};
 		StructArray::new(Self::data_type(version), values, self.validity)
 	}
 
@@ -419,6 +426,9 @@ impl StructArrayConvertible for End {
 				fields.push(Field::new("latest_finalized_frame", DataType::Int32, false))
 			}
 		};
+		if fields.is_empty() {
+			fields.push(Field::new("_dummy", DataType::Null, true))
+		};
 		DataType::Struct(fields)
 	}
 
@@ -427,18 +437,27 @@ impl StructArrayConvertible for End {
 		if version.gte(3, 7) {
 			values.push(self.latest_finalized_frame.unwrap().boxed())
 		};
+		if values.is_empty() {
+			let len = self.validity.as_ref().map_or(0, |b| b.len());
+			values.push(arrow2::array::NullArray::new(DataType::Null, len).boxed())
+		};
 		StructArray::new(Self::data_type(version), values, self.validity)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
 		let (_, values, validity) = array.into_data();
 		Self {
-			latest_finalized_frame: values.get(0).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<i32>>()
-					.unwrap()
-					.clone()
-			}),
+			latest_finalized_frame: if version.gte(3, 7) {
+				Some(
+					values[0]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<i32>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
 			validity: validity,
 		}
 	}
@@ -453,6 +472,9 @@ impl StructArrayConvertible for FodPlatform {
 			fields.push(Field::new("platform", DataType::UInt8, false));
 			fields.push(Field::new("height", DataType::Float32, false))
 		};
+		if fields.is_empty() {
+			fields.push(Field::new("_dummy", DataType::Null, true))
+		};
 		DataType::Struct(fields)
 	}
 
@@ -460,6 +482,10 @@ impl StructArrayConvertible for FodPlatform {
 		let mut values = vec![];
 		values.push(self.platform.boxed());
 		values.push(self.height.boxed());
+		if values.is_empty() {
+			let len = self.validity.as_ref().map_or(0, |b| b.len());
+			values.push(arrow2::array::NullArray::new(DataType::Null, len).boxed())
+		};
 		StructArray::new(Self::data_type(version), values, self.validity)
 	}
 
@@ -505,6 +531,9 @@ impl StructArrayConvertible for Item {
 				}
 			}
 		};
+		if fields.is_empty() {
+			fields.push(Field::new("_dummy", DataType::Null, true))
+		};
 		DataType::Struct(fields)
 	}
 
@@ -526,6 +555,10 @@ impl StructArrayConvertible for Item {
 					values.push(self.instance_id.unwrap().boxed())
 				}
 			}
+		};
+		if values.is_empty() {
+			let len = self.validity.as_ref().map_or(0, |b| b.len());
+			values.push(arrow2::array::NullArray::new(DataType::Null, len).boxed())
 		};
 		StructArray::new(Self::data_type(version), values, self.validity)
 	}
@@ -579,24 +612,40 @@ impl StructArrayConvertible for Item {
 				.downcast_ref::<PrimitiveArray<u32>>()
 				.unwrap()
 				.clone(),
-			misc: values.get(8).map(|x| {
-				ItemMisc::from_struct_array(
-					x.as_any().downcast_ref::<StructArray>().unwrap().clone(),
+			misc: if version.gte(3, 2) {
+				Some(ItemMisc::from_struct_array(
+					values[8]
+						.as_any()
+						.downcast_ref::<StructArray>()
+						.unwrap()
+						.clone(),
 					version,
+				))
+			} else {
+				None
+			},
+			owner: if version.gte(3, 6) {
+				Some(
+					values[9]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<i8>>()
+						.unwrap()
+						.clone(),
 				)
-			}),
-			owner: values.get(9).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<i8>>()
-					.unwrap()
-					.clone()
-			}),
-			instance_id: values.get(10).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<u16>>()
-					.unwrap()
-					.clone()
-			}),
+			} else {
+				None
+			},
+			instance_id: if version.gte(3, 16) {
+				Some(
+					values[10]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<u16>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
 			validity: validity,
 		}
 	}
@@ -613,6 +662,9 @@ impl StructArrayConvertible for ItemMisc {
 			fields.push(Field::new("2", DataType::UInt8, false));
 			fields.push(Field::new("3", DataType::UInt8, false))
 		};
+		if fields.is_empty() {
+			fields.push(Field::new("_dummy", DataType::Null, true))
+		};
 		DataType::Struct(fields)
 	}
 
@@ -622,6 +674,10 @@ impl StructArrayConvertible for ItemMisc {
 		values.push(self.1.boxed());
 		values.push(self.2.boxed());
 		values.push(self.3.boxed());
+		if values.is_empty() {
+			let len = 0;
+			values.push(arrow2::array::NullArray::new(DataType::Null, len).boxed())
+		};
 		StructArray::new(Self::data_type(version), values, None)
 	}
 
@@ -661,6 +717,9 @@ impl StructArrayConvertible for Position {
 			fields.push(Field::new("x", DataType::Float32, false));
 			fields.push(Field::new("y", DataType::Float32, false))
 		};
+		if fields.is_empty() {
+			fields.push(Field::new("_dummy", DataType::Null, true))
+		};
 		DataType::Struct(fields)
 	}
 
@@ -668,6 +727,10 @@ impl StructArrayConvertible for Position {
 		let mut values = vec![];
 		values.push(self.x.boxed());
 		values.push(self.y.boxed());
+		if values.is_empty() {
+			let len = self.validity.as_ref().map_or(0, |b| b.len());
+			values.push(arrow2::array::NullArray::new(DataType::Null, len).boxed())
+		};
 		StructArray::new(Self::data_type(version), values, self.validity)
 	}
 
@@ -753,6 +816,9 @@ impl StructArrayConvertible for Post {
 				}
 			}
 		};
+		if fields.is_empty() {
+			fields.push(Field::new("_dummy", DataType::Null, true))
+		};
 		DataType::Struct(fields)
 	}
 
@@ -794,6 +860,10 @@ impl StructArrayConvertible for Post {
 					}
 				}
 			}
+		};
+		if values.is_empty() {
+			let len = self.validity.as_ref().map_or(0, |b| b.len());
+			values.push(arrow2::array::NullArray::new(DataType::Null, len).boxed())
 		};
 		StructArray::new(Self::data_type(version), values, self.validity)
 	}
@@ -854,84 +924,151 @@ impl StructArrayConvertible for Post {
 				.downcast_ref::<PrimitiveArray<u8>>()
 				.unwrap()
 				.clone(),
-			state_age: values.get(10).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<f32>>()
-					.unwrap()
-					.clone()
-			}),
-			state_flags: values.get(11).map(|x| {
-				StateFlags::from_struct_array(
-					x.as_any().downcast_ref::<StructArray>().unwrap().clone(),
-					version,
+			state_age: if version.gte(0, 2) {
+				Some(
+					values[10]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<f32>>()
+						.unwrap()
+						.clone(),
 				)
-			}),
-			misc_as: values.get(12).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<f32>>()
-					.unwrap()
-					.clone()
-			}),
-			airborne: values.get(13).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<u8>>()
-					.unwrap()
-					.clone()
-			}),
-			ground: values.get(14).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<u16>>()
-					.unwrap()
-					.clone()
-			}),
-			jumps: values.get(15).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<u8>>()
-					.unwrap()
-					.clone()
-			}),
-			l_cancel: values.get(16).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<u8>>()
-					.unwrap()
-					.clone()
-			}),
-			hurtbox_state: values.get(17).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<u8>>()
-					.unwrap()
-					.clone()
-			}),
-			velocities: values.get(18).map(|x| {
-				Velocities::from_struct_array(
-					x.as_any().downcast_ref::<StructArray>().unwrap().clone(),
+			} else {
+				None
+			},
+			state_flags: if version.gte(2, 0) {
+				Some(StateFlags::from_struct_array(
+					values[11]
+						.as_any()
+						.downcast_ref::<StructArray>()
+						.unwrap()
+						.clone(),
 					version,
+				))
+			} else {
+				None
+			},
+			misc_as: if version.gte(2, 0) {
+				Some(
+					values[12]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<f32>>()
+						.unwrap()
+						.clone(),
 				)
-			}),
-			hitlag: values.get(19).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<f32>>()
-					.unwrap()
-					.clone()
-			}),
-			animation_index: values.get(20).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<u32>>()
-					.unwrap()
-					.clone()
-			}),
-			last_hit_by_instance: values.get(21).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<u16>>()
-					.unwrap()
-					.clone()
-			}),
-			instance_id: values.get(22).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<u16>>()
-					.unwrap()
-					.clone()
-			}),
+			} else {
+				None
+			},
+			airborne: if version.gte(2, 0) {
+				Some(
+					values[13]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<u8>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
+			ground: if version.gte(2, 0) {
+				Some(
+					values[14]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<u16>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
+			jumps: if version.gte(2, 0) {
+				Some(
+					values[15]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<u8>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
+			l_cancel: if version.gte(2, 0) {
+				Some(
+					values[16]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<u8>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
+			hurtbox_state: if version.gte(2, 1) {
+				Some(
+					values[17]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<u8>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
+			velocities: if version.gte(3, 5) {
+				Some(Velocities::from_struct_array(
+					values[18]
+						.as_any()
+						.downcast_ref::<StructArray>()
+						.unwrap()
+						.clone(),
+					version,
+				))
+			} else {
+				None
+			},
+			hitlag: if version.gte(3, 8) {
+				Some(
+					values[19]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<f32>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
+			animation_index: if version.gte(3, 11) {
+				Some(
+					values[20]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<u32>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
+			last_hit_by_instance: if version.gte(3, 16) {
+				Some(
+					values[21]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<u16>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
+			instance_id: if version.gte(3, 16) {
+				Some(
+					values[22]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<u16>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
 			validity: validity,
 		}
 	}
@@ -971,6 +1108,9 @@ impl StructArrayConvertible for Pre {
 				}
 			}
 		};
+		if fields.is_empty() {
+			fields.push(Field::new("_dummy", DataType::Null, true))
+		};
 		DataType::Struct(fields)
 	}
 
@@ -998,6 +1138,10 @@ impl StructArrayConvertible for Pre {
 					}
 				}
 			}
+		};
+		if values.is_empty() {
+			let len = self.validity.as_ref().map_or(0, |b| b.len());
+			values.push(arrow2::array::NullArray::new(DataType::Null, len).boxed())
 		};
 		StructArray::new(Self::data_type(version), values, self.validity)
 	}
@@ -1067,36 +1211,61 @@ impl StructArrayConvertible for Pre {
 					.clone(),
 				version,
 			),
-			raw_analog_x: values.get(10).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<i8>>()
-					.unwrap()
-					.clone()
-			}),
-			percent: values.get(11).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<f32>>()
-					.unwrap()
-					.clone()
-			}),
-			raw_analog_y: values.get(12).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<i8>>()
-					.unwrap()
-					.clone()
-			}),
-			raw_analog_cstick_x: values.get(13).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<i8>>()
-					.unwrap()
-					.clone()
-			}),
-			raw_analog_cstick_y: values.get(14).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<i8>>()
-					.unwrap()
-					.clone()
-			}),
+			raw_analog_x: if version.gte(1, 2) {
+				Some(
+					values[10]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<i8>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
+			percent: if version.gte(1, 4) {
+				Some(
+					values[11]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<f32>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
+			raw_analog_y: if version.gte(3, 15) {
+				Some(
+					values[12]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<i8>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
+			raw_analog_cstick_x: if version.gte(3, 17) {
+				Some(
+					values[13]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<i8>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
+			raw_analog_cstick_y: if version.gte(3, 17) {
+				Some(
+					values[14]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<i8>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
 			validity: validity,
 		}
 	}
@@ -1111,6 +1280,9 @@ impl StructArrayConvertible for StadiumTransformation {
 			fields.push(Field::new("event", DataType::UInt16, false));
 			fields.push(Field::new("type", DataType::UInt16, false))
 		};
+		if fields.is_empty() {
+			fields.push(Field::new("_dummy", DataType::Null, true))
+		};
 		DataType::Struct(fields)
 	}
 
@@ -1118,6 +1290,10 @@ impl StructArrayConvertible for StadiumTransformation {
 		let mut values = vec![];
 		values.push(self.event.boxed());
 		values.push(self.r#type.boxed());
+		if values.is_empty() {
+			let len = self.validity.as_ref().map_or(0, |b| b.len());
+			values.push(arrow2::array::NullArray::new(DataType::Null, len).boxed())
+		};
 		StructArray::new(Self::data_type(version), values, self.validity)
 	}
 
@@ -1150,6 +1326,9 @@ impl StructArrayConvertible for Start {
 				fields.push(Field::new("scene_frame_counter", DataType::UInt32, false))
 			}
 		};
+		if fields.is_empty() {
+			fields.push(Field::new("_dummy", DataType::Null, true))
+		};
 		DataType::Struct(fields)
 	}
 
@@ -1158,6 +1337,10 @@ impl StructArrayConvertible for Start {
 		values.push(self.random_seed.boxed());
 		if version.gte(3, 10) {
 			values.push(self.scene_frame_counter.unwrap().boxed())
+		};
+		if values.is_empty() {
+			let len = self.validity.as_ref().map_or(0, |b| b.len());
+			values.push(arrow2::array::NullArray::new(DataType::Null, len).boxed())
 		};
 		StructArray::new(Self::data_type(version), values, self.validity)
 	}
@@ -1170,12 +1353,17 @@ impl StructArrayConvertible for Start {
 				.downcast_ref::<PrimitiveArray<u32>>()
 				.unwrap()
 				.clone(),
-			scene_frame_counter: values.get(1).map(|x| {
-				x.as_any()
-					.downcast_ref::<PrimitiveArray<u32>>()
-					.unwrap()
-					.clone()
-			}),
+			scene_frame_counter: if version.gte(3, 10) {
+				Some(
+					values[1]
+						.as_any()
+						.downcast_ref::<PrimitiveArray<u32>>()
+						.unwrap()
+						.clone(),
+				)
+			} else {
+				None
+			},
 			validity: validity,
 		}
 	}
@@ -1193,6 +1381,9 @@ impl StructArrayConvertible for StateFlags {
 			fields.push(Field::new("3", DataType::UInt8, false));
 			fields.push(Field::new("4", DataType::UInt8, false))
 		};
+		if fields.is_empty() {
+			fields.push(Field::new("_dummy", DataType::Null, true))
+		};
 		DataType::Struct(fields)
 	}
 
@@ -1203,6 +1394,10 @@ impl StructArrayConvertible for StateFlags {
 		values.push(self.2.boxed());
 		values.push(self.3.boxed());
 		values.push(self.4.boxed());
+		if values.is_empty() {
+			let len = 0;
+			values.push(arrow2::array::NullArray::new(DataType::Null, len).boxed())
+		};
 		StructArray::new(Self::data_type(version), values, None)
 	}
 
@@ -1247,6 +1442,9 @@ impl StructArrayConvertible for TriggersPhysical {
 			fields.push(Field::new("l", DataType::Float32, false));
 			fields.push(Field::new("r", DataType::Float32, false))
 		};
+		if fields.is_empty() {
+			fields.push(Field::new("_dummy", DataType::Null, true))
+		};
 		DataType::Struct(fields)
 	}
 
@@ -1254,6 +1452,10 @@ impl StructArrayConvertible for TriggersPhysical {
 		let mut values = vec![];
 		values.push(self.l.boxed());
 		values.push(self.r.boxed());
+		if values.is_empty() {
+			let len = self.validity.as_ref().map_or(0, |b| b.len());
+			values.push(arrow2::array::NullArray::new(DataType::Null, len).boxed())
+		};
 		StructArray::new(Self::data_type(version), values, self.validity)
 	}
 
@@ -1287,6 +1489,9 @@ impl StructArrayConvertible for Velocities {
 			fields.push(Field::new("knockback_y", DataType::Float32, false));
 			fields.push(Field::new("self_x_ground", DataType::Float32, false))
 		};
+		if fields.is_empty() {
+			fields.push(Field::new("_dummy", DataType::Null, true))
+		};
 		DataType::Struct(fields)
 	}
 
@@ -1297,6 +1502,10 @@ impl StructArrayConvertible for Velocities {
 		values.push(self.knockback_x.boxed());
 		values.push(self.knockback_y.boxed());
 		values.push(self.self_x_ground.boxed());
+		if values.is_empty() {
+			let len = self.validity.as_ref().map_or(0, |b| b.len());
+			values.push(arrow2::array::NullArray::new(DataType::Null, len).boxed())
+		};
 		StructArray::new(Self::data_type(version), values, self.validity)
 	}
 
@@ -1342,6 +1551,9 @@ impl StructArrayConvertible for Velocity {
 			fields.push(Field::new("x", DataType::Float32, false));
 			fields.push(Field::new("y", DataType::Float32, false))
 		};
+		if fields.is_empty() {
+			fields.push(Field::new("_dummy", DataType::Null, true))
+		};
 		DataType::Struct(fields)
 	}
 
@@ -1349,6 +1561,10 @@ impl StructArrayConvertible for Velocity {
 		let mut values = vec![];
 		values.push(self.x.boxed());
 		values.push(self.y.boxed());
+		if values.is_empty() {
+			let len = self.validity.as_ref().map_or(0, |b| b.len());
+			values.push(arrow2::array::NullArray::new(DataType::Null, len).boxed())
+		};
 		StructArray::new(Self::data_type(version), values, self.validity)
 	}
 
