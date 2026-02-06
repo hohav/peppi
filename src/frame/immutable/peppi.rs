@@ -14,7 +14,7 @@ use crate::{
 		immutable::{Data, Frame, PortData},
 	},
 	game::{NUM_PORTS, Port},
-	io::slippi::Version,
+	io::slippi::{STAGE_EVENTS_VERSION, Version},
 };
 
 trait StructArrayConvertible {
@@ -178,7 +178,7 @@ impl Frame {
 					Self::item_data_type(version).clone(),
 					false,
 				));
-				if version.gte(3, 18) {
+				if version >= STAGE_EVENTS_VERSION {
 					fields.push(Field::new(
 						"fod_platform",
 						Self::fod_platform_data_type(version).clone(),
@@ -224,7 +224,7 @@ impl Frame {
 					)
 					.boxed(),
 				);
-				if version.gte(3, 18) {
+				if version >= STAGE_EVENTS_VERSION {
 					let fod_platform_values = self
 						.fod_platform
 						.unwrap()
@@ -320,7 +320,7 @@ impl Frame {
 			if version.gte(3, 0) {
 				assert_eq!("end", fields[3].name);
 				assert_eq!("item", fields[4].name);
-				if version.gte(3, 18) {
+				if version >= STAGE_EVENTS_VERSION {
 					assert_eq!("fod_platform", fields[5].name);
 					assert_eq!("dreamland_whispy", fields[6].name);
 					assert_eq!("stadium_transformation", fields[7].name);

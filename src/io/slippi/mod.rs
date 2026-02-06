@@ -16,6 +16,11 @@ pub use ser::write;
 /// This restriction may be removed in the future.
 pub const MAX_SUPPORTED_VERSION: Version = Version(3, 18, 0);
 
+/// Stage events (FoD platforms, Whispy, Stadium transformations) were officially added in
+/// 3.18.0, but Fizzi forgot to bump the version, so some 3.17.0 files also have them. For
+/// those that don't, the stage events arrays will be empty, which is fine.
+pub const STAGE_EVENTS_VERSION: Version = Version(3, 17, 0);
+
 /// Every `.slp` file starts with a UBJSON opening brace, "raw" key & type (`{U\x03raw[$U#l`).
 pub const FILE_SIGNATURE: [u8; 11] = [
 	0x7b, 0x55, 0x03, 0x72, 0x61, 0x77, 0x5b, 0x24, 0x55, 0x23, 0x6c,

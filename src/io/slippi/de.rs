@@ -18,7 +18,11 @@ use crate::{
 		self, MAX_PLAYERS, Match, NUM_PORTS, Netplay, Player, PlayerType, Port, Quirks,
 		immutable::Game, port_occupancy, shift_jis::MeleeString,
 	},
-	io::{HashingReader, Result, expect_bytes, slippi, ubjson},
+	io::{
+		HashingReader, Result, expect_bytes,
+		slippi::{self, STAGE_EVENTS_VERSION},
+		ubjson,
+	},
 };
 
 type PayloadSizes = [Option<NonZeroU16>; 256];
@@ -817,7 +821,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 						.try_into()
 						.unwrap(),
 				);
-				if state.game.start.slippi.version.gte(3, 18) {
+				if state.game.start.slippi.version >= STAGE_EVENTS_VERSION {
 					push_offset::<u8>(
 						&mut state.game.frames.fod_platform_offset,
 						state

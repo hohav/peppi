@@ -21,7 +21,7 @@ use arrow2::{
 };
 
 use crate::{
-	io::slippi::Version,
+	io::slippi::{Version, STAGE_EVENTS_VERSION},
 	frame::{self, mutable, transpose, Rollbacks},
 	game::Port,
 };
@@ -129,19 +129,19 @@ impl Frame {
 					.map(|i| self.item.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
-			fod_platforms: version.gte(3, 18).then(|| {
+			fod_platforms: (version >= STAGE_EVENTS_VERSION).then(|| {
 				let (start, end) = self.fod_platform_offset.as_ref().unwrap().start_end(i);
 				(start..end)
 					.map(|i| self.fod_platform.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
-			dreamland_whispys: version.gte(3, 18).then(|| {
+			dreamland_whispys: (version >= STAGE_EVENTS_VERSION).then(|| {
 				let (start, end) = self.dreamland_whispy_offset.as_ref().unwrap().start_end(i);
 				(start..end)
 					.map(|i| self.dreamland_whispy.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
-			stadium_transformations: version.gte(3, 18).then(|| {
+			stadium_transformations: (version >= STAGE_EVENTS_VERSION).then(|| {
 				let (start, end) = self.stadium_transformation_offset.as_ref().unwrap().start_end(i);
 				(start..end)
 					.map(|i| self.stadium_transformation.as_ref().unwrap().transpose_one(i, version))

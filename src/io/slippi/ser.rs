@@ -9,7 +9,7 @@ use crate::{
 	game::{self, GeckoCodes, MAX_PLAYERS, NUM_PORTS, Player, PlayerType, Port, immutable::Game},
 	io::{
 		Result,
-		slippi::{self, de::Event},
+		slippi::{self, STAGE_EVENTS_VERSION, de::Event},
 		ubjson,
 	},
 };
@@ -92,7 +92,7 @@ fn payload_sizes(game: &Game) -> PayloadSizes {
 						sizes.push(Event::GeckoCodes, codes.actual_size as u16 as usize);
 						sizes.push(Event::MessageSplitter, 516);
 					}
-					if ver.gte(3, 18) {
+					if ver >= STAGE_EVENTS_VERSION {
 						sizes.push(Event::FodPlatform, FRAME_NUMBER + FodPlatform::size(ver));
 						sizes.push(
 							Event::DreamlandWhispy,

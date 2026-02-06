@@ -20,7 +20,7 @@ use arrow2::{array::PrimitiveArray, bitmap::Bitmap, buffer::Buffer, offset::Offs
 use crate::{
 	frame::{self, Rollbacks, mutable, transpose},
 	game::Port,
-	io::slippi::Version,
+	io::slippi::{STAGE_EVENTS_VERSION, Version},
 };
 
 /// Frame data for a single character (ICs are two characters).
@@ -130,7 +130,7 @@ impl Frame {
 					.map(|i| self.item.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
-			fod_platforms: version.gte(3, 18).then(|| {
+			fod_platforms: (version >= STAGE_EVENTS_VERSION).then(|| {
 				let (start, end) = self.fod_platform_offset.as_ref().unwrap().start_end(i);
 				(start..end)
 					.map(|i| {
@@ -141,7 +141,7 @@ impl Frame {
 					})
 					.collect()
 			}),
-			dreamland_whispys: version.gte(3, 18).then(|| {
+			dreamland_whispys: (version >= STAGE_EVENTS_VERSION).then(|| {
 				let (start, end) = self.dreamland_whispy_offset.as_ref().unwrap().start_end(i);
 				(start..end)
 					.map(|i| {
@@ -152,7 +152,7 @@ impl Frame {
 					})
 					.collect()
 			}),
-			stadium_transformations: version.gte(3, 18).then(|| {
+			stadium_transformations: (version >= STAGE_EVENTS_VERSION).then(|| {
 				let (start, end) = self
 					.stadium_transformation_offset
 					.as_ref()

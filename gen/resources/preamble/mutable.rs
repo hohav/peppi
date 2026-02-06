@@ -15,7 +15,7 @@ use byteorder::ReadBytesExt;
 use std::io::Result;
 
 use crate::{
-	io::slippi::Version,
+	io::slippi::{Version, STAGE_EVENTS_VERSION},
 	frame::{transpose, PortOccupancy},
 	game::Port,
 };
@@ -130,12 +130,12 @@ impl Frame {
 			end: version.gte(3, 0).then(|| End::with_capacity(capacity, version)),
 			item: version.gte(3, 0).then(|| Item::with_capacity(0, version)),
 			item_offset: version.gte(3, 0).then(|| Offsets::<i32>::with_capacity(capacity)),
-			fod_platform: version.gte(3, 18).then(|| FodPlatform::with_capacity(0, version)),
-			fod_platform_offset: version.gte(3, 18).then(|| Offsets::<i32>::with_capacity(capacity)),
-			dreamland_whispy: version.gte(3, 18).then(|| DreamlandWhispy::with_capacity(0, version)),
-			dreamland_whispy_offset: version.gte(3, 18).then(|| Offsets::<i32>::with_capacity(capacity)),
-			stadium_transformation: version.gte(3, 18).then(|| StadiumTransformation::with_capacity(0, version)),
-			stadium_transformation_offset: version.gte(3, 18).then(|| Offsets::<i32>::with_capacity(capacity)),
+			fod_platform: (version >= STAGE_EVENTS_VERSION).then(|| FodPlatform::with_capacity(0, version)),
+			fod_platform_offset: (version >= STAGE_EVENTS_VERSION).then(|| Offsets::<i32>::with_capacity(capacity)),
+			dreamland_whispy: (version >= STAGE_EVENTS_VERSION).then(|| DreamlandWhispy::with_capacity(0, version)),
+			dreamland_whispy_offset: (version >= STAGE_EVENTS_VERSION).then(|| Offsets::<i32>::with_capacity(capacity)),
+			stadium_transformation: (version >= STAGE_EVENTS_VERSION).then(|| StadiumTransformation::with_capacity(0, version)),
+			stadium_transformation_offset: (version >= STAGE_EVENTS_VERSION).then(|| Offsets::<i32>::with_capacity(capacity)),
 		}
 	}
 
@@ -155,19 +155,19 @@ impl Frame {
 					.map(|i| self.item.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
-			fod_platforms: version.gte(3, 18).then(|| {
+			fod_platforms: (version >= STAGE_EVENTS_VERSION).then(|| {
 				let (start, end) = self.fod_platform_offset.as_ref().unwrap().start_end(i);
 				(start..end)
 					.map(|i| self.fod_platform.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
-			dreamland_whispys: version.gte(3, 18).then(|| {
+			dreamland_whispys: (version >= STAGE_EVENTS_VERSION).then(|| {
 				let (start, end) = self.dreamland_whispy_offset.as_ref().unwrap().start_end(i);
 				(start..end)
 					.map(|i| self.dreamland_whispy.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
-			stadium_transformations: version.gte(3, 18).then(|| {
+			stadium_transformations: (version >= STAGE_EVENTS_VERSION).then(|| {
 				let (start, end) = self.stadium_transformation_offset.as_ref().unwrap().start_end(i);
 				(start..end)
 					.map(|i| self.stadium_transformation.as_ref().unwrap().transpose_one(i, version))

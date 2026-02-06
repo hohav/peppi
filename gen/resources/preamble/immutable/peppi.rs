@@ -7,7 +7,7 @@ use arrow2::{
 };
 
 use crate::{
-	io::slippi::Version,
+	io::slippi::{Version, STAGE_EVENTS_VERSION},
 	frame::{
 		immutable::{Data, Frame, PortData},
 		PortOccupancy,
@@ -166,7 +166,7 @@ impl Frame {
 			if version.gte(3, 0) {
 				fields.push(Field::new("end", End::data_type(version).clone(), false));
 				fields.push(Field::new("item", Self::item_data_type(version).clone(), false));
-				if version.gte(3, 18) {
+				if version >= STAGE_EVENTS_VERSION {
 					fields.push(Field::new("fod_platform", Self::fod_platform_data_type(version).clone(), false));
 					fields.push(Field::new("dreamland_whispy", Self::dreamland_whispy_data_type(version).clone(), false));
 					fields.push(Field::new("stadium_transformation", Self::stadium_transformation_data_type(version).clone(), false));
@@ -197,7 +197,7 @@ impl Frame {
 					item_values,
 					None,
 				).boxed());
-				if version.gte(3, 18) {
+				if version >= STAGE_EVENTS_VERSION {
 					let fod_platform_values = self.fod_platform.unwrap().into_struct_array(version).boxed();
 					arrays.push(ListArray::new(
 						Self::fod_platform_data_type(version),
@@ -267,7 +267,7 @@ impl Frame {
 			if version.gte(3, 0) {
 				assert_eq!("end", fields[3].name);
 				assert_eq!("item", fields[4].name);
-				if version.gte(3, 18) {
+				if version >= STAGE_EVENTS_VERSION {
 					assert_eq!("fod_platform", fields[5].name);
 					assert_eq!("dreamland_whispy", fields[6].name);
 					assert_eq!("stadium_transformation", fields[7].name);
