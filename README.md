@@ -119,10 +119,8 @@ fn main() {
         );
     }
 
-    // `U` (0x55) means metadata next (skip if using spectator protocol)
-    if r.read_u8().unwrap() == 0x55 {
-        de::parse_metadata(&mut r, &mut state, None).unwrap();
-    }
+    // skip if using spectator protocol
+    de::read_trailer(&mut r, &mut state, None).unwrap();
 }
 ```
 </details>

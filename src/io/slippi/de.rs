@@ -18,7 +18,7 @@ use crate::{
 		self, MAX_PLAYERS, Match, NUM_PORTS, Netplay, Player, PlayerType, Port, Quirks,
 		immutable::Game, port_occupancy, shift_jis::MeleeString,
 	},
-	io::{HashingReader, Result, expect_bytes, slippi, ubjson},
+	io::{HashingReader, Result, expect_bytes, slippi, ubjson::de as ubjson},
 };
 
 type PayloadSizes = [Option<NonZeroU16>; 256];
@@ -926,23 +926,26 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 	Ok(code)
 }
 
-/// Assumes you already consumed the `U`, because that's how you know if there's metadata.
-pub fn parse_metadata<R: Read>(
-	mut r: R,
-	state: &mut ParseState,
-	_opts: Option<&Opts>,
-) -> Result<()> {
-	expect_bytes(
-		&mut r,
-		// `metadata` key & type ("U\x08metadata{", minus the `U`)
-		&[0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b],
-	)?;
-
-	// Since we already read the opening "{" from the `metadata` value,
-	// we know it's a map. `parse_map` will consume the corresponding "}".
-	let metadata = ubjson::read_map(&mut r)?;
-	info!("Metadata: {}", serde_json::to_string(&metadata)?);
-	state.game.metadata = Some(metadata);
+pub fn read_trailer<R: Read>(mut r: R, state: &mut ParseState, _opts: Option<&Opts>) -> Result<()> {
+	// Oddities:
+	// - Some replays have no `metadata` (e.g. Fizzi's anonymized Ranked dataset).
+	// - Some replays have extra keys (e.g. Nintendont adds `notes`).
+	//   We don't currently handle these, which breaks round-tripping.
+	//
+	// Since we already read the opening "{", we know it's a map.
+	// `read_map` will consume the corresponding "}".
+	for (k, v) in ubjson::read_map(&mut r)? {
+		if k == "metadata" {
+			if let serde_json::Value::Object(metadata) = v {
+				info!("Metadata: {}", serde_json::to_string(&metadata)?);
+				state.game.metadata = Some(metadata.clone());
+			} else {
+				warn!("Expected metadata map, got: {:?}", v);
+			}
+		} else {
+			info!("Ignoring unknown key `{}`: {:?}", k, v);
+		}
+	}
 	Ok(())
 }
 
@@ -1021,16 +1024,7 @@ pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
 		);
 	}
 
-	// Some replays have no `metadata` (e.g. Fizzi's anonymized Ranked dataset),
-	// in which case the next char should be the final UBSJON `}`.
-	match r.read_u8()? {
-		0x55 => {
-			parse_metadata(r.by_ref(), &mut state, opts)?;
-			expect_bytes(&mut r, &[0x7d])?;
-		}
-		0x7d => {} // top-level closing brace ("}")
-		x => return Err(err!("expected: 0x55 or 0x7d, got: {:#02x}", x)),
-	};
+	read_trailer(r.by_ref(), &mut state, opts)?;
 
 	state.game.hash = r.into_digest();
 	Ok(Game::from(state.game))

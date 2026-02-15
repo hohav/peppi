@@ -895,7 +895,7 @@ fn round_trip() {
 		.into_iter()
 		.map(|e| e.unwrap())
 		.filter(|e| match e.file_name().to_str().unwrap() {
-			"unknown_event.slp" | "corrupt.slp" => false,
+			"unknown_event.slp" | "corrupt.slp" | "extra_data.slp" => false,
 			_ => true,
 		}) {
 		println!("{:?}", entry.file_name());

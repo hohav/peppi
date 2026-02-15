@@ -5,43 +5,87 @@ use serde_json::{Map, Value};
 
 use crate::io::Result;
 
-fn to_utf8<R: Read>(r: &mut R) -> Result<String> {
-	let length = r.read_u8()?;
+fn read_int<R: Read>(r: &mut R, marker: u8) -> Result<i64> {
+	return match marker {
+		0x55 => Ok(r.read_u8()? as i64),               // `U`
+		0x69 => Ok(r.read_i8()? as i64),               // `i`
+		0x49 => Ok(r.read_i16::<BigEndian>()? as i64), // `I`
+		0x6c => Ok(r.read_i32::<BigEndian>()? as i64), // `l`
+		0x4c => Ok(r.read_i64::<BigEndian>()?),        // `L`
+		c => Err(err!("expected integer string length, got: {:#02x}", c)),
+	};
+}
+
+fn read_utf8<R: Read>(r: &mut R, marker: u8) -> Result<String> {
+	let length = read_int(r, marker)?;
 	let mut buf = vec![0; length as usize];
 	r.read_exact(&mut buf)?;
 	Ok(String::from_utf8(buf)?)
 }
 
-fn to_val<R: Read>(r: &mut R) -> Result<Value> {
-	match r.read_u8()? {
+fn read_array<R: Read>(r: &mut R) -> Result<Vec<Value>> {
+	let mut values = vec![];
+	while match r.read_u8()? {
+		0x5d => false, // end of array (`]`)
+		0x24 => {
+			// optimized format (`$`)
+			let type_marker = r.read_u8()?;
+			let count_marker = r.read_u8()?;
+			if count_marker != 0x23 {
+				// `#`
+				return Err(err!("expected count (`#`), got: {}", count_marker));
+			}
+			let count_type_marker = r.read_u8()?;
+			let count = read_int(r, count_type_marker)?;
+			for _ in 0..count {
+				values.push(read_val(r, type_marker)?);
+			}
+			let end_marker = r.read_u8()?;
+			if end_marker != 0x5d {
+				// `]`
+				return Err(err!("expected end of array (`]`), got: {}", end_marker));
+			}
+			false
+		}
+		c => {
+			values.push(read_val(r, c)?);
+			true // continue
+		}
+	} {}
+	return Ok(values);
+}
+
+pub(crate) fn read_val<R: Read>(r: &mut R, marker: u8) -> Result<Value> {
+	match marker {
 		// "S": str
-		0x53 => match r.read_u8()? {
-			0x55 => Ok(Value::String(to_utf8(r)?)),
-			c => Err(err!("Expected 0x55 for string length, but got: {}", c)),
-		},
-		// "l": i32
-		0x6c => Ok(Value::Number(serde_json::Number::from(
-			r.read_i32::<BigEndian>()?,
-		))),
+		0x53 => {
+			let marker = r.read_u8()?;
+			Ok(Value::String(read_utf8(r, marker)?))
+		}
 		// "{": map
 		0x7b => Ok(Value::Object(read_map(r)?)),
-		c => Err(err!("unexpected UBJSON value type: {}", c)),
+		// number
+		0x55 | 0x69 | 0x49 | 0x6c | 0x4c => Ok(Value::Number(serde_json::Number::from(read_int(
+			r, marker,
+		)?))),
+		0x5b => Ok(Value::Array(read_array(r)?)),
+		_ => Err(err!("unexpected value type: {:#02x}", marker)),
 	}
 }
 
-fn to_key<R: Read>(r: &mut R) -> Result<Option<String>> {
+pub(crate) fn read_key<R: Read>(r: &mut R) -> Result<Option<String>> {
 	match r.read_u8()? {
-		0x55 => Ok(Some(to_utf8(r)?)),
 		0x7d => Ok(None),
-		c => Err(err!("unexpected UBJSON key type: {}", c)),
+		c => Ok(Some(read_utf8(r, c)?)),
 	}
 }
 
 pub(crate) fn read_map<R: Read>(r: &mut R) -> Result<Map<String, Value>> {
 	let mut m = Map::new();
-	while match to_key(r)? {
+	while match read_key(r)? {
 		Some(k) => {
-			m.insert(k, to_val(r)?);
+			let marker = r.read_u8()?;
+			m.insert(k, read_val(r, marker)?);
 			true
 		}
 		None => false,
