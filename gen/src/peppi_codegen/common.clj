@@ -17,6 +17,9 @@
    "f32" "Float32"
    "f64" "Float64"})
 
+(def primitive-types-suffixed
+  (update-vals primitive-types #(str % "Type")))
+
 (def types
   (-> primitive-types
       (update-vals #(str "DataType::" %))
@@ -124,6 +127,8 @@
 
 (defn emit-expr
   [m]
+  #_(binding [*out* *err*]
+	(println m))
   (cond
     (nil? m) ""
     (string? m) m
@@ -233,6 +238,12 @@
                 (mapv emit-expr)
                 (str/join ", "))
            (if unwrap "?" ""))))
+
+(defmethod emit-expr* :cast
+  [_ expr ty]
+  (format "%s as %s"
+		  (emit-expr expr)
+          (emit-type ty)))
 
 (defmethod emit-expr* :vec!
   [_ args]

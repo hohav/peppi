@@ -6,7 +6,7 @@ use std::{
 	path::PathBuf,
 };
 
-use arrow2::{array::MutableArray, offset::Offsets};
+use arrow::array::{ArrayBuilder, OffsetBufferBuilder};
 use byteorder::ReadBytesExt;
 use log::{debug, info, trace, warn};
 
@@ -74,16 +74,16 @@ pub struct PartialGame {
 	pub quirks: Option<Quirks>,
 }
 
-impl From<PartialGame> for Game {
-	fn from(game: PartialGame) -> Game {
+impl PartialGame {
+	fn finish(mut self) -> Game {
 		Game {
-			start: game.start,
-			end: game.end,
-			frames: game.frames.into(),
-			metadata: game.metadata,
-			gecko_codes: game.gecko_codes,
-			hash: game.hash,
-			quirks: game.quirks,
+			start: self.start,
+			end: self.end,
+			frames: self.frames.finish(),
+			metadata: self.metadata,
+			gecko_codes: self.gecko_codes,
+			hash: self.hash,
+			quirks: self.quirks,
 		}
 	}
 }
@@ -136,22 +136,22 @@ impl ParseState {
 	}
 
 	fn last_id(&self) -> Option<i32> {
-		self.game.frames.id.values().last().map(|id| *id)
+		self.game.frames.id.values_slice().last().map(|id| *id)
 	}
 
 	fn frame_open(&mut self, id: i32) {
-		self.game.frames.id.push(Some(id));
+		self.game.frames.id.append_value(id);
 	}
 
 	fn frame_close(&mut self) {
 		let len = self.game.frames.len();
 		for p in &mut self.game.frames.ports {
 			while p.leader.len() < len {
-				p.leader.push_null(self.game.start.slippi.version);
+				p.leader.append_null(self.game.start.slippi.version);
 			}
 			if let Some(f) = &mut p.follower {
 				while f.len() < len {
-					f.push_null(self.game.start.slippi.version);
+					f.append_null(self.game.start.slippi.version);
 				}
 			}
 		}
@@ -656,13 +656,12 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 	})
 }
 
-fn push_offset<T>(offsets: &mut Option<Offsets<i32>>, new_len: i32) {
-	let old_len = *offsets.as_ref().unwrap().last();
+fn push_offset<T>(offsets: &mut Option<OffsetBufferBuilder<i32>>, new_len: i32) {
+	let old_len = *offsets.as_ref().unwrap().last().unwrap();
 	offsets
 		.as_mut()
 		.unwrap()
-		.try_push(new_len.checked_sub(old_len).unwrap())
-		.unwrap();
+		.push_length(new_len.checked_sub(old_len).unwrap().try_into().unwrap());
 }
 
 /// Parses a single event from `r`.
@@ -733,7 +732,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 					.start
 					.as_mut()
 					.unwrap()
-					.read_push(r, state.game.start.slippi.version)?;
+					.read_append(r, state.game.start.slippi.version)?;
 			}
 			FramePre => {
 				let r = &mut &*buf;
@@ -759,24 +758,22 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 						.as_mut()
 						.unwrap()
 						.validity
-						.as_mut()
-						.map(|v| v.push(true));
+						.append_non_null();
 					state.game.frames.ports[port_index]
 						.follower
 						.as_mut()
 						.unwrap()
 						.pre
-						.read_push(r, state.game.start.slippi.version)?;
+						.read_append(r, state.game.start.slippi.version)?;
 				} else {
 					state.game.frames.ports[port_index]
 						.leader
 						.validity
-						.as_mut()
-						.map(|v| v.push(true));
+						.append_non_null();
 					state.game.frames.ports[port_index]
 						.leader
 						.pre
-						.read_push(r, state.game.start.slippi.version)?;
+						.read_append(r, state.game.start.slippi.version)?;
 				}
 			}
 			FramePost => {
@@ -792,11 +789,11 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 						.as_mut()
 						.unwrap()
 						.post
-						.read_push(r, state.game.start.slippi.version)?,
+						.read_append(r, state.game.start.slippi.version)?,
 					_ => state.game.frames.ports[state.port_indexes[port as usize]]
 						.leader
 						.post
-						.read_push(r, state.game.start.slippi.version)?,
+						.read_append(r, state.game.start.slippi.version)?,
 				};
 			}
 			FrameEnd => {
@@ -864,7 +861,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 					.end
 					.as_mut()
 					.unwrap()
-					.read_push(r, state.game.start.slippi.version)?;
+					.read_append(r, state.game.start.slippi.version)?;
 				state.frame_close();
 			}
 			Item => {
@@ -878,7 +875,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 					.item
 					.as_mut()
 					.unwrap()
-					.read_push(r, state.game.start.slippi.version)?;
+					.read_append(r, state.game.start.slippi.version)?;
 			}
 			FodPlatform => {
 				let r = &mut &*buf;
@@ -891,7 +888,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 					.fod_platform
 					.as_mut()
 					.unwrap()
-					.read_push(r, state.game.start.slippi.version)?;
+					.read_append(r, state.game.start.slippi.version)?;
 			}
 			DreamlandWhispy => {
 				let r = &mut &*buf;
@@ -904,7 +901,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 					.dreamland_whispy
 					.as_mut()
 					.unwrap()
-					.read_push(r, state.game.start.slippi.version)?;
+					.read_append(r, state.game.start.slippi.version)?;
 			}
 			StadiumTransformation => {
 				let r = &mut &*buf;
@@ -917,7 +914,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 					.stadium_transformation
 					.as_mut()
 					.unwrap()
-					.read_push(r, state.game.start.slippi.version)?;
+					.read_append(r, state.game.start.slippi.version)?;
 			}
 		};
 	}
@@ -1033,5 +1030,5 @@ pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
 	};
 
 	state.game.hash = r.into_digest();
-	Ok(Game::from(state.game))
+	Ok(state.game.finish())
 }

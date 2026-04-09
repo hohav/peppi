@@ -6,7 +6,7 @@
 //! [`crate::io::peppi::read`].
 //!
 //! These arrays can be shared, and cloning them is `O(1)`. See the
-//! [arrow2 docs](https://docs.rs/arrow2/latest/arrow2/array/index.html) for more.
+//! [arrow docs](https://docs.rs/arrow/latest/arrow/) for more.
 
 #![allow(unused_variables)]
 
@@ -15,20 +15,29 @@ mod slippi;
 
 use std::fmt;
 
-use arrow2::{array::PrimitiveArray, bitmap::Bitmap, buffer::Buffer, offset::OffsetsBuffer};
+use arrow::{
+	array::PrimitiveArray,
+	buffer::{NullBuffer, OffsetBuffer},
+	datatypes::{Float32Type, Int32Type, Int8Type, UInt16Type, UInt32Type, UInt8Type},
+};
 
 use crate::{
-	frame::{self, Rollbacks, mutable, transpose},
+	frame::{self, transpose, Rollbacks},
 	game::Port,
 	io::slippi::Version,
 };
+
+fn start_end(buf: &Option<OffsetBuffer<i32>>, i: usize) -> (usize, usize) {
+	let b = buf.as_ref().unwrap();
+	(b[i].try_into().unwrap(), b[i + 1].try_into().unwrap())
+}
 
 /// Frame data for a single character (ICs are two characters).
 #[derive(Debug)]
 pub struct Data {
 	pub pre: Pre,
 	pub post: Post,
-	pub validity: Option<Bitmap>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl Data {
@@ -36,16 +45,6 @@ impl Data {
 		transpose::Data {
 			pre: self.pre.transpose_one(i, version),
 			post: self.post.transpose_one(i, version),
-		}
-	}
-}
-
-impl From<mutable::Data> for Data {
-	fn from(d: mutable::Data) -> Self {
-		Self {
-			pre: d.pre.into(),
-			post: d.post.into(),
-			validity: d.validity.map(|v| v.into()),
 		}
 	}
 }
@@ -69,20 +68,10 @@ impl PortData {
 	}
 }
 
-impl From<mutable::PortData> for PortData {
-	fn from(p: mutable::PortData) -> Self {
-		Self {
-			port: p.port,
-			leader: p.leader.into(),
-			follower: p.follower.map(|f| f.into()),
-		}
-	}
-}
-
 /// All frame data for a single game, in struct-of-arrays format.
 pub struct Frame {
 	/// Frame IDs start at `-123` and increment each frame. May repeat in case of rollbacks
-	pub id: PrimitiveArray<i32>,
+	pub id: PrimitiveArray<Int32Type>,
 	/// Port-specific data
 	pub ports: Vec<PortData>,
 	/// Start-of-frame data
@@ -93,16 +82,16 @@ pub struct Frame {
 	/// Item data
 	pub item: Option<Item>,
 	/// Logically, each frame has its own array of items. But we represent all item data in a flat array, with this field indicating the start of each sub-array
-	pub item_offset: Option<OffsetsBuffer<i32>>,
+	pub item_offset: Option<OffsetBuffer<i32>>,
 
 	pub fod_platform: Option<FodPlatform>,
-	pub fod_platform_offset: Option<OffsetsBuffer<i32>>,
+	pub fod_platform_offset: Option<OffsetBuffer<i32>>,
 
 	pub dreamland_whispy: Option<DreamlandWhispy>,
-	pub dreamland_whispy_offset: Option<OffsetsBuffer<i32>>,
+	pub dreamland_whispy_offset: Option<OffsetBuffer<i32>>,
 
 	pub stadium_transformation: Option<StadiumTransformation>,
-	pub stadium_transformation_offset: Option<OffsetsBuffer<i32>>,
+	pub stadium_transformation_offset: Option<OffsetBuffer<i32>>,
 }
 
 impl Frame {
@@ -125,13 +114,13 @@ impl Frame {
 				.gte(3, 0)
 				.then(|| self.end.as_ref().unwrap().transpose_one(i, version)),
 			items: version.gte(3, 0).then(|| {
-				let (start, end) = self.item_offset.as_ref().unwrap().start_end(i);
+				let (start, end) = start_end(&self.item_offset, i);
 				(start..end)
 					.map(|i| self.item.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
 			fod_platforms: version.gte(3, 18).then(|| {
-				let (start, end) = self.fod_platform_offset.as_ref().unwrap().start_end(i);
+				let (start, end) = start_end(&self.fod_platform_offset, i);
 				(start..end)
 					.map(|i| {
 						self.fod_platform
@@ -142,7 +131,7 @@ impl Frame {
 					.collect()
 			}),
 			dreamland_whispys: version.gte(3, 18).then(|| {
-				let (start, end) = self.dreamland_whispy_offset.as_ref().unwrap().start_end(i);
+				let (start, end) = start_end(&self.dreamland_whispy_offset, i);
 				(start..end)
 					.map(|i| {
 						self.dreamland_whispy
@@ -153,11 +142,7 @@ impl Frame {
 					.collect()
 			}),
 			stadium_transformations: version.gte(3, 18).then(|| {
-				let (start, end) = self
-					.stadium_transformation_offset
-					.as_ref()
-					.unwrap()
-					.start_end(i);
+				let (start, end) = start_end(&self.stadium_transformation_offset, i);
 				(start..end)
 					.map(|i| {
 						self.stadium_transformation
@@ -176,14 +161,14 @@ impl Frame {
 	pub fn rollbacks(&self, keep: Rollbacks) -> Vec<bool> {
 		use Rollbacks::*;
 		match keep {
-			ExceptFirst => self.rollbacks_(self.id.values_iter().enumerate()),
-			ExceptLast => self.rollbacks_(self.id.values_iter().enumerate().rev()),
+			ExceptFirst => self.rollbacks_(self.id.values().iter().enumerate()),
+			ExceptLast => self.rollbacks_(self.id.values().iter().enumerate().rev()),
 		}
 	}
 
 	fn rollbacks_<'a>(&self, ids: impl Iterator<Item = (usize, &'a i32)>) -> Vec<bool> {
 		let mut result = vec![false; self.len()];
-		let unique_id_count = self.id.values_iter().max().map_or(0, |idx| {
+		let unique_id_count = self.id.values().iter().max().map_or(0, |idx| {
 			1 + usize::try_from(idx - frame::FIRST_INDEX).unwrap()
 		});
 		let mut seen = vec![false; unique_id_count];
@@ -200,33 +185,6 @@ impl Frame {
 	}
 }
 
-impl From<mutable::Frame> for Frame {
-	fn from(f: mutable::Frame) -> Self {
-		Self {
-			id: f.id.into(),
-			ports: f.ports.into_iter().map(|p| p.into()).collect(),
-			start: f.start.map(|x| x.into()),
-			end: f.end.map(|x| x.into()),
-			item: f.item.map(|x| x.into()),
-			item_offset: f
-				.item_offset
-				.map(|x| OffsetsBuffer::try_from(Buffer::from(x.into_inner())).unwrap()),
-			fod_platform: f.fod_platform.map(|x| x.into()),
-			fod_platform_offset: f
-				.fod_platform_offset
-				.map(|x| OffsetsBuffer::try_from(Buffer::from(x.into_inner())).unwrap()),
-			dreamland_whispy: f.dreamland_whispy.map(|x| x.into()),
-			dreamland_whispy_offset: f
-				.dreamland_whispy_offset
-				.map(|x| OffsetsBuffer::try_from(Buffer::from(x.into_inner())).unwrap()),
-			stadium_transformation: f.stadium_transformation.map(|x| x.into()),
-			stadium_transformation_offset: f
-				.stadium_transformation_offset
-				.map(|x| OffsetsBuffer::try_from(Buffer::from(x.into_inner())).unwrap()),
-		}
-	}
-}
-
 impl fmt::Debug for Frame {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
 		write!(f, "Frame {{ len: {} }}", self.id.len())
@@ -237,9 +195,9 @@ impl fmt::Debug for Frame {
 #[derive(Debug)]
 pub struct DreamlandWhispy {
 	/// Which direction Whispy is blowing (0 = None, 1 = Left, 2 = Right)
-	pub direction: PrimitiveArray<u8>,
+	pub direction: PrimitiveArray<UInt8Type>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
-	pub validity: Option<Bitmap>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl DreamlandWhispy {
@@ -250,22 +208,13 @@ impl DreamlandWhispy {
 	}
 }
 
-impl From<mutable::DreamlandWhispy> for DreamlandWhispy {
-	fn from(x: mutable::DreamlandWhispy) -> Self {
-		Self {
-			direction: x.direction.into(),
-			validity: x.validity.map(|v| v.into()),
-		}
-	}
-}
-
 /// Information about the end of the game.
 #[derive(Debug)]
 pub struct End {
 	/// *Added: v3.7* Index of the latest frame which is guaranteed not to happen again (rollback)
-	pub latest_finalized_frame: Option<PrimitiveArray<i32>>,
+	pub latest_finalized_frame: Option<PrimitiveArray<Int32Type>>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
-	pub validity: Option<Bitmap>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl End {
@@ -276,24 +225,15 @@ impl End {
 	}
 }
 
-impl From<mutable::End> for End {
-	fn from(x: mutable::End) -> Self {
-		Self {
-			latest_finalized_frame: x.latest_finalized_frame.map(|x| x.into()),
-			validity: x.validity.map(|v| v.into()),
-		}
-	}
-}
-
 /// This event only occurs on Fountain of Dreams, and is sent for each change in platform height. If both platforms are moving, there will be two events per frame.
 #[derive(Debug)]
 pub struct FodPlatform {
 	/// Which platform has moved. (0 = Right, 1 = Left)
-	pub platform: PrimitiveArray<u8>,
+	pub platform: PrimitiveArray<UInt8Type>,
 	/// The platform's new height
-	pub height: PrimitiveArray<f32>,
+	pub height: PrimitiveArray<Float32Type>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
-	pub validity: Option<Bitmap>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl FodPlatform {
@@ -305,43 +245,33 @@ impl FodPlatform {
 	}
 }
 
-impl From<mutable::FodPlatform> for FodPlatform {
-	fn from(x: mutable::FodPlatform) -> Self {
-		Self {
-			platform: x.platform.into(),
-			height: x.height.into(),
-			validity: x.validity.map(|v| v.into()),
-		}
-	}
-}
-
 /// An active item (includes projectiles).
 #[derive(Debug)]
 pub struct Item {
 	/// Item type
-	pub r#type: PrimitiveArray<u16>,
+	pub r#type: PrimitiveArray<UInt16Type>,
 	/// Item’s action state
-	pub state: PrimitiveArray<u8>,
+	pub state: PrimitiveArray<UInt8Type>,
 	/// Direction item is facing
-	pub direction: PrimitiveArray<f32>,
+	pub direction: PrimitiveArray<Float32Type>,
 	/// Item’s velocity
 	pub velocity: Velocity,
 	/// Item’s position
 	pub position: Position,
 	/// Amount of damage item has taken
-	pub damage: PrimitiveArray<u16>,
+	pub damage: PrimitiveArray<UInt16Type>,
 	/// Frames remaining until item expires
-	pub timer: PrimitiveArray<f32>,
+	pub timer: PrimitiveArray<Float32Type>,
 	/// Unique, serial ID per item spawned
-	pub id: PrimitiveArray<u32>,
+	pub id: PrimitiveArray<UInt32Type>,
 	/// *Added: v3.2* Miscellaneous item state
 	pub misc: Option<ItemMisc>,
 	/// *Added: v3.6* Port that owns the item (-1 when unowned)
-	pub owner: Option<PrimitiveArray<i8>>,
+	pub owner: Option<PrimitiveArray<Int8Type>>,
 	/// *Added: v3.16* Inherited instance ID of the owner (0 when unowned)
-	pub instance_id: Option<PrimitiveArray<u16>>,
+	pub instance_id: Option<PrimitiveArray<UInt16Type>>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
-	pub validity: Option<Bitmap>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl Item {
@@ -362,32 +292,13 @@ impl Item {
 	}
 }
 
-impl From<mutable::Item> for Item {
-	fn from(x: mutable::Item) -> Self {
-		Self {
-			r#type: x.r#type.into(),
-			state: x.state.into(),
-			direction: x.direction.into(),
-			velocity: x.velocity.into(),
-			position: x.position.into(),
-			damage: x.damage.into(),
-			timer: x.timer.into(),
-			id: x.id.into(),
-			misc: x.misc.map(|x| x.into()),
-			owner: x.owner.map(|x| x.into()),
-			instance_id: x.instance_id.map(|x| x.into()),
-			validity: x.validity.map(|v| v.into()),
-		}
-	}
-}
-
 /// Miscellaneous item state.
 #[derive(Debug)]
 pub struct ItemMisc(
-	pub PrimitiveArray<u8>,
-	pub PrimitiveArray<u8>,
-	pub PrimitiveArray<u8>,
-	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<UInt8Type>,
+	pub PrimitiveArray<UInt8Type>,
+	pub PrimitiveArray<UInt8Type>,
+	pub PrimitiveArray<UInt8Type>,
 );
 
 impl ItemMisc {
@@ -401,19 +312,13 @@ impl ItemMisc {
 	}
 }
 
-impl From<mutable::ItemMisc> for ItemMisc {
-	fn from(x: mutable::ItemMisc) -> Self {
-		Self(x.0.into(), x.1.into(), x.2.into(), x.3.into())
-	}
-}
-
 /// 2D position.
 #[derive(Debug)]
 pub struct Position {
-	pub x: PrimitiveArray<f32>,
-	pub y: PrimitiveArray<f32>,
+	pub x: PrimitiveArray<Float32Type>,
+	pub y: PrimitiveArray<Float32Type>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
-	pub validity: Option<Bitmap>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl Position {
@@ -425,69 +330,59 @@ impl Position {
 	}
 }
 
-impl From<mutable::Position> for Position {
-	fn from(x: mutable::Position) -> Self {
-		Self {
-			x: x.x.into(),
-			y: x.y.into(),
-			validity: x.validity.map(|v| v.into()),
-		}
-	}
-}
-
 /// Post-frame update data, for making decisions about game states (such as computing stats).
 ///
 /// Information is collected at the end of collision detection, which is the last consideration of the game engine.
 #[derive(Debug)]
 pub struct Post {
 	/// In-game character (can only change for Zelda/Sheik)
-	pub character: PrimitiveArray<u8>,
+	pub character: PrimitiveArray<UInt8Type>,
 	/// Character’s action state
-	pub state: PrimitiveArray<u16>,
+	pub state: PrimitiveArray<UInt16Type>,
 	/// Character’s position
 	pub position: Position,
 	/// Direction the character is facing
-	pub direction: PrimitiveArray<f32>,
+	pub direction: PrimitiveArray<Float32Type>,
 	/// Damage taken (percent)
-	pub percent: PrimitiveArray<f32>,
+	pub percent: PrimitiveArray<Float32Type>,
 	/// Size/health of shield
-	pub shield: PrimitiveArray<f32>,
+	pub shield: PrimitiveArray<Float32Type>,
 	/// Last attack ID that this character landed
-	pub last_attack_landed: PrimitiveArray<u8>,
+	pub last_attack_landed: PrimitiveArray<UInt8Type>,
 	/// Combo count (as defined by the game)
-	pub combo_count: PrimitiveArray<u8>,
+	pub combo_count: PrimitiveArray<UInt8Type>,
 	/// Port that last hit this player. Bugged in Melee: will be set to `6` in certain situations
-	pub last_hit_by: PrimitiveArray<u8>,
+	pub last_hit_by: PrimitiveArray<UInt8Type>,
 	/// Number of stocks remaining
-	pub stocks: PrimitiveArray<u8>,
+	pub stocks: PrimitiveArray<UInt8Type>,
 	/// *Added: v0.2* Number of frames action state has been active. Can have a fractional component
-	pub state_age: Option<PrimitiveArray<f32>>,
+	pub state_age: Option<PrimitiveArray<Float32Type>>,
 	/// *Added: v2.0* State flags
 	pub state_flags: Option<StateFlags>,
 	/// *Added: v2.0* Used for different things. While in hitstun, contains hitstun frames remaining
-	pub misc_as: Option<PrimitiveArray<f32>>,
+	pub misc_as: Option<PrimitiveArray<Float32Type>>,
 	/// *Added: v2.0* Is the character airborne?
-	pub airborne: Option<PrimitiveArray<u8>>,
+	pub airborne: Option<PrimitiveArray<UInt8Type>>,
 	/// *Added: v2.0* Ground ID the character last touched
-	pub ground: Option<PrimitiveArray<u16>>,
+	pub ground: Option<PrimitiveArray<UInt16Type>>,
 	/// *Added: v2.0* Number of jumps remaining
-	pub jumps: Option<PrimitiveArray<u8>>,
+	pub jumps: Option<PrimitiveArray<UInt8Type>>,
 	/// *Added: v2.0* L-cancel status (0 = none, 1 = successful, 2 = unsuccessful)
-	pub l_cancel: Option<PrimitiveArray<u8>>,
+	pub l_cancel: Option<PrimitiveArray<UInt8Type>>,
 	/// *Added: v2.1* Hurtbox state (0 = vulnerable, 1 = invulnerable, 2 = intangible)
-	pub hurtbox_state: Option<PrimitiveArray<u8>>,
+	pub hurtbox_state: Option<PrimitiveArray<UInt8Type>>,
 	/// *Added: v3.5* Self-induced and knockback velocities
 	pub velocities: Option<Velocities>,
 	/// *Added: v3.8* Hitlag frames remaining
-	pub hitlag: Option<PrimitiveArray<f32>>,
+	pub hitlag: Option<PrimitiveArray<Float32Type>>,
 	/// *Added: v3.11* Animation the character is in
-	pub animation_index: Option<PrimitiveArray<u32>>,
+	pub animation_index: Option<PrimitiveArray<UInt32Type>>,
 	/// *Added: v3.16* Instance ID of the player/item that last hit this player
-	pub last_hit_by_instance: Option<PrimitiveArray<u16>>,
+	pub last_hit_by_instance: Option<PrimitiveArray<UInt16Type>>,
 	/// *Added: v3.16* Unique, serial ID for each new action state across all characters. Resets to 0 on death
-	pub instance_id: Option<PrimitiveArray<u16>>,
+	pub instance_id: Option<PrimitiveArray<UInt16Type>>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
-	pub validity: Option<Bitmap>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl Post {
@@ -526,74 +421,43 @@ impl Post {
 	}
 }
 
-impl From<mutable::Post> for Post {
-	fn from(x: mutable::Post) -> Self {
-		Self {
-			character: x.character.into(),
-			state: x.state.into(),
-			position: x.position.into(),
-			direction: x.direction.into(),
-			percent: x.percent.into(),
-			shield: x.shield.into(),
-			last_attack_landed: x.last_attack_landed.into(),
-			combo_count: x.combo_count.into(),
-			last_hit_by: x.last_hit_by.into(),
-			stocks: x.stocks.into(),
-			state_age: x.state_age.map(|x| x.into()),
-			state_flags: x.state_flags.map(|x| x.into()),
-			misc_as: x.misc_as.map(|x| x.into()),
-			airborne: x.airborne.map(|x| x.into()),
-			ground: x.ground.map(|x| x.into()),
-			jumps: x.jumps.map(|x| x.into()),
-			l_cancel: x.l_cancel.map(|x| x.into()),
-			hurtbox_state: x.hurtbox_state.map(|x| x.into()),
-			velocities: x.velocities.map(|x| x.into()),
-			hitlag: x.hitlag.map(|x| x.into()),
-			animation_index: x.animation_index.map(|x| x.into()),
-			last_hit_by_instance: x.last_hit_by_instance.map(|x| x.into()),
-			instance_id: x.instance_id.map(|x| x.into()),
-			validity: x.validity.map(|v| v.into()),
-		}
-	}
-}
-
 /// Pre-frame update data, required to reconstruct a replay.
 ///
 /// Information is collected right before controller inputs are used to figure out the character’s next action.
 #[derive(Debug)]
 pub struct Pre {
 	/// Random seed
-	pub random_seed: PrimitiveArray<u32>,
+	pub random_seed: PrimitiveArray<UInt32Type>,
 	/// Character’s action state
-	pub state: PrimitiveArray<u16>,
+	pub state: PrimitiveArray<UInt16Type>,
 	/// Character’s position
 	pub position: Position,
 	/// Direction the character is facing
-	pub direction: PrimitiveArray<f32>,
+	pub direction: PrimitiveArray<Float32Type>,
 	/// Processed analog joystick position
 	pub joystick: Position,
 	/// Processed analog c-stick position
 	pub cstick: Position,
 	/// Processed analog trigger position
-	pub triggers: PrimitiveArray<f32>,
+	pub triggers: PrimitiveArray<Float32Type>,
 	/// Processed button-state bitmask
-	pub buttons: PrimitiveArray<u32>,
+	pub buttons: PrimitiveArray<UInt32Type>,
 	/// Physical button-state bitmask
-	pub buttons_physical: PrimitiveArray<u16>,
+	pub buttons_physical: PrimitiveArray<UInt16Type>,
 	/// Physical analog trigger positions (useful for IPM)
 	pub triggers_physical: TriggersPhysical,
 	/// *Added: v1.2* Raw joystick x-position
-	pub raw_analog_x: Option<PrimitiveArray<i8>>,
+	pub raw_analog_x: Option<PrimitiveArray<Int8Type>>,
 	/// *Added: v1.4* Damage taken (percent)
-	pub percent: Option<PrimitiveArray<f32>>,
+	pub percent: Option<PrimitiveArray<Float32Type>>,
 	/// *Added: v3.15* Raw joystick y-position
-	pub raw_analog_y: Option<PrimitiveArray<i8>>,
+	pub raw_analog_y: Option<PrimitiveArray<Int8Type>>,
 	/// *Added: v3.17* Raw c-stick x-position
-	pub raw_analog_cstick_x: Option<PrimitiveArray<i8>>,
+	pub raw_analog_cstick_x: Option<PrimitiveArray<Int8Type>>,
 	/// *Added: v3.17* Raw c-stick y-position
-	pub raw_analog_cstick_y: Option<PrimitiveArray<i8>>,
+	pub raw_analog_cstick_y: Option<PrimitiveArray<Int8Type>>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
-	pub validity: Option<Bitmap>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl Pre {
@@ -618,38 +482,15 @@ impl Pre {
 	}
 }
 
-impl From<mutable::Pre> for Pre {
-	fn from(x: mutable::Pre) -> Self {
-		Self {
-			random_seed: x.random_seed.into(),
-			state: x.state.into(),
-			position: x.position.into(),
-			direction: x.direction.into(),
-			joystick: x.joystick.into(),
-			cstick: x.cstick.into(),
-			triggers: x.triggers.into(),
-			buttons: x.buttons.into(),
-			buttons_physical: x.buttons_physical.into(),
-			triggers_physical: x.triggers_physical.into(),
-			raw_analog_x: x.raw_analog_x.map(|x| x.into()),
-			percent: x.percent.map(|x| x.into()),
-			raw_analog_y: x.raw_analog_y.map(|x| x.into()),
-			raw_analog_cstick_x: x.raw_analog_cstick_x.map(|x| x.into()),
-			raw_analog_cstick_y: x.raw_analog_cstick_y.map(|x| x.into()),
-			validity: x.validity.map(|v| v.into()),
-		}
-	}
-}
-
 /// This event only occurs on Pokemon Stadium, and is sent whenever the transformation event or transformation type changes.
 #[derive(Debug)]
 pub struct StadiumTransformation {
 	/// The subevent for each transformation. (2 = Initialize, 3 = On monitor, 4 = Previous transformation receding, 5 = New transformation rising, 6 = Finalize, 0 = Finished)
-	pub event: PrimitiveArray<u16>,
+	pub event: PrimitiveArray<UInt16Type>,
 	/// The current or upcoming transformation. (3 = Fire, 4 = Grass, 5 = Normal, 6 = Rock, 9 = Water)
-	pub r#type: PrimitiveArray<u16>,
+	pub r#type: PrimitiveArray<UInt16Type>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
-	pub validity: Option<Bitmap>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl StadiumTransformation {
@@ -661,25 +502,15 @@ impl StadiumTransformation {
 	}
 }
 
-impl From<mutable::StadiumTransformation> for StadiumTransformation {
-	fn from(x: mutable::StadiumTransformation) -> Self {
-		Self {
-			event: x.event.into(),
-			r#type: x.r#type.into(),
-			validity: x.validity.map(|v| v.into()),
-		}
-	}
-}
-
 /// Initialization data such as game mode, settings, characters & stage.
 #[derive(Debug)]
 pub struct Start {
 	/// Random seed
-	pub random_seed: PrimitiveArray<u32>,
+	pub random_seed: PrimitiveArray<UInt32Type>,
 	/// *Added: v3.10* Scene frame counter. Starts at 0, and increments every frame (even when paused)
-	pub scene_frame_counter: Option<PrimitiveArray<u32>>,
+	pub scene_frame_counter: Option<PrimitiveArray<UInt32Type>>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
-	pub validity: Option<Bitmap>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl Start {
@@ -691,24 +522,14 @@ impl Start {
 	}
 }
 
-impl From<mutable::Start> for Start {
-	fn from(x: mutable::Start) -> Self {
-		Self {
-			random_seed: x.random_seed.into(),
-			scene_frame_counter: x.scene_frame_counter.map(|x| x.into()),
-			validity: x.validity.map(|v| v.into()),
-		}
-	}
-}
-
 /// Miscellaneous state flags.
 #[derive(Debug)]
 pub struct StateFlags(
-	pub PrimitiveArray<u8>,
-	pub PrimitiveArray<u8>,
-	pub PrimitiveArray<u8>,
-	pub PrimitiveArray<u8>,
-	pub PrimitiveArray<u8>,
+	pub PrimitiveArray<UInt8Type>,
+	pub PrimitiveArray<UInt8Type>,
+	pub PrimitiveArray<UInt8Type>,
+	pub PrimitiveArray<UInt8Type>,
+	pub PrimitiveArray<UInt8Type>,
 );
 
 impl StateFlags {
@@ -723,19 +544,13 @@ impl StateFlags {
 	}
 }
 
-impl From<mutable::StateFlags> for StateFlags {
-	fn from(x: mutable::StateFlags) -> Self {
-		Self(x.0.into(), x.1.into(), x.2.into(), x.3.into(), x.4.into())
-	}
-}
-
 /// Trigger state.
 #[derive(Debug)]
 pub struct TriggersPhysical {
-	pub l: PrimitiveArray<f32>,
-	pub r: PrimitiveArray<f32>,
+	pub l: PrimitiveArray<Float32Type>,
+	pub r: PrimitiveArray<Float32Type>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
-	pub validity: Option<Bitmap>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl TriggersPhysical {
@@ -747,31 +562,21 @@ impl TriggersPhysical {
 	}
 }
 
-impl From<mutable::TriggersPhysical> for TriggersPhysical {
-	fn from(x: mutable::TriggersPhysical) -> Self {
-		Self {
-			l: x.l.into(),
-			r: x.r.into(),
-			validity: x.validity.map(|v| v.into()),
-		}
-	}
-}
-
 /// Self-induced and knockback velocities.
 #[derive(Debug)]
 pub struct Velocities {
 	/// Self-induced x-velocity (airborne)
-	pub self_x_air: PrimitiveArray<f32>,
+	pub self_x_air: PrimitiveArray<Float32Type>,
 	/// Self-induced y-velocity
-	pub self_y: PrimitiveArray<f32>,
+	pub self_y: PrimitiveArray<Float32Type>,
 	/// Knockback-induced x-velocity
-	pub knockback_x: PrimitiveArray<f32>,
+	pub knockback_x: PrimitiveArray<Float32Type>,
 	/// Knockback-induced y-velocity
-	pub knockback_y: PrimitiveArray<f32>,
+	pub knockback_y: PrimitiveArray<Float32Type>,
 	/// Self-induced x-velocity (grounded)
-	pub self_x_ground: PrimitiveArray<f32>,
+	pub self_x_ground: PrimitiveArray<Float32Type>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
-	pub validity: Option<Bitmap>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl Velocities {
@@ -786,26 +591,13 @@ impl Velocities {
 	}
 }
 
-impl From<mutable::Velocities> for Velocities {
-	fn from(x: mutable::Velocities) -> Self {
-		Self {
-			self_x_air: x.self_x_air.into(),
-			self_y: x.self_y.into(),
-			knockback_x: x.knockback_x.into(),
-			knockback_y: x.knockback_y.into(),
-			self_x_ground: x.self_x_ground.into(),
-			validity: x.validity.map(|v| v.into()),
-		}
-	}
-}
-
 /// 2D velocity.
 #[derive(Debug)]
 pub struct Velocity {
-	pub x: PrimitiveArray<f32>,
-	pub y: PrimitiveArray<f32>,
+	pub x: PrimitiveArray<Float32Type>,
+	pub y: PrimitiveArray<Float32Type>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
-	pub validity: Option<Bitmap>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl Velocity {
@@ -813,16 +605,6 @@ impl Velocity {
 		transpose::Velocity {
 			x: self.x.values()[i],
 			y: self.y.values()[i],
-		}
-	}
-}
-
-impl From<mutable::Velocity> for Velocity {
-	fn from(x: mutable::Velocity) -> Self {
-		Self {
-			x: x.x.into(),
-			y: x.y.into(),
-			validity: x.validity.map(|v| v.into()),
 		}
 	}
 }

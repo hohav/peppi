@@ -17,11 +17,11 @@
     (types ty [:fn-call ty "data_type" ["version"]])
     "false"]])
 
-(defn data-type-fn
+(defn fields-fn
   [fields]
   [:fn
-   {:ret "DataType"}
-   "data_type"
+   {:ret "Fields"}
+   "fields"
    [["version" "Version"]]
    [:block
     [:let
@@ -36,29 +36,18 @@
              "push"
              [(arrow-field f)]]))
          (into [:block]))
-    [:struct-init
-     (list "DataType" "Struct")
-     [[nil "fields"]]]]])
+    [:fn-call "Fields" "from" ["fields"]]]])
 
 (defn arrow-values
   [{nm :name, ty :type, idx :index, ver :version}]
   (let [target (cond-> [:field-get "self" (or nm idx)]
-                 ver (#(vector :method-call % "unwrap")))]
-    (if (types ty)
-      [:method-call
-       target
-       "boxed"]
-      [:method-call
-       [:method-call target "into_struct_array" ["version"]]
-       "boxed"
-       []])))
+                 ver (#(vector :method-call % "unwrap"))
+				 (not (types ty)) (#(vector :method-call % "into_struct_array" ["version"])))]
+	[:cast [:fn-call "Arc" "new" [target]] "ArrayRef"]))
 
 (defn push-call
   [field]
-  [:method-call
-   "values"
-   "push"
-   [(arrow-values field)]])
+  [:method-call "values" "push" [(arrow-values field)]])
 
 (defn into-struct-array-fn
   [fields]
@@ -66,7 +55,7 @@
         struct-init [:fn-call
                      "StructArray"
                      "new"
-                     [[:fn-call "Self" "data_type" ["version"]]
+                     [[:fn-call "Self" "fields" ["version"]]
                       "values"
                       (if (named? fields) "self.validity" "None")]]]
     [:fn
@@ -99,7 +88,7 @@
         ver-target (if ver "x" target)
         body (cond
                (primitive-types ty)
-               (downcast-clone ver-target ["PrimitiveArray" ty])
+               (downcast-clone ver-target ["PrimitiveArray" (primitive-types-suffixed ty)])
 
                (nil? ty)
                (downcast-clone ver-target "NullArray")
@@ -123,7 +112,7 @@
    [:block
     [:let
      ["_" "values" "validity"]
-     [:method-call "array" "into_data"]]
+     [:method-call "array" "into_parts"]]
      [:struct-init
       "Self"
       (cond->> (mapv (juxt :name from-struct-array) fields)
@@ -134,7 +123,7 @@
   [:impl
    {:for nm}
    "StructArrayConvertible"
-   [(data-type-fn fields)
+   [(fields-fn fields)
     (into-struct-array-fn fields)
     (from-struct-array-fn fields)]])
 
