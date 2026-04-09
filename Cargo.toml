@@ -32,6 +32,7 @@ ssbm-data = "0.1"
 [lib]
 name = "peppi"
 path = "src/lib.rs"
+bench = false
 
 [[bench]]
 name = "criterion"
