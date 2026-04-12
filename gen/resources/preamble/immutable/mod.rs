@@ -13,21 +13,17 @@ mod slippi;
 
 use std::fmt;
 
-use arrow::{
-	array::PrimitiveArray,
-	buffer::{NullBuffer, OffsetBuffer},
-	datatypes::{Float32Type, Int8Type, Int32Type, UInt8Type, UInt16Type, UInt32Type},
-};
+use arrow::buffer::{NullBuffer, OffsetBuffer};
 
 use crate::{
-	io::slippi::Version,
 	frame::{self, transpose, Rollbacks},
 	game::Port,
+	io::slippi::Version,
 };
 
 fn start_end(buf: &Option<OffsetBuffer<i32>>, i: usize) -> (usize, usize) {
 	let b = buf.as_ref().unwrap();
-	(b[i].try_into().unwrap(), b[i+1].try_into().unwrap())
+	(b[i].try_into().unwrap(), b[i + 1].try_into().unwrap())
 }
 
 /// Frame data for a single character (ICs are two characters).
@@ -39,11 +35,14 @@ pub struct Data {
 }
 
 impl Data {
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Data {
-		transpose::Data {
-			pre: self.pre.transpose_one(i, version),
-			post: self.post.transpose_one(i, version),
-		}
+	pub fn transpose_one(&self, i: usize, version: Version) -> Option<transpose::Data> {
+		self.validity
+			.as_ref()
+			.map_or(true, |v| v.is_valid(i))
+			.then(|| transpose::Data {
+				pre: self.pre.transpose_one(i, version),
+				post: self.post.transpose_one(i, version),
+			})
 	}
 }
 
@@ -54,22 +53,29 @@ pub struct PortData {
 	pub leader: Data,
 	/// The "backup" ICs character
 	pub follower: Option<Data>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl PortData {
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::PortData {
-		transpose::PortData {
-			port: self.port,
-			leader: self.leader.transpose_one(i, version),
-			follower: self.follower.as_ref().map(|f| f.transpose_one(i, version)),
-		}
+	pub fn transpose_one(&self, i: usize, version: Version) -> Option<transpose::PortData> {
+		self.validity
+			.as_ref()
+			.map_or(true, |v| v.is_valid(i))
+			.then(|| transpose::PortData {
+				port: self.port,
+				leader: self.leader.transpose_one(i, version).unwrap(),
+				follower: self
+					.follower
+					.as_ref()
+					.and_then(|f| f.transpose_one(i, version)),
+			})
 	}
 }
 
 /// All frame data for a single game, in struct-of-arrays format.
 pub struct Frame {
 	/// Frame IDs start at `-123` and increment each frame. May repeat in case of rollbacks
-	pub id: PrimitiveArray<Int32Type>,
+	pub id: Vec<i32>,
 	/// Port-specific data
 	pub ports: Vec<PortData>,
 	/// Start-of-frame data
@@ -99,14 +105,18 @@ impl Frame {
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Frame {
 		transpose::Frame {
-			id: self.id.values()[i],
-			ports: self.ports.iter().map(|p| p.transpose_one(i, version)).collect(),
-			start: version.gte(2, 2).then(||
-				self.start.as_ref().unwrap().transpose_one(i, version),
-			),
-			end: version.gte(3, 0).then(||
-				self.end.as_ref().unwrap().transpose_one(i, version),
-			),
+			id: self.id[i],
+			ports: self
+				.ports
+				.iter()
+				.map(|p| p.transpose_one(i, version))
+				.collect(),
+			start: version
+				.gte(2, 2)
+				.then(|| self.start.as_ref().unwrap().transpose_one(i, version)),
+			end: version
+				.gte(3, 0)
+				.then(|| self.end.as_ref().unwrap().transpose_one(i, version)),
 			items: version.gte(3, 0).then(|| {
 				let (start, end) = start_end(&self.item_offset, i);
 				(start..end)
@@ -116,19 +126,34 @@ impl Frame {
 			fod_platforms: version.gte(3, 18).then(|| {
 				let (start, end) = start_end(&self.fod_platform_offset, i);
 				(start..end)
-					.map(|i| self.fod_platform.as_ref().unwrap().transpose_one(i, version))
+					.map(|i| {
+						self.fod_platform
+							.as_ref()
+							.unwrap()
+							.transpose_one(i, version)
+					})
 					.collect()
 			}),
 			dreamland_whispys: version.gte(3, 18).then(|| {
 				let (start, end) = start_end(&self.dreamland_whispy_offset, i);
 				(start..end)
-					.map(|i| self.dreamland_whispy.as_ref().unwrap().transpose_one(i, version))
+					.map(|i| {
+						self.dreamland_whispy
+							.as_ref()
+							.unwrap()
+							.transpose_one(i, version)
+					})
 					.collect()
 			}),
 			stadium_transformations: version.gte(3, 18).then(|| {
 				let (start, end) = start_end(&self.stadium_transformation_offset, i);
 				(start..end)
-					.map(|i| self.stadium_transformation.as_ref().unwrap().transpose_one(i, version))
+					.map(|i| {
+						self.stadium_transformation
+							.as_ref()
+							.unwrap()
+							.transpose_one(i, version)
+					})
 					.collect()
 			}),
 		}
@@ -140,14 +165,14 @@ impl Frame {
 	pub fn rollbacks(&self, keep: Rollbacks) -> Vec<bool> {
 		use Rollbacks::*;
 		match keep {
-			ExceptFirst => self.rollbacks_(self.id.values().iter().enumerate()),
-			ExceptLast => self.rollbacks_(self.id.values().iter().enumerate().rev()),
+			ExceptFirst => self.rollbacks_(self.id.iter().enumerate()),
+			ExceptLast => self.rollbacks_(self.id.iter().enumerate().rev()),
 		}
 	}
 
 	fn rollbacks_<'a>(&self, ids: impl Iterator<Item = (usize, &'a i32)>) -> Vec<bool> {
 		let mut result = vec![false; self.len()];
-		let unique_id_count = self.id.values().iter().max().map_or(0, |idx| {
+		let unique_id_count = self.id.iter().max().map_or(0, |idx| {
 			1 + usize::try_from(idx - frame::FIRST_INDEX).unwrap()
 		});
 		let mut seen = vec![false; unique_id_count];

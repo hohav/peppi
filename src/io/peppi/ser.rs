@@ -5,10 +5,7 @@ use arrow::{
 	datatypes::{DataType, Field, Schema},
 };
 use arrow_ipc::{
-	r#gen::{
-		Schema::MetadataVersion,
-		Message::CompressionType,
-	},
+	r#gen::{Message::CompressionType, Schema::MetadataVersion},
 	writer::{FileWriter, IpcWriteOptions},
 };
 
@@ -77,7 +74,9 @@ pub fn write<W: Write>(w: W, game: Game, opts: Option<&Opts>) -> Result<(), Box<
 
 	if game.frames.id.len() > 0 {
 		let ports = port_occupancy(&game.start);
-		let frames = game.frames.into_struct_array(game.start.slippi.version, &ports);
+		let frames = game
+			.frames
+			.into_struct_array(game.start.slippi.version, &ports);
 		let schema = Schema::new(vec![Field::new(
 			"frame",
 			DataType::Struct(frames.fields().clone()),
@@ -89,10 +88,12 @@ pub fn write<W: Write>(w: W, game: Game, opts: Option<&Opts>) -> Result<(), Box<
 			&mut buf,
 			&schema,
 			IpcWriteOptions::try_new(8, false, MetadataVersion::V5)?
-				.try_with_compression(opts.and_then(|o| o.compression)
-			)?,
+				.try_with_compression(opts.and_then(|o| o.compression))?,
 		)?;
-		writer.write(&RecordBatch::try_new(Arc::new(schema), vec![Arc::new(frames)])?)?;
+		writer.write(&RecordBatch::try_new(
+			Arc::new(schema),
+			vec![Arc::new(frames)],
+		)?)?;
 		writer.finish()?;
 		tar_append(&mut tar, &buf, "frames.arrow")?;
 	}

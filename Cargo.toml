@@ -24,6 +24,7 @@ thiserror = "2.0"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 
 [dev-dependencies]
+arrow-json = "58"
 criterion = "0.8"
 iai-callgrind = "0.16"
 pretty_assertions = "1.3"

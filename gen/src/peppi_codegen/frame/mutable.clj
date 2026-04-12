@@ -11,7 +11,7 @@
 (defn array-type
   [ty]
   (cond
-    (primitive-types ty) ["PrimitiveBuilder" (primitive-types-suffixed ty)]
+    (primitive-types ty) ["Vec" ty]
     (nil? ty)            (throw (ex-info "MutableNullArray" {}))
     :else                ty))
 
@@ -29,17 +29,10 @@
    "with_capacity"
    ["capacity" "version"]])
 
-#_(defn with-capacity-null
-  []
-  [:fn-call
-   "MutableNullArray"
-   "new"
-   ["DataType::Null" 0]])
-
 (defn with-capacity
   [{ty :type, ver :version :as m}]
   (let [expr (cond
-               (primitive-types ty) (-> ty array-type with-capacity-arrow)
+               (primitive-types ty) [:fn-call "Vec" "with_capacity" ["capacity"]]
                ty                   (with-capacity-custom ty)
                :else                (throw (ex-info "with-capacity-null" {})))]
     (if ver
@@ -64,44 +57,39 @@
        (cond->> (mapv (juxt :name with-capacity) fields)
          (named? fields) (append ["validity" null-buffer-init]))]]]))
 
-(defn append-null-primitive
-  [target]
-  [:method-call target "append_null"])
+(defn append-default-primitive
+  [target ty]
+  [:method-call target "push" [(zero ty)]])
 
-(defn append-null-composite
+(defn append-default-composite
   [target]
-  [:method-call target "append_null" ["version"]])
+  [:method-call target "append_default" ["version"]])
 
-(defn append-null-null
+(defn append-default-null
   [target]
-  [:method-call target "append_null"])
+  [:method-call target "append_empty_value"])
 
-(defn append-null
+(defn append-default
   [{nm :name, ty :type, ver :version, idx :index}]
   (let [target (cond-> [:field-get "self" (or nm idx)]
                  ver ((comp unwrap as-mut)))]
     (cond
-      (types ty) (append-null-primitive target)
-      ty         (append-null-composite target)
-      :else      (append-null-null target))))
+      (types ty) (append-default-primitive target ty)
+      ty         (append-default-composite target)
+      :else      (append-default-null target))))
 
-(defn append-null-fn
+(defn append-default-fn
   [fields]
   [:fn
    {:visibility "pub"}
-   "append_null"
+   "append_default"
    [["&mut self"]
     ["version" "Version"]]
    (cond-> [:block]
      (named? fields) (into [[:method-call
                              [:field-get "self" "validity"]
-                             "append_n_non_nulls"
-                             [[:method-call "self" "len"]]]
-                            [:method-call
-                             [:field-get "self" "validity"]
-                             "append_null"]])
-     true (into (nested-version-ifs append-null fields)))])
-
+                             "append_non_null"]])
+     true (into (nested-version-ifs append-default fields)))])
 
 (defn read-append-primitive
   [target ty]
@@ -116,7 +104,7 @@
      [["x"]]
      [[:method-call
        target
-       "append_value"
+       "push"
        ["x"]]]]]])
 
 (defn read-append-composite
@@ -129,7 +117,7 @@
 
 (defn read-append-null
   [target]
-  [:method-call target "append_null"])
+  [:method-call target "append_empty_value"])
 
 (defn read-append
   [{nm :name, ty :type, ver :version, idx :index}]
@@ -168,9 +156,11 @@
 (defn finish
   [{idx :index, nm :name, ver :version, ty :type}]
   (let [target [:field-get "self" (or nm idx)]]
-    (if ver
-      (wrap-map (as-mut target) "x" [:method-call "x" "finish"])
-      [:method-call target "finish"])))
+	(if (primitive-types ty)
+	  [:fn-call "mem" "take" [[:ref {:mut true} target]]]
+      (if ver
+        (wrap-map (as-mut target) "x" [:method-call "x" "finish"])
+        [:method-call target "finish"]))))
 
 (defn finish-fn
   [nm fields]
@@ -228,7 +218,7 @@
   [[nm {:keys [fields]}]]
   [:impl nm [(with-capacity-fn fields)
              (len-fn fields)
-             (append-null-fn fields)
+             (append-default-fn fields)
              (read-append-fn fields)
 			 (finish-fn nm fields)
              (immutable/transpose-one-fn nm fields "values_slice")]])

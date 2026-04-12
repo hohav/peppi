@@ -6,8 +6,8 @@
 
 (defn array-type
   [ty]
-  (if-let [pt (primitive-types-suffixed ty)]
-    ["PrimitiveArray" pt]
+  (if (primitive-types ty)
+    ["Vec" ty]
     (or ty "NullArray")))
 
 (defn struct-field
@@ -30,7 +30,7 @@
   (let [real-target [:field-get "self" (or nm idx)]
         target (if ver "x" real-target)
         value (if (primitive-types ty)
-                [:subscript [:method-call target values-fn-name] "i"]
+                [:subscript target "i"]
                 [:method-call target "transpose_one" ["i" "version"]])]
     (if ver
       (wrap-map (as-ref real-target) "x" value)

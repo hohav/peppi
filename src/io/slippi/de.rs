@@ -6,7 +6,7 @@ use std::{
 	path::PathBuf,
 };
 
-use arrow::array::{ArrayBuilder, OffsetBufferBuilder};
+use arrow::array::OffsetBufferBuilder;
 use byteorder::ReadBytesExt;
 use log::{debug, info, trace, warn};
 
@@ -136,18 +136,18 @@ impl ParseState {
 	}
 
 	fn last_id(&self) -> Option<i32> {
-		self.game.frames.id.values_slice().last().map(|id| *id)
+		self.game.frames.id.last().map(|id| *id)
 	}
 
 	fn frame_open(&mut self, id: i32) {
-		self.game.frames.id.append_value(id);
+		self.game.frames.id.push(id);
 	}
 
 	fn frame_close(&mut self) {
 		let len = self.game.frames.len();
 		for p in &mut self.game.frames.ports {
-			while p.leader.len() < len {
-				p.leader.append_null(self.game.start.slippi.version);
+			while p.len() < len {
+				p.append_null(self.game.start.slippi.version);
 			}
 			if let Some(f) = &mut p.follower {
 				while f.len() < len {

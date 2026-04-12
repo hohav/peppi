@@ -34,8 +34,8 @@ fn button_seq(game: &Game) -> Vec<Buttons> {
 	let mut button_seq = vec![];
 	for idx in 0..game.frames.len() {
 		let b = Buttons {
-			logical: game.frames.ports[0].leader.pre.buttons.values()[idx],
-			physical: game.frames.ports[0].leader.pre.buttons_physical.values()[idx],
+			logical: game.frames.ports[0].leader.pre.buttons[idx],
+			physical: game.frames.ports[0].leader.pre.buttons_physical[idx],
 		};
 		if (b.physical > 0 || b.logical > 0) && Some(b) != last_buttons {
 			button_seq.push(b);
@@ -193,7 +193,7 @@ fn basic_game() {
 		transpose::Frame {
 			id: 877,
 			ports: vec![
-				transpose::PortData {
+				Some(transpose::PortData {
 					port: Port::P1,
 					leader: transpose::Data {
 						pre: transpose::Pre {
@@ -234,8 +234,8 @@ fn basic_game() {
 						},
 					},
 					follower: None,
-				},
-				transpose::PortData {
+				}),
+				Some(transpose::PortData {
 					port: Port::P2,
 					leader: transpose::Data {
 						pre: transpose::Pre {
@@ -279,7 +279,7 @@ fn basic_game() {
 						},
 					},
 					follower: None,
-				},
+				}),
 			],
 			..Default::default()
 		}
@@ -685,6 +685,8 @@ fn v3_15() {
 		game.frames
 			.transpose_one(200, game.start.slippi.version)
 			.ports[0]
+			.as_ref()
+			.unwrap()
 			.leader
 			.pre
 			.raw_analog_y,
@@ -707,11 +709,11 @@ fn v3_16() {
 		.instance_id
 		.as_ref()
 		.unwrap();
-	let mut id_set: HashSet<u16> = player1_ids.values_iter().cloned().collect();
+	let mut id_set: HashSet<u16> = player1_ids.iter().cloned().collect();
 	id_set.remove(&0);
 
 	// player1 and player2 ids should not share any instance ids
-	assert!(player2_ids.values_iter().all(|id| !id_set.contains(id)));
+	assert!(player2_ids.iter().all(|id| !id_set.contains(id)));
 
 	let player2_hit_bys = game.frames.ports[1]
 		.leader
@@ -723,7 +725,7 @@ fn v3_16() {
 	// player2 should be hit by player1 ids
 	assert!(
 		player2_hit_bys
-			.values_iter()
+			.iter()
 			.all(|id| *id == 0 || id_set.contains(id))
 	);
 
@@ -735,8 +737,8 @@ fn v3_16() {
 	// The laser/gun should share instance id with the Fox player (P1)
 	assert!(
 		item_instance_ids
-			.values_iter()
-			.zip(item_types.values_iter())
+			.iter()
+			.zip(item_types.iter())
 			.all(|(&id, &r#type)| (r#type == 210 && id == 0) || id_set.contains(&id))
 	);
 }
@@ -777,7 +779,7 @@ fn corrupt_replay() {
 fn zelda_sheik_transformation() {
 	let game = game("transform");
 	assert_eq!(
-		game.frames.ports[1].leader.pre.state.values()[400],
+		game.frames.ports[1].leader.pre.state[400],
 		action_state::Zelda::TransformGround as u16,
 	);
 }
@@ -907,10 +909,7 @@ fn round_trip() {
 fn rollbacks() {
 	let game = game("ics2");
 	assert_eq!(game.frames.len(), 9530);
-	assert_eq!(
-		game.frames.id.values().clone().sliced(473, 4).as_slice(),
-		[350, 351, 351, 352]
-	);
+	assert_eq!(game.frames.id[473..477], [350, 351, 351, 352]);
 	assert_eq!(
 		game.frames.rollbacks(Rollbacks::ExceptFirst)[473..477],
 		[false, false, true, false],

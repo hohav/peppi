@@ -7,16 +7,14 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-use arrow::{
-	array::{ArrayBuilder, NullBufferBuilder, OffsetBufferBuilder, PrimitiveBuilder},
-	datatypes::{Float32Type, Int32Type, Int8Type, UInt16Type, UInt32Type, UInt8Type},
-};
+use arrow::array::{NullBufferBuilder, OffsetBufferBuilder};
 
 use byteorder::ReadBytesExt;
 use std::io::Result;
+use std::mem;
 
 use crate::{
-	frame::{immutable, transpose, PortOccupancy},
+	frame::{PortOccupancy, immutable, transpose},
 	game::Port,
 	io::slippi::Version,
 };
@@ -49,17 +47,22 @@ impl Data {
 	}
 
 	pub fn append_null(&mut self, version: Version) {
-		self.validity.append_n_non_nulls(self.len());
 		self.validity.append_null();
-		self.pre.append_null(version);
-		self.post.append_null(version);
+		self.pre.append_default(version);
+		self.post.append_default(version);
 	}
 
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Data {
-		transpose::Data {
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.append_non_null();
+		self.pre.append_default(version);
+		self.post.append_default(version);
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> Option<transpose::Data> {
+		self.validity.is_valid(i).then(|| transpose::Data {
 			pre: self.pre.transpose_one(i, version),
 			post: self.post.transpose_one(i, version),
-		}
+		})
 	}
 
 	pub fn finish(&mut self) -> immutable::Data {
@@ -77,6 +80,7 @@ pub struct PortData {
 	pub leader: Data,
 	/// The "backup" ICs character
 	pub follower: Option<Data>,
+	pub validity: NullBufferBuilder,
 }
 
 impl PortData {
@@ -88,6 +92,7 @@ impl PortData {
 				true => Some(Data::with_capacity(capacity, version)),
 				_ => None,
 			},
+			validity: NullBufferBuilder::new(capacity),
 		}
 	}
 
@@ -95,12 +100,21 @@ impl PortData {
 		self.leader.len()
 	}
 
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::PortData {
-		transpose::PortData {
+	pub fn append_null(&mut self, version: Version) {
+		self.validity.append_null();
+		self.leader.append_default(version);
+		self.follower.as_mut().map(|f| f.append_default(version));
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> Option<transpose::PortData> {
+		self.validity.is_valid(i).then(|| transpose::PortData {
 			port: self.port,
-			leader: self.leader.transpose_one(i, version),
-			follower: self.follower.as_ref().map(|f| f.transpose_one(i, version)),
-		}
+			leader: self.leader.transpose_one(i, version).unwrap(),
+			follower: self
+				.follower
+				.as_ref()
+				.and_then(|f| f.transpose_one(i, version)),
+		})
 	}
 
 	pub fn finish(&mut self) -> immutable::PortData {
@@ -108,11 +122,13 @@ impl PortData {
 			port,
 			leader,
 			follower,
+			validity,
 		} = self;
 		immutable::PortData {
 			port: *port,
 			leader: leader.finish(),
 			follower: follower.as_mut().map(|f| f.finish()),
+			validity: validity.finish(),
 		}
 	}
 }
@@ -120,7 +136,7 @@ impl PortData {
 /// All frame data for a single game, in struct-of-arrays format.
 pub struct Frame {
 	/// Frame IDs start at `-123` and increment each frame. May repeat in case of rollbacks
-	pub id: PrimitiveBuilder<Int32Type>,
+	pub id: Vec<i32>,
 	/// Port-specific data
 	pub ports: Vec<PortData>,
 	/// Start-of-frame data
@@ -146,7 +162,7 @@ pub struct Frame {
 impl Frame {
 	pub fn with_capacity(capacity: usize, version: Version, ports: &[PortOccupancy]) -> Self {
 		Self {
-			id: PrimitiveBuilder::<Int32Type>::with_capacity(capacity),
+			id: Vec::with_capacity(capacity),
 			ports: ports
 				.iter()
 				.map(|p| PortData::with_capacity(capacity, version, *p))
@@ -188,7 +204,7 @@ impl Frame {
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Frame {
 		transpose::Frame {
-			id: self.id.values_slice()[i],
+			id: self.id[i],
 			ports: self
 				.ports
 				.iter()
@@ -243,33 +259,22 @@ impl Frame {
 	}
 
 	pub fn finish(&mut self) -> immutable::Frame {
-		let Self {
-			id,
-			ports,
-			start,
-			end,
-			item,
-			item_offset,
-			fod_platform,
-			fod_platform_offset,
-			dreamland_whispy,
-			dreamland_whispy_offset,
-			stadium_transformation,
-			stadium_transformation_offset,
-		} = self;
 		immutable::Frame {
-			id: id.finish(),
-			ports: ports.into_iter().map(|p| p.finish()).collect(),
-			start: start.as_mut().map(|x| x.finish()),
-			end: end.as_mut().map(|x| x.finish()),
-			item: item.as_mut().map(|x| x.finish()),
-			item_offset: item_offset.take().map(|x| x.finish()),
-			fod_platform: fod_platform.as_mut().map(|x| x.finish()),
-			fod_platform_offset: fod_platform_offset.take().map(|x| x.finish()),
-			dreamland_whispy: dreamland_whispy.as_mut().map(|x| x.finish()),
-			dreamland_whispy_offset: dreamland_whispy_offset.take().map(|x| x.finish()),
-			stadium_transformation: stadium_transformation.as_mut().map(|x| x.finish()),
-			stadium_transformation_offset: stadium_transformation_offset.take().map(|x| x.finish()),
+			id: mem::take(&mut self.id),
+			ports: self.ports.iter_mut().map(|p| p.finish()).collect(),
+			start: self.start.as_mut().map(|x| x.finish()),
+			end: self.end.as_mut().map(|x| x.finish()),
+			item: self.item.as_mut().map(|x| x.finish()),
+			item_offset: self.item_offset.take().map(|x| x.finish()),
+			fod_platform: self.fod_platform.as_mut().map(|x| x.finish()),
+			fod_platform_offset: self.fod_platform_offset.take().map(|x| x.finish()),
+			dreamland_whispy: self.dreamland_whispy.as_mut().map(|x| x.finish()),
+			dreamland_whispy_offset: self.dreamland_whispy_offset.take().map(|x| x.finish()),
+			stadium_transformation: self.stadium_transformation.as_mut().map(|x| x.finish()),
+			stadium_transformation_offset: self
+				.stadium_transformation_offset
+				.take()
+				.map(|x| x.finish()),
 		}
 	}
 }
@@ -278,7 +283,7 @@ impl Frame {
 
 pub struct DreamlandWhispy {
 	/// Which direction Whispy is blowing (0 = None, 1 = Left, 2 = Right)
-	pub direction: PrimitiveBuilder<UInt8Type>,
+	pub direction: Vec<u8>,
 	/// Indicates which indexes are valid. Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: NullBufferBuilder,
 }
@@ -286,7 +291,7 @@ pub struct DreamlandWhispy {
 impl DreamlandWhispy {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self {
-			direction: PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
+			direction: Vec::with_capacity(capacity),
 			validity: NullBufferBuilder::new(capacity),
 		}
 	}
@@ -295,28 +300,27 @@ impl DreamlandWhispy {
 		self.direction.len()
 	}
 
-	pub fn append_null(&mut self, version: Version) {
-		self.validity.append_n_non_nulls(self.len());
-		self.validity.append_null();
-		self.direction.append_null()
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.append_non_null();
+		self.direction.push(0u8)
 	}
 
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.direction.append_value(x))?;
+		r.read_u8().map(|x| self.direction.push(x))?;
 		self.validity.append_non_null();
 		Ok(())
 	}
 
 	pub fn finish(&mut self) -> immutable::DreamlandWhispy {
 		immutable::DreamlandWhispy {
-			direction: self.direction.finish(),
+			direction: mem::take(&mut self.direction),
 			validity: self.validity.finish(),
 		}
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::DreamlandWhispy {
 		transpose::DreamlandWhispy {
-			direction: self.direction.values_slice()[i],
+			direction: self.direction[i],
 		}
 	}
 }
@@ -325,7 +329,7 @@ impl DreamlandWhispy {
 
 pub struct End {
 	/// *Added: v3.7* Index of the latest frame which is guaranteed not to happen again (rollback)
-	pub latest_finalized_frame: Option<PrimitiveBuilder<Int32Type>>,
+	pub latest_finalized_frame: Option<Vec<i32>>,
 	/// Indicates which indexes are valid. Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: NullBufferBuilder,
 }
@@ -333,9 +337,7 @@ pub struct End {
 impl End {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self {
-			latest_finalized_frame: version
-				.gte(3, 7)
-				.then(|| PrimitiveBuilder::<Int32Type>::with_capacity(capacity)),
+			latest_finalized_frame: version.gte(3, 7).then(|| Vec::with_capacity(capacity)),
 			validity: NullBufferBuilder::new(capacity),
 		}
 	}
@@ -344,22 +346,17 @@ impl End {
 		self.validity.len()
 	}
 
-	pub fn append_null(&mut self, version: Version) {
-		self.validity.append_n_non_nulls(self.len());
-		self.validity.append_null();
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.append_non_null();
 		if version.gte(3, 7) {
-			self.latest_finalized_frame.as_mut().unwrap().append_null()
+			self.latest_finalized_frame.as_mut().unwrap().push(0i32)
 		}
 	}
 
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
 		if version.gte(3, 7) {
-			r.read_i32::<BE>().map(|x| {
-				self.latest_finalized_frame
-					.as_mut()
-					.unwrap()
-					.append_value(x)
-			})?
+			r.read_i32::<BE>()
+				.map(|x| self.latest_finalized_frame.as_mut().unwrap().push(x))?
 		};
 		self.validity.append_non_null();
 		Ok(())
@@ -367,17 +364,14 @@ impl End {
 
 	pub fn finish(&mut self) -> immutable::End {
 		immutable::End {
-			latest_finalized_frame: self.latest_finalized_frame.as_mut().map(|x| x.finish()),
+			latest_finalized_frame: mem::take(&mut self.latest_finalized_frame),
 			validity: self.validity.finish(),
 		}
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::End {
 		transpose::End {
-			latest_finalized_frame: self
-				.latest_finalized_frame
-				.as_ref()
-				.map(|x| x.values_slice()[i]),
+			latest_finalized_frame: self.latest_finalized_frame.as_ref().map(|x| x[i]),
 		}
 	}
 }
@@ -386,9 +380,9 @@ impl End {
 
 pub struct FodPlatform {
 	/// Which platform has moved. (0 = Right, 1 = Left)
-	pub platform: PrimitiveBuilder<UInt8Type>,
+	pub platform: Vec<u8>,
 	/// The platform's new height
-	pub height: PrimitiveBuilder<Float32Type>,
+	pub height: Vec<f32>,
 	/// Indicates which indexes are valid. Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: NullBufferBuilder,
 }
@@ -396,8 +390,8 @@ pub struct FodPlatform {
 impl FodPlatform {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self {
-			platform: PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
-			height: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
+			platform: Vec::with_capacity(capacity),
+			height: Vec::with_capacity(capacity),
 			validity: NullBufferBuilder::new(capacity),
 		}
 	}
@@ -406,32 +400,31 @@ impl FodPlatform {
 		self.platform.len()
 	}
 
-	pub fn append_null(&mut self, version: Version) {
-		self.validity.append_n_non_nulls(self.len());
-		self.validity.append_null();
-		self.platform.append_null();
-		self.height.append_null()
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.append_non_null();
+		self.platform.push(0u8);
+		self.height.push(0f32)
 	}
 
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.platform.append_value(x))?;
-		r.read_f32::<BE>().map(|x| self.height.append_value(x))?;
+		r.read_u8().map(|x| self.platform.push(x))?;
+		r.read_f32::<BE>().map(|x| self.height.push(x))?;
 		self.validity.append_non_null();
 		Ok(())
 	}
 
 	pub fn finish(&mut self) -> immutable::FodPlatform {
 		immutable::FodPlatform {
-			platform: self.platform.finish(),
-			height: self.height.finish(),
+			platform: mem::take(&mut self.platform),
+			height: mem::take(&mut self.height),
 			validity: self.validity.finish(),
 		}
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::FodPlatform {
 		transpose::FodPlatform {
-			platform: self.platform.values_slice()[i],
-			height: self.height.values_slice()[i],
+			platform: self.platform[i],
+			height: self.height[i],
 		}
 	}
 }
@@ -440,27 +433,27 @@ impl FodPlatform {
 
 pub struct Item {
 	/// Item type
-	pub r#type: PrimitiveBuilder<UInt16Type>,
+	pub r#type: Vec<u16>,
 	/// Item’s action state
-	pub state: PrimitiveBuilder<UInt8Type>,
+	pub state: Vec<u8>,
 	/// Direction item is facing
-	pub direction: PrimitiveBuilder<Float32Type>,
+	pub direction: Vec<f32>,
 	/// Item’s velocity
 	pub velocity: Velocity,
 	/// Item’s position
 	pub position: Position,
 	/// Amount of damage item has taken
-	pub damage: PrimitiveBuilder<UInt16Type>,
+	pub damage: Vec<u16>,
 	/// Frames remaining until item expires
-	pub timer: PrimitiveBuilder<Float32Type>,
+	pub timer: Vec<f32>,
 	/// Unique, serial ID per item spawned
-	pub id: PrimitiveBuilder<UInt32Type>,
+	pub id: Vec<u32>,
 	/// *Added: v3.2* Miscellaneous item state
 	pub misc: Option<ItemMisc>,
 	/// *Added: v3.6* Port that owns the item (-1 when unowned)
-	pub owner: Option<PrimitiveBuilder<Int8Type>>,
+	pub owner: Option<Vec<i8>>,
 	/// *Added: v3.16* Inherited instance ID of the owner (0 when unowned)
-	pub instance_id: Option<PrimitiveBuilder<UInt16Type>>,
+	pub instance_id: Option<Vec<u16>>,
 	/// Indicates which indexes are valid. Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: NullBufferBuilder,
 }
@@ -468,23 +461,19 @@ pub struct Item {
 impl Item {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self {
-			r#type: PrimitiveBuilder::<UInt16Type>::with_capacity(capacity),
-			state: PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
-			direction: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
+			r#type: Vec::with_capacity(capacity),
+			state: Vec::with_capacity(capacity),
+			direction: Vec::with_capacity(capacity),
 			velocity: Velocity::with_capacity(capacity, version),
 			position: Position::with_capacity(capacity, version),
-			damage: PrimitiveBuilder::<UInt16Type>::with_capacity(capacity),
-			timer: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
-			id: PrimitiveBuilder::<UInt32Type>::with_capacity(capacity),
+			damage: Vec::with_capacity(capacity),
+			timer: Vec::with_capacity(capacity),
+			id: Vec::with_capacity(capacity),
 			misc: version
 				.gte(3, 2)
 				.then(|| ItemMisc::with_capacity(capacity, version)),
-			owner: version
-				.gte(3, 6)
-				.then(|| PrimitiveBuilder::<Int8Type>::with_capacity(capacity)),
-			instance_id: version
-				.gte(3, 16)
-				.then(|| PrimitiveBuilder::<UInt16Type>::with_capacity(capacity)),
+			owner: version.gte(3, 6).then(|| Vec::with_capacity(capacity)),
+			instance_id: version.gte(3, 16).then(|| Vec::with_capacity(capacity)),
 			validity: NullBufferBuilder::new(capacity),
 		}
 	}
@@ -493,45 +482,43 @@ impl Item {
 		self.r#type.len()
 	}
 
-	pub fn append_null(&mut self, version: Version) {
-		self.validity.append_n_non_nulls(self.len());
-		self.validity.append_null();
-		self.r#type.append_null();
-		self.state.append_null();
-		self.direction.append_null();
-		self.velocity.append_null(version);
-		self.position.append_null(version);
-		self.damage.append_null();
-		self.timer.append_null();
-		self.id.append_null();
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.append_non_null();
+		self.r#type.push(0u16);
+		self.state.push(0u8);
+		self.direction.push(0f32);
+		self.velocity.append_default(version);
+		self.position.append_default(version);
+		self.damage.push(0u16);
+		self.timer.push(0f32);
+		self.id.push(0u32);
 		if version.gte(3, 2) {
-			self.misc.as_mut().unwrap().append_null(version);
+			self.misc.as_mut().unwrap().append_default(version);
 			if version.gte(3, 6) {
-				self.owner.as_mut().unwrap().append_null();
+				self.owner.as_mut().unwrap().push(0i8);
 				if version.gte(3, 16) {
-					self.instance_id.as_mut().unwrap().append_null()
+					self.instance_id.as_mut().unwrap().push(0u16)
 				}
 			}
 		}
 	}
 
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u16::<BE>().map(|x| self.r#type.append_value(x))?;
-		r.read_u8().map(|x| self.state.append_value(x))?;
-		r.read_f32::<BE>().map(|x| self.direction.append_value(x))?;
+		r.read_u16::<BE>().map(|x| self.r#type.push(x))?;
+		r.read_u8().map(|x| self.state.push(x))?;
+		r.read_f32::<BE>().map(|x| self.direction.push(x))?;
 		self.velocity.read_append(r, version)?;
 		self.position.read_append(r, version)?;
-		r.read_u16::<BE>().map(|x| self.damage.append_value(x))?;
-		r.read_f32::<BE>().map(|x| self.timer.append_value(x))?;
-		r.read_u32::<BE>().map(|x| self.id.append_value(x))?;
+		r.read_u16::<BE>().map(|x| self.damage.push(x))?;
+		r.read_f32::<BE>().map(|x| self.timer.push(x))?;
+		r.read_u32::<BE>().map(|x| self.id.push(x))?;
 		if version.gte(3, 2) {
 			self.misc.as_mut().unwrap().read_append(r, version)?;
 			if version.gte(3, 6) {
-				r.read_i8()
-					.map(|x| self.owner.as_mut().unwrap().append_value(x))?;
+				r.read_i8().map(|x| self.owner.as_mut().unwrap().push(x))?;
 				if version.gte(3, 16) {
 					r.read_u16::<BE>()
-						.map(|x| self.instance_id.as_mut().unwrap().append_value(x))?
+						.map(|x| self.instance_id.as_mut().unwrap().push(x))?
 				}
 			}
 		};
@@ -541,54 +528,49 @@ impl Item {
 
 	pub fn finish(&mut self) -> immutable::Item {
 		immutable::Item {
-			r#type: self.r#type.finish(),
-			state: self.state.finish(),
-			direction: self.direction.finish(),
+			r#type: mem::take(&mut self.r#type),
+			state: mem::take(&mut self.state),
+			direction: mem::take(&mut self.direction),
 			velocity: self.velocity.finish(),
 			position: self.position.finish(),
-			damage: self.damage.finish(),
-			timer: self.timer.finish(),
-			id: self.id.finish(),
+			damage: mem::take(&mut self.damage),
+			timer: mem::take(&mut self.timer),
+			id: mem::take(&mut self.id),
 			misc: self.misc.as_mut().map(|x| x.finish()),
-			owner: self.owner.as_mut().map(|x| x.finish()),
-			instance_id: self.instance_id.as_mut().map(|x| x.finish()),
+			owner: mem::take(&mut self.owner),
+			instance_id: mem::take(&mut self.instance_id),
 			validity: self.validity.finish(),
 		}
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Item {
 		transpose::Item {
-			r#type: self.r#type.values_slice()[i],
-			state: self.state.values_slice()[i],
-			direction: self.direction.values_slice()[i],
+			r#type: self.r#type[i],
+			state: self.state[i],
+			direction: self.direction[i],
 			velocity: self.velocity.transpose_one(i, version),
 			position: self.position.transpose_one(i, version),
-			damage: self.damage.values_slice()[i],
-			timer: self.timer.values_slice()[i],
-			id: self.id.values_slice()[i],
+			damage: self.damage[i],
+			timer: self.timer[i],
+			id: self.id[i],
 			misc: self.misc.as_ref().map(|x| x.transpose_one(i, version)),
-			owner: self.owner.as_ref().map(|x| x.values_slice()[i]),
-			instance_id: self.instance_id.as_ref().map(|x| x.values_slice()[i]),
+			owner: self.owner.as_ref().map(|x| x[i]),
+			instance_id: self.instance_id.as_ref().map(|x| x[i]),
 		}
 	}
 }
 
 /// Miscellaneous item state.
 
-pub struct ItemMisc(
-	pub PrimitiveBuilder<UInt8Type>,
-	pub PrimitiveBuilder<UInt8Type>,
-	pub PrimitiveBuilder<UInt8Type>,
-	pub PrimitiveBuilder<UInt8Type>,
-);
+pub struct ItemMisc(pub Vec<u8>, pub Vec<u8>, pub Vec<u8>, pub Vec<u8>);
 
 impl ItemMisc {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self(
-			PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
-			PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
-			PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
-			PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
+			Vec::with_capacity(capacity),
+			Vec::with_capacity(capacity),
+			Vec::with_capacity(capacity),
+			Vec::with_capacity(capacity),
 		)
 	}
 
@@ -596,45 +578,40 @@ impl ItemMisc {
 		self.0.len()
 	}
 
-	pub fn append_null(&mut self, version: Version) {
-		self.0.append_null();
-		self.1.append_null();
-		self.2.append_null();
-		self.3.append_null()
+	pub fn append_default(&mut self, version: Version) {
+		self.0.push(0u8);
+		self.1.push(0u8);
+		self.2.push(0u8);
+		self.3.push(0u8)
 	}
 
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.0.append_value(x))?;
-		r.read_u8().map(|x| self.1.append_value(x))?;
-		r.read_u8().map(|x| self.2.append_value(x))?;
-		r.read_u8().map(|x| self.3.append_value(x))?;
+		r.read_u8().map(|x| self.0.push(x))?;
+		r.read_u8().map(|x| self.1.push(x))?;
+		r.read_u8().map(|x| self.2.push(x))?;
+		r.read_u8().map(|x| self.3.push(x))?;
 		Ok(())
 	}
 
 	pub fn finish(&mut self) -> immutable::ItemMisc {
 		immutable::ItemMisc(
-			self.0.finish(),
-			self.1.finish(),
-			self.2.finish(),
-			self.3.finish(),
+			mem::take(&mut self.0),
+			mem::take(&mut self.1),
+			mem::take(&mut self.2),
+			mem::take(&mut self.3),
 		)
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::ItemMisc {
-		transpose::ItemMisc(
-			self.0.values_slice()[i],
-			self.1.values_slice()[i],
-			self.2.values_slice()[i],
-			self.3.values_slice()[i],
-		)
+		transpose::ItemMisc(self.0[i], self.1[i], self.2[i], self.3[i])
 	}
 }
 
 /// 2D position.
 
 pub struct Position {
-	pub x: PrimitiveBuilder<Float32Type>,
-	pub y: PrimitiveBuilder<Float32Type>,
+	pub x: Vec<f32>,
+	pub y: Vec<f32>,
 	/// Indicates which indexes are valid. Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: NullBufferBuilder,
 }
@@ -642,8 +619,8 @@ pub struct Position {
 impl Position {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self {
-			x: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
-			y: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
+			x: Vec::with_capacity(capacity),
+			y: Vec::with_capacity(capacity),
 			validity: NullBufferBuilder::new(capacity),
 		}
 	}
@@ -652,32 +629,31 @@ impl Position {
 		self.x.len()
 	}
 
-	pub fn append_null(&mut self, version: Version) {
-		self.validity.append_n_non_nulls(self.len());
-		self.validity.append_null();
-		self.x.append_null();
-		self.y.append_null()
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.append_non_null();
+		self.x.push(0f32);
+		self.y.push(0f32)
 	}
 
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>().map(|x| self.x.append_value(x))?;
-		r.read_f32::<BE>().map(|x| self.y.append_value(x))?;
+		r.read_f32::<BE>().map(|x| self.x.push(x))?;
+		r.read_f32::<BE>().map(|x| self.y.push(x))?;
 		self.validity.append_non_null();
 		Ok(())
 	}
 
 	pub fn finish(&mut self) -> immutable::Position {
 		immutable::Position {
-			x: self.x.finish(),
-			y: self.y.finish(),
+			x: mem::take(&mut self.x),
+			y: mem::take(&mut self.y),
 			validity: self.validity.finish(),
 		}
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Position {
 		transpose::Position {
-			x: self.x.values_slice()[i],
-			y: self.y.values_slice()[i],
+			x: self.x[i],
+			y: self.y[i],
 		}
 	}
 }
@@ -688,51 +664,51 @@ impl Position {
 
 pub struct Post {
 	/// In-game character (can only change for Zelda/Sheik)
-	pub character: PrimitiveBuilder<UInt8Type>,
+	pub character: Vec<u8>,
 	/// Character’s action state
-	pub state: PrimitiveBuilder<UInt16Type>,
+	pub state: Vec<u16>,
 	/// Character’s position
 	pub position: Position,
 	/// Direction the character is facing
-	pub direction: PrimitiveBuilder<Float32Type>,
+	pub direction: Vec<f32>,
 	/// Damage taken (percent)
-	pub percent: PrimitiveBuilder<Float32Type>,
+	pub percent: Vec<f32>,
 	/// Size/health of shield
-	pub shield: PrimitiveBuilder<Float32Type>,
+	pub shield: Vec<f32>,
 	/// Last attack ID that this character landed
-	pub last_attack_landed: PrimitiveBuilder<UInt8Type>,
+	pub last_attack_landed: Vec<u8>,
 	/// Combo count (as defined by the game)
-	pub combo_count: PrimitiveBuilder<UInt8Type>,
+	pub combo_count: Vec<u8>,
 	/// Port that last hit this player. Bugged in Melee: will be set to `6` in certain situations
-	pub last_hit_by: PrimitiveBuilder<UInt8Type>,
+	pub last_hit_by: Vec<u8>,
 	/// Number of stocks remaining
-	pub stocks: PrimitiveBuilder<UInt8Type>,
+	pub stocks: Vec<u8>,
 	/// *Added: v0.2* Number of frames action state has been active. Can have a fractional component
-	pub state_age: Option<PrimitiveBuilder<Float32Type>>,
+	pub state_age: Option<Vec<f32>>,
 	/// *Added: v2.0* State flags
 	pub state_flags: Option<StateFlags>,
 	/// *Added: v2.0* Used for different things. While in hitstun, contains hitstun frames remaining
-	pub misc_as: Option<PrimitiveBuilder<Float32Type>>,
+	pub misc_as: Option<Vec<f32>>,
 	/// *Added: v2.0* Is the character airborne?
-	pub airborne: Option<PrimitiveBuilder<UInt8Type>>,
+	pub airborne: Option<Vec<u8>>,
 	/// *Added: v2.0* Ground ID the character last touched
-	pub ground: Option<PrimitiveBuilder<UInt16Type>>,
+	pub ground: Option<Vec<u16>>,
 	/// *Added: v2.0* Number of jumps remaining
-	pub jumps: Option<PrimitiveBuilder<UInt8Type>>,
+	pub jumps: Option<Vec<u8>>,
 	/// *Added: v2.0* L-cancel status (0 = none, 1 = successful, 2 = unsuccessful)
-	pub l_cancel: Option<PrimitiveBuilder<UInt8Type>>,
+	pub l_cancel: Option<Vec<u8>>,
 	/// *Added: v2.1* Hurtbox state (0 = vulnerable, 1 = invulnerable, 2 = intangible)
-	pub hurtbox_state: Option<PrimitiveBuilder<UInt8Type>>,
+	pub hurtbox_state: Option<Vec<u8>>,
 	/// *Added: v3.5* Self-induced and knockback velocities
 	pub velocities: Option<Velocities>,
 	/// *Added: v3.8* Hitlag frames remaining
-	pub hitlag: Option<PrimitiveBuilder<Float32Type>>,
+	pub hitlag: Option<Vec<f32>>,
 	/// *Added: v3.11* Animation the character is in
-	pub animation_index: Option<PrimitiveBuilder<UInt32Type>>,
+	pub animation_index: Option<Vec<u32>>,
 	/// *Added: v3.16* Instance ID of the player/item that last hit this player
-	pub last_hit_by_instance: Option<PrimitiveBuilder<UInt16Type>>,
+	pub last_hit_by_instance: Option<Vec<u16>>,
 	/// *Added: v3.16* Unique, serial ID for each new action state across all characters. Resets to 0 on death
-	pub instance_id: Option<PrimitiveBuilder<UInt16Type>>,
+	pub instance_id: Option<Vec<u16>>,
 	/// Indicates which indexes are valid. Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: NullBufferBuilder,
 }
@@ -740,55 +716,33 @@ pub struct Post {
 impl Post {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self {
-			character: PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
-			state: PrimitiveBuilder::<UInt16Type>::with_capacity(capacity),
+			character: Vec::with_capacity(capacity),
+			state: Vec::with_capacity(capacity),
 			position: Position::with_capacity(capacity, version),
-			direction: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
-			percent: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
-			shield: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
-			last_attack_landed: PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
-			combo_count: PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
-			last_hit_by: PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
-			stocks: PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
-			state_age: version
-				.gte(0, 2)
-				.then(|| PrimitiveBuilder::<Float32Type>::with_capacity(capacity)),
+			direction: Vec::with_capacity(capacity),
+			percent: Vec::with_capacity(capacity),
+			shield: Vec::with_capacity(capacity),
+			last_attack_landed: Vec::with_capacity(capacity),
+			combo_count: Vec::with_capacity(capacity),
+			last_hit_by: Vec::with_capacity(capacity),
+			stocks: Vec::with_capacity(capacity),
+			state_age: version.gte(0, 2).then(|| Vec::with_capacity(capacity)),
 			state_flags: version
 				.gte(2, 0)
 				.then(|| StateFlags::with_capacity(capacity, version)),
-			misc_as: version
-				.gte(2, 0)
-				.then(|| PrimitiveBuilder::<Float32Type>::with_capacity(capacity)),
-			airborne: version
-				.gte(2, 0)
-				.then(|| PrimitiveBuilder::<UInt8Type>::with_capacity(capacity)),
-			ground: version
-				.gte(2, 0)
-				.then(|| PrimitiveBuilder::<UInt16Type>::with_capacity(capacity)),
-			jumps: version
-				.gte(2, 0)
-				.then(|| PrimitiveBuilder::<UInt8Type>::with_capacity(capacity)),
-			l_cancel: version
-				.gte(2, 0)
-				.then(|| PrimitiveBuilder::<UInt8Type>::with_capacity(capacity)),
-			hurtbox_state: version
-				.gte(2, 1)
-				.then(|| PrimitiveBuilder::<UInt8Type>::with_capacity(capacity)),
+			misc_as: version.gte(2, 0).then(|| Vec::with_capacity(capacity)),
+			airborne: version.gte(2, 0).then(|| Vec::with_capacity(capacity)),
+			ground: version.gte(2, 0).then(|| Vec::with_capacity(capacity)),
+			jumps: version.gte(2, 0).then(|| Vec::with_capacity(capacity)),
+			l_cancel: version.gte(2, 0).then(|| Vec::with_capacity(capacity)),
+			hurtbox_state: version.gte(2, 1).then(|| Vec::with_capacity(capacity)),
 			velocities: version
 				.gte(3, 5)
 				.then(|| Velocities::with_capacity(capacity, version)),
-			hitlag: version
-				.gte(3, 8)
-				.then(|| PrimitiveBuilder::<Float32Type>::with_capacity(capacity)),
-			animation_index: version
-				.gte(3, 11)
-				.then(|| PrimitiveBuilder::<UInt32Type>::with_capacity(capacity)),
-			last_hit_by_instance: version
-				.gte(3, 16)
-				.then(|| PrimitiveBuilder::<UInt16Type>::with_capacity(capacity)),
-			instance_id: version
-				.gte(3, 16)
-				.then(|| PrimitiveBuilder::<UInt16Type>::with_capacity(capacity)),
+			hitlag: version.gte(3, 8).then(|| Vec::with_capacity(capacity)),
+			animation_index: version.gte(3, 11).then(|| Vec::with_capacity(capacity)),
+			last_hit_by_instance: version.gte(3, 16).then(|| Vec::with_capacity(capacity)),
+			instance_id: version.gte(3, 16).then(|| Vec::with_capacity(capacity)),
 			validity: NullBufferBuilder::new(capacity),
 		}
 	}
@@ -797,39 +751,38 @@ impl Post {
 		self.character.len()
 	}
 
-	pub fn append_null(&mut self, version: Version) {
-		self.validity.append_n_non_nulls(self.len());
-		self.validity.append_null();
-		self.character.append_null();
-		self.state.append_null();
-		self.position.append_null(version);
-		self.direction.append_null();
-		self.percent.append_null();
-		self.shield.append_null();
-		self.last_attack_landed.append_null();
-		self.combo_count.append_null();
-		self.last_hit_by.append_null();
-		self.stocks.append_null();
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.append_non_null();
+		self.character.push(0u8);
+		self.state.push(0u16);
+		self.position.append_default(version);
+		self.direction.push(0f32);
+		self.percent.push(0f32);
+		self.shield.push(0f32);
+		self.last_attack_landed.push(0u8);
+		self.combo_count.push(0u8);
+		self.last_hit_by.push(0u8);
+		self.stocks.push(0u8);
 		if version.gte(0, 2) {
-			self.state_age.as_mut().unwrap().append_null();
+			self.state_age.as_mut().unwrap().push(0f32);
 			if version.gte(2, 0) {
-				self.state_flags.as_mut().unwrap().append_null(version);
-				self.misc_as.as_mut().unwrap().append_null();
-				self.airborne.as_mut().unwrap().append_null();
-				self.ground.as_mut().unwrap().append_null();
-				self.jumps.as_mut().unwrap().append_null();
-				self.l_cancel.as_mut().unwrap().append_null();
+				self.state_flags.as_mut().unwrap().append_default(version);
+				self.misc_as.as_mut().unwrap().push(0f32);
+				self.airborne.as_mut().unwrap().push(0u8);
+				self.ground.as_mut().unwrap().push(0u16);
+				self.jumps.as_mut().unwrap().push(0u8);
+				self.l_cancel.as_mut().unwrap().push(0u8);
 				if version.gte(2, 1) {
-					self.hurtbox_state.as_mut().unwrap().append_null();
+					self.hurtbox_state.as_mut().unwrap().push(0u8);
 					if version.gte(3, 5) {
-						self.velocities.as_mut().unwrap().append_null(version);
+						self.velocities.as_mut().unwrap().append_default(version);
 						if version.gte(3, 8) {
-							self.hitlag.as_mut().unwrap().append_null();
+							self.hitlag.as_mut().unwrap().push(0f32);
 							if version.gte(3, 11) {
-								self.animation_index.as_mut().unwrap().append_null();
+								self.animation_index.as_mut().unwrap().push(0u32);
 								if version.gte(3, 16) {
-									self.last_hit_by_instance.as_mut().unwrap().append_null();
-									self.instance_id.as_mut().unwrap().append_null()
+									self.last_hit_by_instance.as_mut().unwrap().push(0u16);
+									self.instance_id.as_mut().unwrap().push(0u16)
 								}
 							}
 						}
@@ -840,51 +793,47 @@ impl Post {
 	}
 
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.character.append_value(x))?;
-		r.read_u16::<BE>().map(|x| self.state.append_value(x))?;
+		r.read_u8().map(|x| self.character.push(x))?;
+		r.read_u16::<BE>().map(|x| self.state.push(x))?;
 		self.position.read_append(r, version)?;
-		r.read_f32::<BE>().map(|x| self.direction.append_value(x))?;
-		r.read_f32::<BE>().map(|x| self.percent.append_value(x))?;
-		r.read_f32::<BE>().map(|x| self.shield.append_value(x))?;
-		r.read_u8()
-			.map(|x| self.last_attack_landed.append_value(x))?;
-		r.read_u8().map(|x| self.combo_count.append_value(x))?;
-		r.read_u8().map(|x| self.last_hit_by.append_value(x))?;
-		r.read_u8().map(|x| self.stocks.append_value(x))?;
+		r.read_f32::<BE>().map(|x| self.direction.push(x))?;
+		r.read_f32::<BE>().map(|x| self.percent.push(x))?;
+		r.read_f32::<BE>().map(|x| self.shield.push(x))?;
+		r.read_u8().map(|x| self.last_attack_landed.push(x))?;
+		r.read_u8().map(|x| self.combo_count.push(x))?;
+		r.read_u8().map(|x| self.last_hit_by.push(x))?;
+		r.read_u8().map(|x| self.stocks.push(x))?;
 		if version.gte(0, 2) {
 			r.read_f32::<BE>()
-				.map(|x| self.state_age.as_mut().unwrap().append_value(x))?;
+				.map(|x| self.state_age.as_mut().unwrap().push(x))?;
 			if version.gte(2, 0) {
 				self.state_flags.as_mut().unwrap().read_append(r, version)?;
 				r.read_f32::<BE>()
-					.map(|x| self.misc_as.as_mut().unwrap().append_value(x))?;
+					.map(|x| self.misc_as.as_mut().unwrap().push(x))?;
 				r.read_u8()
-					.map(|x| self.airborne.as_mut().unwrap().append_value(x))?;
+					.map(|x| self.airborne.as_mut().unwrap().push(x))?;
 				r.read_u16::<BE>()
-					.map(|x| self.ground.as_mut().unwrap().append_value(x))?;
+					.map(|x| self.ground.as_mut().unwrap().push(x))?;
+				r.read_u8().map(|x| self.jumps.as_mut().unwrap().push(x))?;
 				r.read_u8()
-					.map(|x| self.jumps.as_mut().unwrap().append_value(x))?;
-				r.read_u8()
-					.map(|x| self.l_cancel.as_mut().unwrap().append_value(x))?;
+					.map(|x| self.l_cancel.as_mut().unwrap().push(x))?;
 				if version.gte(2, 1) {
 					r.read_u8()
-						.map(|x| self.hurtbox_state.as_mut().unwrap().append_value(x))?;
+						.map(|x| self.hurtbox_state.as_mut().unwrap().push(x))?;
 					if version.gte(3, 5) {
 						self.velocities.as_mut().unwrap().read_append(r, version)?;
 						if version.gte(3, 8) {
 							r.read_f32::<BE>()
-								.map(|x| self.hitlag.as_mut().unwrap().append_value(x))?;
+								.map(|x| self.hitlag.as_mut().unwrap().push(x))?;
 							if version.gte(3, 11) {
-								r.read_u32::<BE>().map(|x| {
-									self.animation_index.as_mut().unwrap().append_value(x)
-								})?;
+								r.read_u32::<BE>()
+									.map(|x| self.animation_index.as_mut().unwrap().push(x))?;
 								if version.gte(3, 16) {
 									r.read_u16::<BE>().map(|x| {
-										self.last_hit_by_instance.as_mut().unwrap().append_value(x)
+										self.last_hit_by_instance.as_mut().unwrap().push(x)
 									})?;
-									r.read_u16::<BE>().map(|x| {
-										self.instance_id.as_mut().unwrap().append_value(x)
-									})?
+									r.read_u16::<BE>()
+										.map(|x| self.instance_id.as_mut().unwrap().push(x))?
 								}
 							}
 						}
@@ -898,67 +847,64 @@ impl Post {
 
 	pub fn finish(&mut self) -> immutable::Post {
 		immutable::Post {
-			character: self.character.finish(),
-			state: self.state.finish(),
+			character: mem::take(&mut self.character),
+			state: mem::take(&mut self.state),
 			position: self.position.finish(),
-			direction: self.direction.finish(),
-			percent: self.percent.finish(),
-			shield: self.shield.finish(),
-			last_attack_landed: self.last_attack_landed.finish(),
-			combo_count: self.combo_count.finish(),
-			last_hit_by: self.last_hit_by.finish(),
-			stocks: self.stocks.finish(),
-			state_age: self.state_age.as_mut().map(|x| x.finish()),
+			direction: mem::take(&mut self.direction),
+			percent: mem::take(&mut self.percent),
+			shield: mem::take(&mut self.shield),
+			last_attack_landed: mem::take(&mut self.last_attack_landed),
+			combo_count: mem::take(&mut self.combo_count),
+			last_hit_by: mem::take(&mut self.last_hit_by),
+			stocks: mem::take(&mut self.stocks),
+			state_age: mem::take(&mut self.state_age),
 			state_flags: self.state_flags.as_mut().map(|x| x.finish()),
-			misc_as: self.misc_as.as_mut().map(|x| x.finish()),
-			airborne: self.airborne.as_mut().map(|x| x.finish()),
-			ground: self.ground.as_mut().map(|x| x.finish()),
-			jumps: self.jumps.as_mut().map(|x| x.finish()),
-			l_cancel: self.l_cancel.as_mut().map(|x| x.finish()),
-			hurtbox_state: self.hurtbox_state.as_mut().map(|x| x.finish()),
+			misc_as: mem::take(&mut self.misc_as),
+			airborne: mem::take(&mut self.airborne),
+			ground: mem::take(&mut self.ground),
+			jumps: mem::take(&mut self.jumps),
+			l_cancel: mem::take(&mut self.l_cancel),
+			hurtbox_state: mem::take(&mut self.hurtbox_state),
 			velocities: self.velocities.as_mut().map(|x| x.finish()),
-			hitlag: self.hitlag.as_mut().map(|x| x.finish()),
-			animation_index: self.animation_index.as_mut().map(|x| x.finish()),
-			last_hit_by_instance: self.last_hit_by_instance.as_mut().map(|x| x.finish()),
-			instance_id: self.instance_id.as_mut().map(|x| x.finish()),
+			hitlag: mem::take(&mut self.hitlag),
+			animation_index: mem::take(&mut self.animation_index),
+			last_hit_by_instance: mem::take(&mut self.last_hit_by_instance),
+			instance_id: mem::take(&mut self.instance_id),
 			validity: self.validity.finish(),
 		}
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Post {
 		transpose::Post {
-			character: self.character.values_slice()[i],
-			state: self.state.values_slice()[i],
+			character: self.character[i],
+			state: self.state[i],
 			position: self.position.transpose_one(i, version),
-			direction: self.direction.values_slice()[i],
-			percent: self.percent.values_slice()[i],
-			shield: self.shield.values_slice()[i],
-			last_attack_landed: self.last_attack_landed.values_slice()[i],
-			combo_count: self.combo_count.values_slice()[i],
-			last_hit_by: self.last_hit_by.values_slice()[i],
-			stocks: self.stocks.values_slice()[i],
-			state_age: self.state_age.as_ref().map(|x| x.values_slice()[i]),
+			direction: self.direction[i],
+			percent: self.percent[i],
+			shield: self.shield[i],
+			last_attack_landed: self.last_attack_landed[i],
+			combo_count: self.combo_count[i],
+			last_hit_by: self.last_hit_by[i],
+			stocks: self.stocks[i],
+			state_age: self.state_age.as_ref().map(|x| x[i]),
 			state_flags: self
 				.state_flags
 				.as_ref()
 				.map(|x| x.transpose_one(i, version)),
-			misc_as: self.misc_as.as_ref().map(|x| x.values_slice()[i]),
-			airborne: self.airborne.as_ref().map(|x| x.values_slice()[i]),
-			ground: self.ground.as_ref().map(|x| x.values_slice()[i]),
-			jumps: self.jumps.as_ref().map(|x| x.values_slice()[i]),
-			l_cancel: self.l_cancel.as_ref().map(|x| x.values_slice()[i]),
-			hurtbox_state: self.hurtbox_state.as_ref().map(|x| x.values_slice()[i]),
+			misc_as: self.misc_as.as_ref().map(|x| x[i]),
+			airborne: self.airborne.as_ref().map(|x| x[i]),
+			ground: self.ground.as_ref().map(|x| x[i]),
+			jumps: self.jumps.as_ref().map(|x| x[i]),
+			l_cancel: self.l_cancel.as_ref().map(|x| x[i]),
+			hurtbox_state: self.hurtbox_state.as_ref().map(|x| x[i]),
 			velocities: self
 				.velocities
 				.as_ref()
 				.map(|x| x.transpose_one(i, version)),
-			hitlag: self.hitlag.as_ref().map(|x| x.values_slice()[i]),
-			animation_index: self.animation_index.as_ref().map(|x| x.values_slice()[i]),
-			last_hit_by_instance: self
-				.last_hit_by_instance
-				.as_ref()
-				.map(|x| x.values_slice()[i]),
-			instance_id: self.instance_id.as_ref().map(|x| x.values_slice()[i]),
+			hitlag: self.hitlag.as_ref().map(|x| x[i]),
+			animation_index: self.animation_index.as_ref().map(|x| x[i]),
+			last_hit_by_instance: self.last_hit_by_instance.as_ref().map(|x| x[i]),
+			instance_id: self.instance_id.as_ref().map(|x| x[i]),
 		}
 	}
 }
@@ -969,35 +915,35 @@ impl Post {
 
 pub struct Pre {
 	/// Random seed
-	pub random_seed: PrimitiveBuilder<UInt32Type>,
+	pub random_seed: Vec<u32>,
 	/// Character’s action state
-	pub state: PrimitiveBuilder<UInt16Type>,
+	pub state: Vec<u16>,
 	/// Character’s position
 	pub position: Position,
 	/// Direction the character is facing
-	pub direction: PrimitiveBuilder<Float32Type>,
+	pub direction: Vec<f32>,
 	/// Processed analog joystick position
 	pub joystick: Position,
 	/// Processed analog c-stick position
 	pub cstick: Position,
 	/// Processed analog trigger position
-	pub triggers: PrimitiveBuilder<Float32Type>,
+	pub triggers: Vec<f32>,
 	/// Processed button-state bitmask
-	pub buttons: PrimitiveBuilder<UInt32Type>,
+	pub buttons: Vec<u32>,
 	/// Physical button-state bitmask
-	pub buttons_physical: PrimitiveBuilder<UInt16Type>,
+	pub buttons_physical: Vec<u16>,
 	/// Physical analog trigger positions (useful for IPM)
 	pub triggers_physical: TriggersPhysical,
 	/// *Added: v1.2* Raw joystick x-position
-	pub raw_analog_x: Option<PrimitiveBuilder<Int8Type>>,
+	pub raw_analog_x: Option<Vec<i8>>,
 	/// *Added: v1.4* Damage taken (percent)
-	pub percent: Option<PrimitiveBuilder<Float32Type>>,
+	pub percent: Option<Vec<f32>>,
 	/// *Added: v3.15* Raw joystick y-position
-	pub raw_analog_y: Option<PrimitiveBuilder<Int8Type>>,
+	pub raw_analog_y: Option<Vec<i8>>,
 	/// *Added: v3.17* Raw c-stick x-position
-	pub raw_analog_cstick_x: Option<PrimitiveBuilder<Int8Type>>,
+	pub raw_analog_cstick_x: Option<Vec<i8>>,
 	/// *Added: v3.17* Raw c-stick y-position
-	pub raw_analog_cstick_y: Option<PrimitiveBuilder<Int8Type>>,
+	pub raw_analog_cstick_y: Option<Vec<i8>>,
 	/// Indicates which indexes are valid. Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: NullBufferBuilder,
 }
@@ -1005,31 +951,21 @@ pub struct Pre {
 impl Pre {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self {
-			random_seed: PrimitiveBuilder::<UInt32Type>::with_capacity(capacity),
-			state: PrimitiveBuilder::<UInt16Type>::with_capacity(capacity),
+			random_seed: Vec::with_capacity(capacity),
+			state: Vec::with_capacity(capacity),
 			position: Position::with_capacity(capacity, version),
-			direction: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
+			direction: Vec::with_capacity(capacity),
 			joystick: Position::with_capacity(capacity, version),
 			cstick: Position::with_capacity(capacity, version),
-			triggers: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
-			buttons: PrimitiveBuilder::<UInt32Type>::with_capacity(capacity),
-			buttons_physical: PrimitiveBuilder::<UInt16Type>::with_capacity(capacity),
+			triggers: Vec::with_capacity(capacity),
+			buttons: Vec::with_capacity(capacity),
+			buttons_physical: Vec::with_capacity(capacity),
 			triggers_physical: TriggersPhysical::with_capacity(capacity, version),
-			raw_analog_x: version
-				.gte(1, 2)
-				.then(|| PrimitiveBuilder::<Int8Type>::with_capacity(capacity)),
-			percent: version
-				.gte(1, 4)
-				.then(|| PrimitiveBuilder::<Float32Type>::with_capacity(capacity)),
-			raw_analog_y: version
-				.gte(3, 15)
-				.then(|| PrimitiveBuilder::<Int8Type>::with_capacity(capacity)),
-			raw_analog_cstick_x: version
-				.gte(3, 17)
-				.then(|| PrimitiveBuilder::<Int8Type>::with_capacity(capacity)),
-			raw_analog_cstick_y: version
-				.gte(3, 17)
-				.then(|| PrimitiveBuilder::<Int8Type>::with_capacity(capacity)),
+			raw_analog_x: version.gte(1, 2).then(|| Vec::with_capacity(capacity)),
+			percent: version.gte(1, 4).then(|| Vec::with_capacity(capacity)),
+			raw_analog_y: version.gte(3, 15).then(|| Vec::with_capacity(capacity)),
+			raw_analog_cstick_x: version.gte(3, 17).then(|| Vec::with_capacity(capacity)),
+			raw_analog_cstick_y: version.gte(3, 17).then(|| Vec::with_capacity(capacity)),
 			validity: NullBufferBuilder::new(capacity),
 		}
 	}
@@ -1038,28 +974,27 @@ impl Pre {
 		self.random_seed.len()
 	}
 
-	pub fn append_null(&mut self, version: Version) {
-		self.validity.append_n_non_nulls(self.len());
-		self.validity.append_null();
-		self.random_seed.append_null();
-		self.state.append_null();
-		self.position.append_null(version);
-		self.direction.append_null();
-		self.joystick.append_null(version);
-		self.cstick.append_null(version);
-		self.triggers.append_null();
-		self.buttons.append_null();
-		self.buttons_physical.append_null();
-		self.triggers_physical.append_null(version);
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.append_non_null();
+		self.random_seed.push(0u32);
+		self.state.push(0u16);
+		self.position.append_default(version);
+		self.direction.push(0f32);
+		self.joystick.append_default(version);
+		self.cstick.append_default(version);
+		self.triggers.push(0f32);
+		self.buttons.push(0u32);
+		self.buttons_physical.push(0u16);
+		self.triggers_physical.append_default(version);
 		if version.gte(1, 2) {
-			self.raw_analog_x.as_mut().unwrap().append_null();
+			self.raw_analog_x.as_mut().unwrap().push(0i8);
 			if version.gte(1, 4) {
-				self.percent.as_mut().unwrap().append_null();
+				self.percent.as_mut().unwrap().push(0f32);
 				if version.gte(3, 15) {
-					self.raw_analog_y.as_mut().unwrap().append_null();
+					self.raw_analog_y.as_mut().unwrap().push(0i8);
 					if version.gte(3, 17) {
-						self.raw_analog_cstick_x.as_mut().unwrap().append_null();
-						self.raw_analog_cstick_y.as_mut().unwrap().append_null()
+						self.raw_analog_cstick_x.as_mut().unwrap().push(0i8);
+						self.raw_analog_cstick_y.as_mut().unwrap().push(0i8)
 					}
 				}
 			}
@@ -1067,32 +1002,30 @@ impl Pre {
 	}
 
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u32::<BE>()
-			.map(|x| self.random_seed.append_value(x))?;
-		r.read_u16::<BE>().map(|x| self.state.append_value(x))?;
+		r.read_u32::<BE>().map(|x| self.random_seed.push(x))?;
+		r.read_u16::<BE>().map(|x| self.state.push(x))?;
 		self.position.read_append(r, version)?;
-		r.read_f32::<BE>().map(|x| self.direction.append_value(x))?;
+		r.read_f32::<BE>().map(|x| self.direction.push(x))?;
 		self.joystick.read_append(r, version)?;
 		self.cstick.read_append(r, version)?;
-		r.read_f32::<BE>().map(|x| self.triggers.append_value(x))?;
-		r.read_u32::<BE>().map(|x| self.buttons.append_value(x))?;
-		r.read_u16::<BE>()
-			.map(|x| self.buttons_physical.append_value(x))?;
+		r.read_f32::<BE>().map(|x| self.triggers.push(x))?;
+		r.read_u32::<BE>().map(|x| self.buttons.push(x))?;
+		r.read_u16::<BE>().map(|x| self.buttons_physical.push(x))?;
 		self.triggers_physical.read_append(r, version)?;
 		if version.gte(1, 2) {
 			r.read_i8()
-				.map(|x| self.raw_analog_x.as_mut().unwrap().append_value(x))?;
+				.map(|x| self.raw_analog_x.as_mut().unwrap().push(x))?;
 			if version.gte(1, 4) {
 				r.read_f32::<BE>()
-					.map(|x| self.percent.as_mut().unwrap().append_value(x))?;
+					.map(|x| self.percent.as_mut().unwrap().push(x))?;
 				if version.gte(3, 15) {
 					r.read_i8()
-						.map(|x| self.raw_analog_y.as_mut().unwrap().append_value(x))?;
+						.map(|x| self.raw_analog_y.as_mut().unwrap().push(x))?;
 					if version.gte(3, 17) {
 						r.read_i8()
-							.map(|x| self.raw_analog_cstick_x.as_mut().unwrap().append_value(x))?;
+							.map(|x| self.raw_analog_cstick_x.as_mut().unwrap().push(x))?;
 						r.read_i8()
-							.map(|x| self.raw_analog_cstick_y.as_mut().unwrap().append_value(x))?
+							.map(|x| self.raw_analog_cstick_y.as_mut().unwrap().push(x))?
 					}
 				}
 			}
@@ -1103,48 +1036,42 @@ impl Pre {
 
 	pub fn finish(&mut self) -> immutable::Pre {
 		immutable::Pre {
-			random_seed: self.random_seed.finish(),
-			state: self.state.finish(),
+			random_seed: mem::take(&mut self.random_seed),
+			state: mem::take(&mut self.state),
 			position: self.position.finish(),
-			direction: self.direction.finish(),
+			direction: mem::take(&mut self.direction),
 			joystick: self.joystick.finish(),
 			cstick: self.cstick.finish(),
-			triggers: self.triggers.finish(),
-			buttons: self.buttons.finish(),
-			buttons_physical: self.buttons_physical.finish(),
+			triggers: mem::take(&mut self.triggers),
+			buttons: mem::take(&mut self.buttons),
+			buttons_physical: mem::take(&mut self.buttons_physical),
 			triggers_physical: self.triggers_physical.finish(),
-			raw_analog_x: self.raw_analog_x.as_mut().map(|x| x.finish()),
-			percent: self.percent.as_mut().map(|x| x.finish()),
-			raw_analog_y: self.raw_analog_y.as_mut().map(|x| x.finish()),
-			raw_analog_cstick_x: self.raw_analog_cstick_x.as_mut().map(|x| x.finish()),
-			raw_analog_cstick_y: self.raw_analog_cstick_y.as_mut().map(|x| x.finish()),
+			raw_analog_x: mem::take(&mut self.raw_analog_x),
+			percent: mem::take(&mut self.percent),
+			raw_analog_y: mem::take(&mut self.raw_analog_y),
+			raw_analog_cstick_x: mem::take(&mut self.raw_analog_cstick_x),
+			raw_analog_cstick_y: mem::take(&mut self.raw_analog_cstick_y),
 			validity: self.validity.finish(),
 		}
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Pre {
 		transpose::Pre {
-			random_seed: self.random_seed.values_slice()[i],
-			state: self.state.values_slice()[i],
+			random_seed: self.random_seed[i],
+			state: self.state[i],
 			position: self.position.transpose_one(i, version),
-			direction: self.direction.values_slice()[i],
+			direction: self.direction[i],
 			joystick: self.joystick.transpose_one(i, version),
 			cstick: self.cstick.transpose_one(i, version),
-			triggers: self.triggers.values_slice()[i],
-			buttons: self.buttons.values_slice()[i],
-			buttons_physical: self.buttons_physical.values_slice()[i],
+			triggers: self.triggers[i],
+			buttons: self.buttons[i],
+			buttons_physical: self.buttons_physical[i],
 			triggers_physical: self.triggers_physical.transpose_one(i, version),
-			raw_analog_x: self.raw_analog_x.as_ref().map(|x| x.values_slice()[i]),
-			percent: self.percent.as_ref().map(|x| x.values_slice()[i]),
-			raw_analog_y: self.raw_analog_y.as_ref().map(|x| x.values_slice()[i]),
-			raw_analog_cstick_x: self
-				.raw_analog_cstick_x
-				.as_ref()
-				.map(|x| x.values_slice()[i]),
-			raw_analog_cstick_y: self
-				.raw_analog_cstick_y
-				.as_ref()
-				.map(|x| x.values_slice()[i]),
+			raw_analog_x: self.raw_analog_x.as_ref().map(|x| x[i]),
+			percent: self.percent.as_ref().map(|x| x[i]),
+			raw_analog_y: self.raw_analog_y.as_ref().map(|x| x[i]),
+			raw_analog_cstick_x: self.raw_analog_cstick_x.as_ref().map(|x| x[i]),
+			raw_analog_cstick_y: self.raw_analog_cstick_y.as_ref().map(|x| x[i]),
 		}
 	}
 }
@@ -1153,9 +1080,9 @@ impl Pre {
 
 pub struct StadiumTransformation {
 	/// The subevent for each transformation. (2 = Initialize, 3 = On monitor, 4 = Previous transformation receding, 5 = New transformation rising, 6 = Finalize, 0 = Finished)
-	pub event: PrimitiveBuilder<UInt16Type>,
+	pub event: Vec<u16>,
 	/// The current or upcoming transformation. (3 = Fire, 4 = Grass, 5 = Normal, 6 = Rock, 9 = Water)
-	pub r#type: PrimitiveBuilder<UInt16Type>,
+	pub r#type: Vec<u16>,
 	/// Indicates which indexes are valid. Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: NullBufferBuilder,
 }
@@ -1163,8 +1090,8 @@ pub struct StadiumTransformation {
 impl StadiumTransformation {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self {
-			event: PrimitiveBuilder::<UInt16Type>::with_capacity(capacity),
-			r#type: PrimitiveBuilder::<UInt16Type>::with_capacity(capacity),
+			event: Vec::with_capacity(capacity),
+			r#type: Vec::with_capacity(capacity),
 			validity: NullBufferBuilder::new(capacity),
 		}
 	}
@@ -1173,32 +1100,31 @@ impl StadiumTransformation {
 		self.event.len()
 	}
 
-	pub fn append_null(&mut self, version: Version) {
-		self.validity.append_n_non_nulls(self.len());
-		self.validity.append_null();
-		self.event.append_null();
-		self.r#type.append_null()
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.append_non_null();
+		self.event.push(0u16);
+		self.r#type.push(0u16)
 	}
 
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u16::<BE>().map(|x| self.event.append_value(x))?;
-		r.read_u16::<BE>().map(|x| self.r#type.append_value(x))?;
+		r.read_u16::<BE>().map(|x| self.event.push(x))?;
+		r.read_u16::<BE>().map(|x| self.r#type.push(x))?;
 		self.validity.append_non_null();
 		Ok(())
 	}
 
 	pub fn finish(&mut self) -> immutable::StadiumTransformation {
 		immutable::StadiumTransformation {
-			event: self.event.finish(),
-			r#type: self.r#type.finish(),
+			event: mem::take(&mut self.event),
+			r#type: mem::take(&mut self.r#type),
 			validity: self.validity.finish(),
 		}
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::StadiumTransformation {
 		transpose::StadiumTransformation {
-			event: self.event.values_slice()[i],
-			r#type: self.r#type.values_slice()[i],
+			event: self.event[i],
+			r#type: self.r#type[i],
 		}
 	}
 }
@@ -1207,9 +1133,9 @@ impl StadiumTransformation {
 
 pub struct Start {
 	/// Random seed
-	pub random_seed: PrimitiveBuilder<UInt32Type>,
+	pub random_seed: Vec<u32>,
 	/// *Added: v3.10* Scene frame counter. Starts at 0, and increments every frame (even when paused)
-	pub scene_frame_counter: Option<PrimitiveBuilder<UInt32Type>>,
+	pub scene_frame_counter: Option<Vec<u32>>,
 	/// Indicates which indexes are valid. Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: NullBufferBuilder,
 }
@@ -1217,10 +1143,8 @@ pub struct Start {
 impl Start {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self {
-			random_seed: PrimitiveBuilder::<UInt32Type>::with_capacity(capacity),
-			scene_frame_counter: version
-				.gte(3, 10)
-				.then(|| PrimitiveBuilder::<UInt32Type>::with_capacity(capacity)),
+			random_seed: Vec::with_capacity(capacity),
+			scene_frame_counter: version.gte(3, 10).then(|| Vec::with_capacity(capacity)),
 			validity: NullBufferBuilder::new(capacity),
 		}
 	}
@@ -1229,21 +1153,19 @@ impl Start {
 		self.random_seed.len()
 	}
 
-	pub fn append_null(&mut self, version: Version) {
-		self.validity.append_n_non_nulls(self.len());
-		self.validity.append_null();
-		self.random_seed.append_null();
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.append_non_null();
+		self.random_seed.push(0u32);
 		if version.gte(3, 10) {
-			self.scene_frame_counter.as_mut().unwrap().append_null()
+			self.scene_frame_counter.as_mut().unwrap().push(0u32)
 		}
 	}
 
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u32::<BE>()
-			.map(|x| self.random_seed.append_value(x))?;
+		r.read_u32::<BE>().map(|x| self.random_seed.push(x))?;
 		if version.gte(3, 10) {
 			r.read_u32::<BE>()
-				.map(|x| self.scene_frame_counter.as_mut().unwrap().append_value(x))?
+				.map(|x| self.scene_frame_counter.as_mut().unwrap().push(x))?
 		};
 		self.validity.append_non_null();
 		Ok(())
@@ -1251,19 +1173,16 @@ impl Start {
 
 	pub fn finish(&mut self) -> immutable::Start {
 		immutable::Start {
-			random_seed: self.random_seed.finish(),
-			scene_frame_counter: self.scene_frame_counter.as_mut().map(|x| x.finish()),
+			random_seed: mem::take(&mut self.random_seed),
+			scene_frame_counter: mem::take(&mut self.scene_frame_counter),
 			validity: self.validity.finish(),
 		}
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Start {
 		transpose::Start {
-			random_seed: self.random_seed.values_slice()[i],
-			scene_frame_counter: self
-				.scene_frame_counter
-				.as_ref()
-				.map(|x| x.values_slice()[i]),
+			random_seed: self.random_seed[i],
+			scene_frame_counter: self.scene_frame_counter.as_ref().map(|x| x[i]),
 		}
 	}
 }
@@ -1271,21 +1190,21 @@ impl Start {
 /// Miscellaneous state flags.
 
 pub struct StateFlags(
-	pub PrimitiveBuilder<UInt8Type>,
-	pub PrimitiveBuilder<UInt8Type>,
-	pub PrimitiveBuilder<UInt8Type>,
-	pub PrimitiveBuilder<UInt8Type>,
-	pub PrimitiveBuilder<UInt8Type>,
+	pub Vec<u8>,
+	pub Vec<u8>,
+	pub Vec<u8>,
+	pub Vec<u8>,
+	pub Vec<u8>,
 );
 
 impl StateFlags {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self(
-			PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
-			PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
-			PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
-			PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
-			PrimitiveBuilder::<UInt8Type>::with_capacity(capacity),
+			Vec::with_capacity(capacity),
+			Vec::with_capacity(capacity),
+			Vec::with_capacity(capacity),
+			Vec::with_capacity(capacity),
+			Vec::with_capacity(capacity),
 		)
 	}
 
@@ -1293,49 +1212,43 @@ impl StateFlags {
 		self.0.len()
 	}
 
-	pub fn append_null(&mut self, version: Version) {
-		self.0.append_null();
-		self.1.append_null();
-		self.2.append_null();
-		self.3.append_null();
-		self.4.append_null()
+	pub fn append_default(&mut self, version: Version) {
+		self.0.push(0u8);
+		self.1.push(0u8);
+		self.2.push(0u8);
+		self.3.push(0u8);
+		self.4.push(0u8)
 	}
 
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.0.append_value(x))?;
-		r.read_u8().map(|x| self.1.append_value(x))?;
-		r.read_u8().map(|x| self.2.append_value(x))?;
-		r.read_u8().map(|x| self.3.append_value(x))?;
-		r.read_u8().map(|x| self.4.append_value(x))?;
+		r.read_u8().map(|x| self.0.push(x))?;
+		r.read_u8().map(|x| self.1.push(x))?;
+		r.read_u8().map(|x| self.2.push(x))?;
+		r.read_u8().map(|x| self.3.push(x))?;
+		r.read_u8().map(|x| self.4.push(x))?;
 		Ok(())
 	}
 
 	pub fn finish(&mut self) -> immutable::StateFlags {
 		immutable::StateFlags(
-			self.0.finish(),
-			self.1.finish(),
-			self.2.finish(),
-			self.3.finish(),
-			self.4.finish(),
+			mem::take(&mut self.0),
+			mem::take(&mut self.1),
+			mem::take(&mut self.2),
+			mem::take(&mut self.3),
+			mem::take(&mut self.4),
 		)
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::StateFlags {
-		transpose::StateFlags(
-			self.0.values_slice()[i],
-			self.1.values_slice()[i],
-			self.2.values_slice()[i],
-			self.3.values_slice()[i],
-			self.4.values_slice()[i],
-		)
+		transpose::StateFlags(self.0[i], self.1[i], self.2[i], self.3[i], self.4[i])
 	}
 }
 
 /// Trigger state.
 
 pub struct TriggersPhysical {
-	pub l: PrimitiveBuilder<Float32Type>,
-	pub r: PrimitiveBuilder<Float32Type>,
+	pub l: Vec<f32>,
+	pub r: Vec<f32>,
 	/// Indicates which indexes are valid. Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: NullBufferBuilder,
 }
@@ -1343,8 +1256,8 @@ pub struct TriggersPhysical {
 impl TriggersPhysical {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self {
-			l: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
-			r: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
+			l: Vec::with_capacity(capacity),
+			r: Vec::with_capacity(capacity),
 			validity: NullBufferBuilder::new(capacity),
 		}
 	}
@@ -1353,32 +1266,31 @@ impl TriggersPhysical {
 		self.l.len()
 	}
 
-	pub fn append_null(&mut self, version: Version) {
-		self.validity.append_n_non_nulls(self.len());
-		self.validity.append_null();
-		self.l.append_null();
-		self.r.append_null()
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.append_non_null();
+		self.l.push(0f32);
+		self.r.push(0f32)
 	}
 
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>().map(|x| self.l.append_value(x))?;
-		r.read_f32::<BE>().map(|x| self.r.append_value(x))?;
+		r.read_f32::<BE>().map(|x| self.l.push(x))?;
+		r.read_f32::<BE>().map(|x| self.r.push(x))?;
 		self.validity.append_non_null();
 		Ok(())
 	}
 
 	pub fn finish(&mut self) -> immutable::TriggersPhysical {
 		immutable::TriggersPhysical {
-			l: self.l.finish(),
-			r: self.r.finish(),
+			l: mem::take(&mut self.l),
+			r: mem::take(&mut self.r),
 			validity: self.validity.finish(),
 		}
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::TriggersPhysical {
 		transpose::TriggersPhysical {
-			l: self.l.values_slice()[i],
-			r: self.r.values_slice()[i],
+			l: self.l[i],
+			r: self.r[i],
 		}
 	}
 }
@@ -1387,15 +1299,15 @@ impl TriggersPhysical {
 
 pub struct Velocities {
 	/// Self-induced x-velocity (airborne)
-	pub self_x_air: PrimitiveBuilder<Float32Type>,
+	pub self_x_air: Vec<f32>,
 	/// Self-induced y-velocity
-	pub self_y: PrimitiveBuilder<Float32Type>,
+	pub self_y: Vec<f32>,
 	/// Knockback-induced x-velocity
-	pub knockback_x: PrimitiveBuilder<Float32Type>,
+	pub knockback_x: Vec<f32>,
 	/// Knockback-induced y-velocity
-	pub knockback_y: PrimitiveBuilder<Float32Type>,
+	pub knockback_y: Vec<f32>,
 	/// Self-induced x-velocity (grounded)
-	pub self_x_ground: PrimitiveBuilder<Float32Type>,
+	pub self_x_ground: Vec<f32>,
 	/// Indicates which indexes are valid. Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: NullBufferBuilder,
 }
@@ -1403,11 +1315,11 @@ pub struct Velocities {
 impl Velocities {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self {
-			self_x_air: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
-			self_y: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
-			knockback_x: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
-			knockback_y: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
-			self_x_ground: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
+			self_x_air: Vec::with_capacity(capacity),
+			self_y: Vec::with_capacity(capacity),
+			knockback_x: Vec::with_capacity(capacity),
+			knockback_y: Vec::with_capacity(capacity),
+			self_x_ground: Vec::with_capacity(capacity),
 			validity: NullBufferBuilder::new(capacity),
 		}
 	}
@@ -1416,48 +1328,43 @@ impl Velocities {
 		self.self_x_air.len()
 	}
 
-	pub fn append_null(&mut self, version: Version) {
-		self.validity.append_n_non_nulls(self.len());
-		self.validity.append_null();
-		self.self_x_air.append_null();
-		self.self_y.append_null();
-		self.knockback_x.append_null();
-		self.knockback_y.append_null();
-		self.self_x_ground.append_null()
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.append_non_null();
+		self.self_x_air.push(0f32);
+		self.self_y.push(0f32);
+		self.knockback_x.push(0f32);
+		self.knockback_y.push(0f32);
+		self.self_x_ground.push(0f32)
 	}
 
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>()
-			.map(|x| self.self_x_air.append_value(x))?;
-		r.read_f32::<BE>().map(|x| self.self_y.append_value(x))?;
-		r.read_f32::<BE>()
-			.map(|x| self.knockback_x.append_value(x))?;
-		r.read_f32::<BE>()
-			.map(|x| self.knockback_y.append_value(x))?;
-		r.read_f32::<BE>()
-			.map(|x| self.self_x_ground.append_value(x))?;
+		r.read_f32::<BE>().map(|x| self.self_x_air.push(x))?;
+		r.read_f32::<BE>().map(|x| self.self_y.push(x))?;
+		r.read_f32::<BE>().map(|x| self.knockback_x.push(x))?;
+		r.read_f32::<BE>().map(|x| self.knockback_y.push(x))?;
+		r.read_f32::<BE>().map(|x| self.self_x_ground.push(x))?;
 		self.validity.append_non_null();
 		Ok(())
 	}
 
 	pub fn finish(&mut self) -> immutable::Velocities {
 		immutable::Velocities {
-			self_x_air: self.self_x_air.finish(),
-			self_y: self.self_y.finish(),
-			knockback_x: self.knockback_x.finish(),
-			knockback_y: self.knockback_y.finish(),
-			self_x_ground: self.self_x_ground.finish(),
+			self_x_air: mem::take(&mut self.self_x_air),
+			self_y: mem::take(&mut self.self_y),
+			knockback_x: mem::take(&mut self.knockback_x),
+			knockback_y: mem::take(&mut self.knockback_y),
+			self_x_ground: mem::take(&mut self.self_x_ground),
 			validity: self.validity.finish(),
 		}
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Velocities {
 		transpose::Velocities {
-			self_x_air: self.self_x_air.values_slice()[i],
-			self_y: self.self_y.values_slice()[i],
-			knockback_x: self.knockback_x.values_slice()[i],
-			knockback_y: self.knockback_y.values_slice()[i],
-			self_x_ground: self.self_x_ground.values_slice()[i],
+			self_x_air: self.self_x_air[i],
+			self_y: self.self_y[i],
+			knockback_x: self.knockback_x[i],
+			knockback_y: self.knockback_y[i],
+			self_x_ground: self.self_x_ground[i],
 		}
 	}
 }
@@ -1465,8 +1372,8 @@ impl Velocities {
 /// 2D velocity.
 
 pub struct Velocity {
-	pub x: PrimitiveBuilder<Float32Type>,
-	pub y: PrimitiveBuilder<Float32Type>,
+	pub x: Vec<f32>,
+	pub y: Vec<f32>,
 	/// Indicates which indexes are valid. Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: NullBufferBuilder,
 }
@@ -1474,8 +1381,8 @@ pub struct Velocity {
 impl Velocity {
 	fn with_capacity(capacity: usize, version: Version) -> Self {
 		Self {
-			x: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
-			y: PrimitiveBuilder::<Float32Type>::with_capacity(capacity),
+			x: Vec::with_capacity(capacity),
+			y: Vec::with_capacity(capacity),
 			validity: NullBufferBuilder::new(capacity),
 		}
 	}
@@ -1484,32 +1391,31 @@ impl Velocity {
 		self.x.len()
 	}
 
-	pub fn append_null(&mut self, version: Version) {
-		self.validity.append_n_non_nulls(self.len());
-		self.validity.append_null();
-		self.x.append_null();
-		self.y.append_null()
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.append_non_null();
+		self.x.push(0f32);
+		self.y.push(0f32)
 	}
 
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>().map(|x| self.x.append_value(x))?;
-		r.read_f32::<BE>().map(|x| self.y.append_value(x))?;
+		r.read_f32::<BE>().map(|x| self.x.push(x))?;
+		r.read_f32::<BE>().map(|x| self.y.push(x))?;
 		self.validity.append_non_null();
 		Ok(())
 	}
 
 	pub fn finish(&mut self) -> immutable::Velocity {
 		immutable::Velocity {
-			x: self.x.finish(),
-			y: self.y.finish(),
+			x: mem::take(&mut self.x),
+			y: mem::take(&mut self.y),
 			validity: self.validity.finish(),
 		}
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Velocity {
 		transpose::Velocity {
-			x: self.x.values_slice()[i],
-			y: self.y.values_slice()[i],
+			x: self.x[i],
+			y: self.y[i],
 		}
 	}
 }

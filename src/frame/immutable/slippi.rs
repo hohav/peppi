@@ -11,10 +11,10 @@ use byteorder::WriteBytesExt;
 
 use crate::{
 	frame::{
-		immutable::{Data, Frame, PortData},
 		PortOccupancy,
+		immutable::{Data, Frame, PortData},
 	},
-	io::slippi::{de::Event, Version},
+	io::slippi::{Version, de::Event},
 };
 
 type BE = byteorder::BigEndian;
@@ -137,7 +137,7 @@ impl PortData {
 
 impl Frame {
 	pub fn write<W: Write>(&self, w: &mut W, version: Version) -> Result<()> {
-		for (idx, &frame_id) in self.id.values().iter().enumerate() {
+		for (idx, &frame_id) in self.id.iter().enumerate() {
 			if version.gte(2, 2) {
 				w.write_u8(Event::FrameStart as u8)?;
 				w.write_i32::<BE>(frame_id)?;
@@ -205,7 +205,7 @@ use crate::frame::immutable::DreamlandWhispy;
 
 impl DreamlandWhispy {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_u8(self.direction.value(i))?;
+		w.write_u8(self.direction[i])?;
 		Ok(())
 	}
 
@@ -221,7 +221,7 @@ use crate::frame::immutable::End;
 impl End {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		if version.gte(3, 7) {
-			w.write_i32::<BE>(self.latest_finalized_frame.as_ref().unwrap().value(i))?
+			w.write_i32::<BE>(self.latest_finalized_frame.as_ref().unwrap()[i])?
 		};
 		Ok(())
 	}
@@ -239,8 +239,8 @@ use crate::frame::immutable::FodPlatform;
 
 impl FodPlatform {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_u8(self.platform.value(i))?;
-		w.write_f32::<BE>(self.height.value(i))?;
+		w.write_u8(self.platform[i])?;
+		w.write_f32::<BE>(self.height[i])?;
 		Ok(())
 	}
 
@@ -256,20 +256,20 @@ use crate::frame::immutable::Item;
 
 impl Item {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_u16::<BE>(self.r#type.value(i))?;
-		w.write_u8(self.state.value(i))?;
-		w.write_f32::<BE>(self.direction.value(i))?;
+		w.write_u16::<BE>(self.r#type[i])?;
+		w.write_u8(self.state[i])?;
+		w.write_f32::<BE>(self.direction[i])?;
 		self.velocity.write(w, version, i)?;
 		self.position.write(w, version, i)?;
-		w.write_u16::<BE>(self.damage.value(i))?;
-		w.write_f32::<BE>(self.timer.value(i))?;
-		w.write_u32::<BE>(self.id.value(i))?;
+		w.write_u16::<BE>(self.damage[i])?;
+		w.write_f32::<BE>(self.timer[i])?;
+		w.write_u32::<BE>(self.id[i])?;
 		if version.gte(3, 2) {
 			self.misc.as_ref().unwrap().write(w, version, i)?;
 			if version.gte(3, 6) {
-				w.write_i8(self.owner.as_ref().unwrap().value(i))?;
+				w.write_i8(self.owner.as_ref().unwrap()[i])?;
 				if version.gte(3, 16) {
-					w.write_u16::<BE>(self.instance_id.as_ref().unwrap().value(i))?
+					w.write_u16::<BE>(self.instance_id.as_ref().unwrap()[i])?
 				}
 			}
 		};
@@ -303,10 +303,10 @@ use crate::frame::immutable::ItemMisc;
 
 impl ItemMisc {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_u8(self.0.value(i))?;
-		w.write_u8(self.1.value(i))?;
-		w.write_u8(self.2.value(i))?;
-		w.write_u8(self.3.value(i))?;
+		w.write_u8(self.0[i])?;
+		w.write_u8(self.1[i])?;
+		w.write_u8(self.2[i])?;
+		w.write_u8(self.3[i])?;
 		Ok(())
 	}
 
@@ -324,8 +324,8 @@ use crate::frame::immutable::Position;
 
 impl Position {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_f32::<BE>(self.x.value(i))?;
-		w.write_f32::<BE>(self.y.value(i))?;
+		w.write_f32::<BE>(self.x[i])?;
+		w.write_f32::<BE>(self.y[i])?;
 		Ok(())
 	}
 
@@ -341,38 +341,38 @@ use crate::frame::immutable::Post;
 
 impl Post {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_u8(self.character.value(i))?;
-		w.write_u16::<BE>(self.state.value(i))?;
+		w.write_u8(self.character[i])?;
+		w.write_u16::<BE>(self.state[i])?;
 		self.position.write(w, version, i)?;
-		w.write_f32::<BE>(self.direction.value(i))?;
-		w.write_f32::<BE>(self.percent.value(i))?;
-		w.write_f32::<BE>(self.shield.value(i))?;
-		w.write_u8(self.last_attack_landed.value(i))?;
-		w.write_u8(self.combo_count.value(i))?;
-		w.write_u8(self.last_hit_by.value(i))?;
-		w.write_u8(self.stocks.value(i))?;
+		w.write_f32::<BE>(self.direction[i])?;
+		w.write_f32::<BE>(self.percent[i])?;
+		w.write_f32::<BE>(self.shield[i])?;
+		w.write_u8(self.last_attack_landed[i])?;
+		w.write_u8(self.combo_count[i])?;
+		w.write_u8(self.last_hit_by[i])?;
+		w.write_u8(self.stocks[i])?;
 		if version.gte(0, 2) {
-			w.write_f32::<BE>(self.state_age.as_ref().unwrap().value(i))?;
+			w.write_f32::<BE>(self.state_age.as_ref().unwrap()[i])?;
 			if version.gte(2, 0) {
 				self.state_flags.as_ref().unwrap().write(w, version, i)?;
-				w.write_f32::<BE>(self.misc_as.as_ref().unwrap().value(i))?;
-				w.write_u8(self.airborne.as_ref().unwrap().value(i))?;
-				w.write_u16::<BE>(self.ground.as_ref().unwrap().value(i))?;
-				w.write_u8(self.jumps.as_ref().unwrap().value(i))?;
-				w.write_u8(self.l_cancel.as_ref().unwrap().value(i))?;
+				w.write_f32::<BE>(self.misc_as.as_ref().unwrap()[i])?;
+				w.write_u8(self.airborne.as_ref().unwrap()[i])?;
+				w.write_u16::<BE>(self.ground.as_ref().unwrap()[i])?;
+				w.write_u8(self.jumps.as_ref().unwrap()[i])?;
+				w.write_u8(self.l_cancel.as_ref().unwrap()[i])?;
 				if version.gte(2, 1) {
-					w.write_u8(self.hurtbox_state.as_ref().unwrap().value(i))?;
+					w.write_u8(self.hurtbox_state.as_ref().unwrap()[i])?;
 					if version.gte(3, 5) {
 						self.velocities.as_ref().unwrap().write(w, version, i)?;
 						if version.gte(3, 8) {
-							w.write_f32::<BE>(self.hitlag.as_ref().unwrap().value(i))?;
+							w.write_f32::<BE>(self.hitlag.as_ref().unwrap()[i])?;
 							if version.gte(3, 11) {
-								w.write_u32::<BE>(self.animation_index.as_ref().unwrap().value(i))?;
+								w.write_u32::<BE>(self.animation_index.as_ref().unwrap()[i])?;
 								if version.gte(3, 16) {
 									w.write_u16::<BE>(
-										self.last_hit_by_instance.as_ref().unwrap().value(i),
+										self.last_hit_by_instance.as_ref().unwrap()[i],
 									)?;
-									w.write_u16::<BE>(self.instance_id.as_ref().unwrap().value(i))?
+									w.write_u16::<BE>(self.instance_id.as_ref().unwrap()[i])?
 								}
 							}
 						}
@@ -430,25 +430,25 @@ use crate::frame::immutable::Pre;
 
 impl Pre {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_u32::<BE>(self.random_seed.value(i))?;
-		w.write_u16::<BE>(self.state.value(i))?;
+		w.write_u32::<BE>(self.random_seed[i])?;
+		w.write_u16::<BE>(self.state[i])?;
 		self.position.write(w, version, i)?;
-		w.write_f32::<BE>(self.direction.value(i))?;
+		w.write_f32::<BE>(self.direction[i])?;
 		self.joystick.write(w, version, i)?;
 		self.cstick.write(w, version, i)?;
-		w.write_f32::<BE>(self.triggers.value(i))?;
-		w.write_u32::<BE>(self.buttons.value(i))?;
-		w.write_u16::<BE>(self.buttons_physical.value(i))?;
+		w.write_f32::<BE>(self.triggers[i])?;
+		w.write_u32::<BE>(self.buttons[i])?;
+		w.write_u16::<BE>(self.buttons_physical[i])?;
 		self.triggers_physical.write(w, version, i)?;
 		if version.gte(1, 2) {
-			w.write_i8(self.raw_analog_x.as_ref().unwrap().value(i))?;
+			w.write_i8(self.raw_analog_x.as_ref().unwrap()[i])?;
 			if version.gte(1, 4) {
-				w.write_f32::<BE>(self.percent.as_ref().unwrap().value(i))?;
+				w.write_f32::<BE>(self.percent.as_ref().unwrap()[i])?;
 				if version.gte(3, 15) {
-					w.write_i8(self.raw_analog_y.as_ref().unwrap().value(i))?;
+					w.write_i8(self.raw_analog_y.as_ref().unwrap()[i])?;
 					if version.gte(3, 17) {
-						w.write_i8(self.raw_analog_cstick_x.as_ref().unwrap().value(i))?;
-						w.write_i8(self.raw_analog_cstick_y.as_ref().unwrap().value(i))?
+						w.write_i8(self.raw_analog_cstick_x.as_ref().unwrap()[i])?;
+						w.write_i8(self.raw_analog_cstick_y.as_ref().unwrap()[i])?
 					}
 				}
 			}
@@ -489,8 +489,8 @@ use crate::frame::immutable::StadiumTransformation;
 
 impl StadiumTransformation {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_u16::<BE>(self.event.value(i))?;
-		w.write_u16::<BE>(self.r#type.value(i))?;
+		w.write_u16::<BE>(self.event[i])?;
+		w.write_u16::<BE>(self.r#type[i])?;
 		Ok(())
 	}
 
@@ -506,9 +506,9 @@ use crate::frame::immutable::Start;
 
 impl Start {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_u32::<BE>(self.random_seed.value(i))?;
+		w.write_u32::<BE>(self.random_seed[i])?;
 		if version.gte(3, 10) {
-			w.write_u32::<BE>(self.scene_frame_counter.as_ref().unwrap().value(i))?
+			w.write_u32::<BE>(self.scene_frame_counter.as_ref().unwrap()[i])?
 		};
 		Ok(())
 	}
@@ -527,11 +527,11 @@ use crate::frame::immutable::StateFlags;
 
 impl StateFlags {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_u8(self.0.value(i))?;
-		w.write_u8(self.1.value(i))?;
-		w.write_u8(self.2.value(i))?;
-		w.write_u8(self.3.value(i))?;
-		w.write_u8(self.4.value(i))?;
+		w.write_u8(self.0[i])?;
+		w.write_u8(self.1[i])?;
+		w.write_u8(self.2[i])?;
+		w.write_u8(self.3[i])?;
+		w.write_u8(self.4[i])?;
 		Ok(())
 	}
 
@@ -550,8 +550,8 @@ use crate::frame::immutable::TriggersPhysical;
 
 impl TriggersPhysical {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_f32::<BE>(self.l.value(i))?;
-		w.write_f32::<BE>(self.r.value(i))?;
+		w.write_f32::<BE>(self.l[i])?;
+		w.write_f32::<BE>(self.r[i])?;
 		Ok(())
 	}
 
@@ -567,11 +567,11 @@ use crate::frame::immutable::Velocities;
 
 impl Velocities {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_f32::<BE>(self.self_x_air.value(i))?;
-		w.write_f32::<BE>(self.self_y.value(i))?;
-		w.write_f32::<BE>(self.knockback_x.value(i))?;
-		w.write_f32::<BE>(self.knockback_y.value(i))?;
-		w.write_f32::<BE>(self.self_x_ground.value(i))?;
+		w.write_f32::<BE>(self.self_x_air[i])?;
+		w.write_f32::<BE>(self.self_y[i])?;
+		w.write_f32::<BE>(self.knockback_x[i])?;
+		w.write_f32::<BE>(self.knockback_y[i])?;
+		w.write_f32::<BE>(self.self_x_ground[i])?;
 		Ok(())
 	}
 
@@ -590,8 +590,8 @@ use crate::frame::immutable::Velocity;
 
 impl Velocity {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
-		w.write_f32::<BE>(self.x.value(i))?;
-		w.write_f32::<BE>(self.y.value(i))?;
+		w.write_f32::<BE>(self.x[i])?;
+		w.write_f32::<BE>(self.y[i])?;
 		Ok(())
 	}
 

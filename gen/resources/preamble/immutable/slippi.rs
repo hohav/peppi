@@ -12,7 +12,7 @@ use crate::{
 		immutable::{Data, Frame, PortData},
 		PortOccupancy,
 	},
-	io::slippi::{Version, de::Event},
+	io::slippi::{de::Event, Version},
 };
 
 type BE = byteorder::BigEndian;
@@ -79,24 +79,22 @@ impl PortData {
 				follower: false,
 			},
 		)?;
-		self.follower
-			.as_ref()
-			.map_or(Ok(()), |f| {
-				if f.validity.as_ref().map_or(true, |v| v.is_valid(idx)) {
-					f.write_pre(
-						w,
-						version,
-						idx,
-						frame_id,
-						PortOccupancy {
-							port: self.port,
-							follower: true,
-						},
-					)
-				} else {
-					Ok(())
-				}
-			})
+		self.follower.as_ref().map_or(Ok(()), |f| {
+			if f.validity.as_ref().map_or(true, |v| v.is_valid(idx)) {
+				f.write_pre(
+					w,
+					version,
+					idx,
+					frame_id,
+					PortOccupancy {
+						port: self.port,
+						follower: true,
+					},
+				)
+			} else {
+				Ok(())
+			}
+		})
 	}
 
 	fn write_post<W: Write>(
@@ -116,30 +114,28 @@ impl PortData {
 				follower: false,
 			},
 		)?;
-		self.follower
-			.as_ref()
-			.map_or(Ok(()), |f| {
-				if f.validity.as_ref().map_or(true, |v| v.is_valid(idx)) {
-					f.write_post(
-						w,
-						version,
-						idx,
-						frame_id,
-						PortOccupancy {
-							port: self.port,
-							follower: true,
-						},
-					)
-				} else {
-					Ok(())
-				}
-			})
+		self.follower.as_ref().map_or(Ok(()), |f| {
+			if f.validity.as_ref().map_or(true, |v| v.is_valid(idx)) {
+				f.write_post(
+					w,
+					version,
+					idx,
+					frame_id,
+					PortOccupancy {
+						port: self.port,
+						follower: true,
+					},
+				)
+			} else {
+				Ok(())
+			}
+		})
 	}
 }
 
 impl Frame {
 	pub fn write<W: Write>(&self, w: &mut W, version: Version) -> Result<()> {
-		for (idx, &frame_id) in self.id.values().iter().enumerate() {
+		for (idx, &frame_id) in self.id.iter().enumerate() {
 			if version.gte(2, 2) {
 				w.write_u8(Event::FrameStart as u8)?;
 				w.write_i32::<BE>(frame_id)?;
@@ -154,7 +150,10 @@ impl Frame {
 				for evt_idx in (offset[idx] as usize)..(offset[idx + 1] as usize) {
 					w.write_u8(Event::FodPlatform as u8)?;
 					w.write_i32::<BE>(frame_id)?;
-					self.fod_platform.as_ref().unwrap().write(w, version, evt_idx)?;
+					self.fod_platform
+						.as_ref()
+						.unwrap()
+						.write(w, version, evt_idx)?;
 				}
 
 				// Dreamland Whispy
@@ -162,7 +161,10 @@ impl Frame {
 				for evt_idx in (offset[idx] as usize)..(offset[idx + 1] as usize) {
 					w.write_u8(Event::DreamlandWhispy as u8)?;
 					w.write_i32::<BE>(frame_id)?;
-					self.dreamland_whispy.as_ref().unwrap().write(w, version, evt_idx)?;
+					self.dreamland_whispy
+						.as_ref()
+						.unwrap()
+						.write(w, version, evt_idx)?;
 				}
 
 				// Stadium transformation
@@ -170,7 +172,10 @@ impl Frame {
 				for evt_idx in (offset[idx] as usize)..(offset[idx + 1] as usize) {
 					w.write_u8(Event::StadiumTransformation as u8)?;
 					w.write_i32::<BE>(frame_id)?;
-					self.stadium_transformation.as_ref().unwrap().write(w, version, evt_idx)?;
+					self.stadium_transformation
+						.as_ref()
+						.unwrap()
+						.write(w, version, evt_idx)?;
 				}
 			}
 			if version.gte(3, 0) {

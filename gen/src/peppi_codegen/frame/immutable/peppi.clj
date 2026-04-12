@@ -41,9 +41,11 @@
 (defn arrow-values
   [{nm :name, ty :type, idx :index, ver :version}]
   (let [target (cond-> [:field-get "self" (or nm idx)]
-                 ver (#(vector :method-call % "unwrap"))
-				 (not (types ty)) (#(vector :method-call % "into_struct_array" ["version"])))]
-	[:cast [:fn-call "Arc" "new" [target]] "ArrayRef"]))
+                 ver (#(vector :method-call % "unwrap")))
+        target (if-let [prim-ty (primitive-types-suffixed ty)]
+                 [:fn-call ["PrimitiveArray" prim-ty] "from" [target]]
+                 [:method-call target "into_struct_array" ["version"]])]
+    [:cast [:fn-call "Arc" "new" [target]] "ArrayRef"]))
 
 (defn push-call
   [field]
@@ -67,6 +69,20 @@
           (into [:block let-values])
           (append struct-init))]))
 
+(defn downcast-into
+  [target as]
+  [:method-call
+   [:field-get
+    [:method-call
+     [:fn-call
+      {:generics [as]}
+      nil
+      "downcast_array"
+      [[:method-call target "as_ref"]]]
+     "into_parts"]
+    "1"]
+   "into"])
+
 (defn downcast-clone
   [target as]
   [:method-call
@@ -88,7 +104,7 @@
         ver-target (if ver "x" target)
         body (cond
                (primitive-types ty)
-               (downcast-clone ver-target ["PrimitiveArray" (primitive-types-suffixed ty)])
+               (downcast-into ver-target ["PrimitiveArray" (primitive-types-suffixed ty)])
 
                (nil? ty)
                (downcast-clone ver-target "NullArray")
@@ -113,10 +129,10 @@
     [:let
      ["_" "values" "validity"]
      [:method-call "array" "into_parts"]]
-     [:struct-init
-      "Self"
-      (cond->> (mapv (juxt :name from-struct-array) fields)
-        (named? fields) (append ["validity" "validity"]))]]])
+    [:struct-init
+     "Self"
+     (cond->> (mapv (juxt :name from-struct-array) fields)
+       (named? fields) (append ["validity" "validity"]))]]])
 
 (defn struct-impl
   [[nm {:keys [fields]}]]

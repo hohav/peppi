@@ -5,6 +5,18 @@
    [clojure.pprint :refer [pprint]]
    [clojure.string :as str]))
 
+(def zero
+  {"i8"  "0i8"
+   "u8"  "0u8"
+   "i16" "0i16"
+   "u16" "0u16"
+   "i32" "0i32"
+   "u32" "0u32"
+   "i64" "0i64"
+   "u64" "0u64"
+   "f32" "0f32"
+   "f64" "0f64"})
+
 (def primitive-types
   {"i8"  "Int8"
    "u8"  "UInt8"
@@ -173,6 +185,10 @@
 (defmethod emit-expr* :unit
   [_]
   "()")
+
+(defmethod emit-expr* :ref
+  [{:keys [mut]} target]
+  (str "&" (when mut "mut") " " (emit-expr target)))
 
 (defmethod emit-expr* :string
   [_ s]

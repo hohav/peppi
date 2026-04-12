@@ -41,7 +41,10 @@ pub fn into_struct_array(c: &mut Criterion) {
 					|| contents.as_slice(),
 					|buf| {
 						let game = read(&mut Cursor::new(buf), None).unwrap();
-						game.frames.into_struct_array(game.start.slippi.version, &port_occupancy(&game.start))
+						game.frames.into_struct_array(
+							game.start.slippi.version,
+							&port_occupancy(&game.start),
+						)
 					},
 					BatchSize::LargeInput,
 				)

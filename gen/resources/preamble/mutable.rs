@@ -5,25 +5,23 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-use arrow::{
-	array::{ArrayBuilder, NullBufferBuilder, OffsetBufferBuilder, PrimitiveBuilder},
-	datatypes::{Float32Type, Int8Type, Int32Type, UInt8Type, UInt16Type, UInt32Type},
-};
+use arrow::array::{NullBufferBuilder, OffsetBufferBuilder};
 
 use byteorder::ReadBytesExt;
 use std::io::Result;
+use std::mem;
 
 use crate::{
-	io::slippi::Version,
 	frame::{immutable, transpose, PortOccupancy},
 	game::Port,
+	io::slippi::Version,
 };
 
 type BE = byteorder::BigEndian;
 
 fn start_end(buf: &Option<OffsetBufferBuilder<i32>>, i: usize) -> (usize, usize) {
 	let b = buf.as_ref().unwrap();
-	(b[i].try_into().unwrap(), b[i+1].try_into().unwrap())
+	(b[i].try_into().unwrap(), b[i + 1].try_into().unwrap())
 }
 
 /// Frame data for a single character (ICs are two characters).
@@ -47,17 +45,22 @@ impl Data {
 	}
 
 	pub fn append_null(&mut self, version: Version) {
-		self.validity.append_n_non_nulls(self.len());
 		self.validity.append_null();
-		self.pre.append_null(version);
-		self.post.append_null(version);
+		self.pre.append_default(version);
+		self.post.append_default(version);
 	}
 
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Data {
-		transpose::Data {
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.append_non_null();
+		self.pre.append_default(version);
+		self.post.append_default(version);
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> Option<transpose::Data> {
+		self.validity.is_valid(i).then(|| transpose::Data {
 			pre: self.pre.transpose_one(i, version),
 			post: self.post.transpose_one(i, version),
-		}
+		})
 	}
 
 	pub fn finish(&mut self) -> immutable::Data {
@@ -75,6 +78,7 @@ pub struct PortData {
 	pub leader: Data,
 	/// The "backup" ICs character
 	pub follower: Option<Data>,
+	pub validity: NullBufferBuilder,
 }
 
 impl PortData {
@@ -86,6 +90,7 @@ impl PortData {
 				true => Some(Data::with_capacity(capacity, version)),
 				_ => None,
 			},
+			validity: NullBufferBuilder::new(capacity),
 		}
 	}
 
@@ -93,12 +98,21 @@ impl PortData {
 		self.leader.len()
 	}
 
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::PortData {
-		transpose::PortData {
+	pub fn append_null(&mut self, version: Version) {
+		self.validity.append_null();
+		self.leader.append_default(version);
+		self.follower.as_mut().map(|f| f.append_default(version));
+	}
+
+	pub fn transpose_one(&self, i: usize, version: Version) -> Option<transpose::PortData> {
+		self.validity.is_valid(i).then(|| transpose::PortData {
 			port: self.port,
-			leader: self.leader.transpose_one(i, version),
-			follower: self.follower.as_ref().map(|f| f.transpose_one(i, version)),
-		}
+			leader: self.leader.transpose_one(i, version).unwrap(),
+			follower: self
+				.follower
+				.as_ref()
+				.and_then(|f| f.transpose_one(i, version)),
+		})
 	}
 
 	pub fn finish(&mut self) -> immutable::PortData {
@@ -106,11 +120,13 @@ impl PortData {
 			port,
 			leader,
 			follower,
+			validity,
 		} = self;
 		immutable::PortData {
 			port: *port,
 			leader: leader.finish(),
 			follower: follower.as_mut().map(|f| f.finish()),
+			validity: validity.finish(),
 		}
 	}
 }
@@ -118,7 +134,7 @@ impl PortData {
 /// All frame data for a single game, in struct-of-arrays format.
 pub struct Frame {
 	/// Frame IDs start at `-123` and increment each frame. May repeat in case of rollbacks
-	pub id: PrimitiveBuilder<Int32Type>,
+	pub id: Vec<i32>,
 	/// Port-specific data
 	pub ports: Vec<PortData>,
 	/// Start-of-frame data
@@ -144,21 +160,39 @@ pub struct Frame {
 impl Frame {
 	pub fn with_capacity(capacity: usize, version: Version, ports: &[PortOccupancy]) -> Self {
 		Self {
-			id: PrimitiveBuilder::<Int32Type>::with_capacity(capacity),
+			id: Vec::with_capacity(capacity),
 			ports: ports
 				.iter()
 				.map(|p| PortData::with_capacity(capacity, version, *p))
 				.collect(),
-			start: version.gte(2, 2).then(|| Start::with_capacity(capacity, version)),
-			end: version.gte(3, 0).then(|| End::with_capacity(capacity, version)),
+			start: version
+				.gte(2, 2)
+				.then(|| Start::with_capacity(capacity, version)),
+			end: version
+				.gte(3, 0)
+				.then(|| End::with_capacity(capacity, version)),
 			item: version.gte(3, 0).then(|| Item::with_capacity(0, version)),
-			item_offset: version.gte(3, 0).then(|| OffsetBufferBuilder::<i32>::new(capacity)),
-			fod_platform: version.gte(3, 18).then(|| FodPlatform::with_capacity(0, version)),
-			fod_platform_offset: version.gte(3, 18).then(|| OffsetBufferBuilder::<i32>::new(capacity)),
-			dreamland_whispy: version.gte(3, 18).then(|| DreamlandWhispy::with_capacity(0, version)),
-			dreamland_whispy_offset: version.gte(3, 18).then(|| OffsetBufferBuilder::<i32>::new(capacity)),
-			stadium_transformation: version.gte(3, 18).then(|| StadiumTransformation::with_capacity(0, version)),
-			stadium_transformation_offset: version.gte(3, 18).then(|| OffsetBufferBuilder::<i32>::new(capacity)),
+			item_offset: version
+				.gte(3, 0)
+				.then(|| OffsetBufferBuilder::<i32>::new(capacity)),
+			fod_platform: version
+				.gte(3, 18)
+				.then(|| FodPlatform::with_capacity(0, version)),
+			fod_platform_offset: version
+				.gte(3, 18)
+				.then(|| OffsetBufferBuilder::<i32>::new(capacity)),
+			dreamland_whispy: version
+				.gte(3, 18)
+				.then(|| DreamlandWhispy::with_capacity(0, version)),
+			dreamland_whispy_offset: version
+				.gte(3, 18)
+				.then(|| OffsetBufferBuilder::<i32>::new(capacity)),
+			stadium_transformation: version
+				.gte(3, 18)
+				.then(|| StadiumTransformation::with_capacity(0, version)),
+			stadium_transformation_offset: version
+				.gte(3, 18)
+				.then(|| OffsetBufferBuilder::<i32>::new(capacity)),
 		}
 	}
 
@@ -168,10 +202,18 @@ impl Frame {
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Frame {
 		transpose::Frame {
-			id: self.id.values_slice()[i],
-			ports: self.ports.iter().map(|p| p.transpose_one(i, version)).collect(),
-			start: version.gte(2, 2).then(|| self.start.as_ref().unwrap().transpose_one(i, version)),
-			end: version.gte(3, 0).then(|| self.end.as_ref().unwrap().transpose_one(i, version)),
+			id: self.id[i],
+			ports: self
+				.ports
+				.iter()
+				.map(|p| p.transpose_one(i, version))
+				.collect(),
+			start: version
+				.gte(2, 2)
+				.then(|| self.start.as_ref().unwrap().transpose_one(i, version)),
+			end: version
+				.gte(3, 0)
+				.then(|| self.end.as_ref().unwrap().transpose_one(i, version)),
 			items: version.gte(3, 0).then(|| {
 				let (start, end) = start_end(&self.item_offset, i);
 				(start..end)
@@ -181,52 +223,56 @@ impl Frame {
 			fod_platforms: version.gte(3, 18).then(|| {
 				let (start, end) = start_end(&self.fod_platform_offset, i);
 				(start..end)
-					.map(|i| self.fod_platform.as_ref().unwrap().transpose_one(i, version))
+					.map(|i| {
+						self.fod_platform
+							.as_ref()
+							.unwrap()
+							.transpose_one(i, version)
+					})
 					.collect()
 			}),
 			dreamland_whispys: version.gte(3, 18).then(|| {
 				let (start, end) = start_end(&self.dreamland_whispy_offset, i);
 				(start..end)
-					.map(|i| self.dreamland_whispy.as_ref().unwrap().transpose_one(i, version))
+					.map(|i| {
+						self.dreamland_whispy
+							.as_ref()
+							.unwrap()
+							.transpose_one(i, version)
+					})
 					.collect()
 			}),
 			stadium_transformations: version.gte(3, 18).then(|| {
 				let (start, end) = start_end(&self.stadium_transformation_offset, i);
 				(start..end)
-					.map(|i| self.stadium_transformation.as_ref().unwrap().transpose_one(i, version))
+					.map(|i| {
+						self.stadium_transformation
+							.as_ref()
+							.unwrap()
+							.transpose_one(i, version)
+					})
 					.collect()
 			}),
 		}
 	}
 
 	pub fn finish(&mut self) -> immutable::Frame {
-		let Self {
-			id,
-			ports,
-			start,
-			end,
-			item,
-			item_offset,
-			fod_platform,
-			fod_platform_offset,
-			dreamland_whispy,
-			dreamland_whispy_offset,
-			stadium_transformation,
-			stadium_transformation_offset,
-		} = self;
 		immutable::Frame {
-			id: id.finish(),
-			ports: ports.into_iter().map(|p| p.finish()).collect(),
-			start: start.as_mut().map(|x| x.finish()),
-			end: end.as_mut().map(|x| x.finish()),
-			item: item.as_mut().map(|x| x.finish()),
-			item_offset: item_offset.take().map(|x| x.finish()),
-			fod_platform: fod_platform.as_mut().map(|x| x.finish()),
-			fod_platform_offset: fod_platform_offset.take().map(|x| x.finish()),
-			dreamland_whispy: dreamland_whispy.as_mut().map(|x| x.finish()),
-			dreamland_whispy_offset: dreamland_whispy_offset.take().map(|x| x.finish()),
-			stadium_transformation: stadium_transformation.as_mut().map(|x| x.finish()),
-			stadium_transformation_offset: stadium_transformation_offset.take().map(|x| x.finish()),
+			id: mem::take(&mut self.id),
+			ports: self.ports.iter_mut().map(|p| p.finish()).collect(),
+			start: self.start.as_mut().map(|x| x.finish()),
+			end: self.end.as_mut().map(|x| x.finish()),
+			item: self.item.as_mut().map(|x| x.finish()),
+			item_offset: self.item_offset.take().map(|x| x.finish()),
+			fod_platform: self.fod_platform.as_mut().map(|x| x.finish()),
+			fod_platform_offset: self.fod_platform_offset.take().map(|x| x.finish()),
+			dreamland_whispy: self.dreamland_whispy.as_mut().map(|x| x.finish()),
+			dreamland_whispy_offset: self.dreamland_whispy_offset.take().map(|x| x.finish()),
+			stadium_transformation: self.stadium_transformation.as_mut().map(|x| x.finish()),
+			stadium_transformation_offset: self
+				.stadium_transformation_offset
+				.take()
+				.map(|x| x.finish()),
 		}
 	}
 }

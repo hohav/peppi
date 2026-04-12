@@ -15,10 +15,7 @@
     :generics (when-not (#{"u8" "i8"} ty) ["BE"])}
    "w"
    (str "write_" ty)
-   [[:method-call
-     target
-     "value"
-     ["i"]]]])
+   [[:subscript target "i"]]])
 
 (defn write-field-composite
   [target field]

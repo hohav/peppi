@@ -20,7 +20,7 @@ pub struct PortData {
 #[derive(PartialEq, Debug, Default)]
 pub struct Frame {
 	pub id: i32,
-	pub ports: Vec<PortData>,
+	pub ports: Vec<Option<PortData>>,
 	pub start: Option<Start>,
 	pub end: Option<End>,
 	pub items: Option<Vec<Item>>,

@@ -56,13 +56,7 @@ fn main() {
             continue;
         }
         for (port_idx, port_data) in game.frames.ports.iter().enumerate() {
-            match port_data
-                .leader
-                .post
-                .state
-                .get(frame_idx)
-                .and_then(|s| Common::try_from(s).ok())
-            {
+            match Common::try_from(port_data.leader.post.state[frame_idx]).ok() {
                 Some(DeadDown)
                 | Some(DeadLeft)
                 | Some(DeadRight)

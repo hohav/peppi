@@ -15,14 +15,10 @@ mod slippi;
 
 use std::fmt;
 
-use arrow::{
-	array::PrimitiveArray,
-	buffer::{NullBuffer, OffsetBuffer},
-	datatypes::{Float32Type, Int32Type, Int8Type, UInt16Type, UInt32Type, UInt8Type},
-};
+use arrow::buffer::{NullBuffer, OffsetBuffer};
 
 use crate::{
-	frame::{self, transpose, Rollbacks},
+	frame::{self, Rollbacks, transpose},
 	game::Port,
 	io::slippi::Version,
 };
@@ -41,11 +37,14 @@ pub struct Data {
 }
 
 impl Data {
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Data {
-		transpose::Data {
-			pre: self.pre.transpose_one(i, version),
-			post: self.post.transpose_one(i, version),
-		}
+	pub fn transpose_one(&self, i: usize, version: Version) -> Option<transpose::Data> {
+		self.validity
+			.as_ref()
+			.map_or(true, |v| v.is_valid(i))
+			.then(|| transpose::Data {
+				pre: self.pre.transpose_one(i, version),
+				post: self.post.transpose_one(i, version),
+			})
 	}
 }
 
@@ -56,22 +55,29 @@ pub struct PortData {
 	pub leader: Data,
 	/// The "backup" ICs character
 	pub follower: Option<Data>,
+	pub validity: Option<NullBuffer>,
 }
 
 impl PortData {
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::PortData {
-		transpose::PortData {
-			port: self.port,
-			leader: self.leader.transpose_one(i, version),
-			follower: self.follower.as_ref().map(|f| f.transpose_one(i, version)),
-		}
+	pub fn transpose_one(&self, i: usize, version: Version) -> Option<transpose::PortData> {
+		self.validity
+			.as_ref()
+			.map_or(true, |v| v.is_valid(i))
+			.then(|| transpose::PortData {
+				port: self.port,
+				leader: self.leader.transpose_one(i, version).unwrap(),
+				follower: self
+					.follower
+					.as_ref()
+					.and_then(|f| f.transpose_one(i, version)),
+			})
 	}
 }
 
 /// All frame data for a single game, in struct-of-arrays format.
 pub struct Frame {
 	/// Frame IDs start at `-123` and increment each frame. May repeat in case of rollbacks
-	pub id: PrimitiveArray<Int32Type>,
+	pub id: Vec<i32>,
 	/// Port-specific data
 	pub ports: Vec<PortData>,
 	/// Start-of-frame data
@@ -101,7 +107,7 @@ impl Frame {
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Frame {
 		transpose::Frame {
-			id: self.id.values()[i],
+			id: self.id[i],
 			ports: self
 				.ports
 				.iter()
@@ -161,14 +167,14 @@ impl Frame {
 	pub fn rollbacks(&self, keep: Rollbacks) -> Vec<bool> {
 		use Rollbacks::*;
 		match keep {
-			ExceptFirst => self.rollbacks_(self.id.values().iter().enumerate()),
-			ExceptLast => self.rollbacks_(self.id.values().iter().enumerate().rev()),
+			ExceptFirst => self.rollbacks_(self.id.iter().enumerate()),
+			ExceptLast => self.rollbacks_(self.id.iter().enumerate().rev()),
 		}
 	}
 
 	fn rollbacks_<'a>(&self, ids: impl Iterator<Item = (usize, &'a i32)>) -> Vec<bool> {
 		let mut result = vec![false; self.len()];
-		let unique_id_count = self.id.values().iter().max().map_or(0, |idx| {
+		let unique_id_count = self.id.iter().max().map_or(0, |idx| {
 			1 + usize::try_from(idx - frame::FIRST_INDEX).unwrap()
 		});
 		let mut seen = vec![false; unique_id_count];
@@ -195,7 +201,7 @@ impl fmt::Debug for Frame {
 #[derive(Debug)]
 pub struct DreamlandWhispy {
 	/// Which direction Whispy is blowing (0 = None, 1 = Left, 2 = Right)
-	pub direction: PrimitiveArray<UInt8Type>,
+	pub direction: Vec<u8>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<NullBuffer>,
 }
@@ -203,7 +209,7 @@ pub struct DreamlandWhispy {
 impl DreamlandWhispy {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::DreamlandWhispy {
 		transpose::DreamlandWhispy {
-			direction: self.direction.values()[i],
+			direction: self.direction[i],
 		}
 	}
 }
@@ -212,7 +218,7 @@ impl DreamlandWhispy {
 #[derive(Debug)]
 pub struct End {
 	/// *Added: v3.7* Index of the latest frame which is guaranteed not to happen again (rollback)
-	pub latest_finalized_frame: Option<PrimitiveArray<Int32Type>>,
+	pub latest_finalized_frame: Option<Vec<i32>>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<NullBuffer>,
 }
@@ -220,7 +226,7 @@ pub struct End {
 impl End {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::End {
 		transpose::End {
-			latest_finalized_frame: self.latest_finalized_frame.as_ref().map(|x| x.values()[i]),
+			latest_finalized_frame: self.latest_finalized_frame.as_ref().map(|x| x[i]),
 		}
 	}
 }
@@ -229,9 +235,9 @@ impl End {
 #[derive(Debug)]
 pub struct FodPlatform {
 	/// Which platform has moved. (0 = Right, 1 = Left)
-	pub platform: PrimitiveArray<UInt8Type>,
+	pub platform: Vec<u8>,
 	/// The platform's new height
-	pub height: PrimitiveArray<Float32Type>,
+	pub height: Vec<f32>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<NullBuffer>,
 }
@@ -239,8 +245,8 @@ pub struct FodPlatform {
 impl FodPlatform {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::FodPlatform {
 		transpose::FodPlatform {
-			platform: self.platform.values()[i],
-			height: self.height.values()[i],
+			platform: self.platform[i],
+			height: self.height[i],
 		}
 	}
 }
@@ -249,27 +255,27 @@ impl FodPlatform {
 #[derive(Debug)]
 pub struct Item {
 	/// Item type
-	pub r#type: PrimitiveArray<UInt16Type>,
+	pub r#type: Vec<u16>,
 	/// Item’s action state
-	pub state: PrimitiveArray<UInt8Type>,
+	pub state: Vec<u8>,
 	/// Direction item is facing
-	pub direction: PrimitiveArray<Float32Type>,
+	pub direction: Vec<f32>,
 	/// Item’s velocity
 	pub velocity: Velocity,
 	/// Item’s position
 	pub position: Position,
 	/// Amount of damage item has taken
-	pub damage: PrimitiveArray<UInt16Type>,
+	pub damage: Vec<u16>,
 	/// Frames remaining until item expires
-	pub timer: PrimitiveArray<Float32Type>,
+	pub timer: Vec<f32>,
 	/// Unique, serial ID per item spawned
-	pub id: PrimitiveArray<UInt32Type>,
+	pub id: Vec<u32>,
 	/// *Added: v3.2* Miscellaneous item state
 	pub misc: Option<ItemMisc>,
 	/// *Added: v3.6* Port that owns the item (-1 when unowned)
-	pub owner: Option<PrimitiveArray<Int8Type>>,
+	pub owner: Option<Vec<i8>>,
 	/// *Added: v3.16* Inherited instance ID of the owner (0 when unowned)
-	pub instance_id: Option<PrimitiveArray<UInt16Type>>,
+	pub instance_id: Option<Vec<u16>>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<NullBuffer>,
 }
@@ -277,46 +283,36 @@ pub struct Item {
 impl Item {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Item {
 		transpose::Item {
-			r#type: self.r#type.values()[i],
-			state: self.state.values()[i],
-			direction: self.direction.values()[i],
+			r#type: self.r#type[i],
+			state: self.state[i],
+			direction: self.direction[i],
 			velocity: self.velocity.transpose_one(i, version),
 			position: self.position.transpose_one(i, version),
-			damage: self.damage.values()[i],
-			timer: self.timer.values()[i],
-			id: self.id.values()[i],
+			damage: self.damage[i],
+			timer: self.timer[i],
+			id: self.id[i],
 			misc: self.misc.as_ref().map(|x| x.transpose_one(i, version)),
-			owner: self.owner.as_ref().map(|x| x.values()[i]),
-			instance_id: self.instance_id.as_ref().map(|x| x.values()[i]),
+			owner: self.owner.as_ref().map(|x| x[i]),
+			instance_id: self.instance_id.as_ref().map(|x| x[i]),
 		}
 	}
 }
 
 /// Miscellaneous item state.
 #[derive(Debug)]
-pub struct ItemMisc(
-	pub PrimitiveArray<UInt8Type>,
-	pub PrimitiveArray<UInt8Type>,
-	pub PrimitiveArray<UInt8Type>,
-	pub PrimitiveArray<UInt8Type>,
-);
+pub struct ItemMisc(pub Vec<u8>, pub Vec<u8>, pub Vec<u8>, pub Vec<u8>);
 
 impl ItemMisc {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::ItemMisc {
-		transpose::ItemMisc(
-			self.0.values()[i],
-			self.1.values()[i],
-			self.2.values()[i],
-			self.3.values()[i],
-		)
+		transpose::ItemMisc(self.0[i], self.1[i], self.2[i], self.3[i])
 	}
 }
 
 /// 2D position.
 #[derive(Debug)]
 pub struct Position {
-	pub x: PrimitiveArray<Float32Type>,
-	pub y: PrimitiveArray<Float32Type>,
+	pub x: Vec<f32>,
+	pub y: Vec<f32>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<NullBuffer>,
 }
@@ -324,8 +320,8 @@ pub struct Position {
 impl Position {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Position {
 		transpose::Position {
-			x: self.x.values()[i],
-			y: self.y.values()[i],
+			x: self.x[i],
+			y: self.y[i],
 		}
 	}
 }
@@ -336,51 +332,51 @@ impl Position {
 #[derive(Debug)]
 pub struct Post {
 	/// In-game character (can only change for Zelda/Sheik)
-	pub character: PrimitiveArray<UInt8Type>,
+	pub character: Vec<u8>,
 	/// Character’s action state
-	pub state: PrimitiveArray<UInt16Type>,
+	pub state: Vec<u16>,
 	/// Character’s position
 	pub position: Position,
 	/// Direction the character is facing
-	pub direction: PrimitiveArray<Float32Type>,
+	pub direction: Vec<f32>,
 	/// Damage taken (percent)
-	pub percent: PrimitiveArray<Float32Type>,
+	pub percent: Vec<f32>,
 	/// Size/health of shield
-	pub shield: PrimitiveArray<Float32Type>,
+	pub shield: Vec<f32>,
 	/// Last attack ID that this character landed
-	pub last_attack_landed: PrimitiveArray<UInt8Type>,
+	pub last_attack_landed: Vec<u8>,
 	/// Combo count (as defined by the game)
-	pub combo_count: PrimitiveArray<UInt8Type>,
+	pub combo_count: Vec<u8>,
 	/// Port that last hit this player. Bugged in Melee: will be set to `6` in certain situations
-	pub last_hit_by: PrimitiveArray<UInt8Type>,
+	pub last_hit_by: Vec<u8>,
 	/// Number of stocks remaining
-	pub stocks: PrimitiveArray<UInt8Type>,
+	pub stocks: Vec<u8>,
 	/// *Added: v0.2* Number of frames action state has been active. Can have a fractional component
-	pub state_age: Option<PrimitiveArray<Float32Type>>,
+	pub state_age: Option<Vec<f32>>,
 	/// *Added: v2.0* State flags
 	pub state_flags: Option<StateFlags>,
 	/// *Added: v2.0* Used for different things. While in hitstun, contains hitstun frames remaining
-	pub misc_as: Option<PrimitiveArray<Float32Type>>,
+	pub misc_as: Option<Vec<f32>>,
 	/// *Added: v2.0* Is the character airborne?
-	pub airborne: Option<PrimitiveArray<UInt8Type>>,
+	pub airborne: Option<Vec<u8>>,
 	/// *Added: v2.0* Ground ID the character last touched
-	pub ground: Option<PrimitiveArray<UInt16Type>>,
+	pub ground: Option<Vec<u16>>,
 	/// *Added: v2.0* Number of jumps remaining
-	pub jumps: Option<PrimitiveArray<UInt8Type>>,
+	pub jumps: Option<Vec<u8>>,
 	/// *Added: v2.0* L-cancel status (0 = none, 1 = successful, 2 = unsuccessful)
-	pub l_cancel: Option<PrimitiveArray<UInt8Type>>,
+	pub l_cancel: Option<Vec<u8>>,
 	/// *Added: v2.1* Hurtbox state (0 = vulnerable, 1 = invulnerable, 2 = intangible)
-	pub hurtbox_state: Option<PrimitiveArray<UInt8Type>>,
+	pub hurtbox_state: Option<Vec<u8>>,
 	/// *Added: v3.5* Self-induced and knockback velocities
 	pub velocities: Option<Velocities>,
 	/// *Added: v3.8* Hitlag frames remaining
-	pub hitlag: Option<PrimitiveArray<Float32Type>>,
+	pub hitlag: Option<Vec<f32>>,
 	/// *Added: v3.11* Animation the character is in
-	pub animation_index: Option<PrimitiveArray<UInt32Type>>,
+	pub animation_index: Option<Vec<u32>>,
 	/// *Added: v3.16* Instance ID of the player/item that last hit this player
-	pub last_hit_by_instance: Option<PrimitiveArray<UInt16Type>>,
+	pub last_hit_by_instance: Option<Vec<u16>>,
 	/// *Added: v3.16* Unique, serial ID for each new action state across all characters. Resets to 0 on death
-	pub instance_id: Option<PrimitiveArray<UInt16Type>>,
+	pub instance_id: Option<Vec<u16>>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<NullBuffer>,
 }
@@ -388,35 +384,35 @@ pub struct Post {
 impl Post {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Post {
 		transpose::Post {
-			character: self.character.values()[i],
-			state: self.state.values()[i],
+			character: self.character[i],
+			state: self.state[i],
 			position: self.position.transpose_one(i, version),
-			direction: self.direction.values()[i],
-			percent: self.percent.values()[i],
-			shield: self.shield.values()[i],
-			last_attack_landed: self.last_attack_landed.values()[i],
-			combo_count: self.combo_count.values()[i],
-			last_hit_by: self.last_hit_by.values()[i],
-			stocks: self.stocks.values()[i],
-			state_age: self.state_age.as_ref().map(|x| x.values()[i]),
+			direction: self.direction[i],
+			percent: self.percent[i],
+			shield: self.shield[i],
+			last_attack_landed: self.last_attack_landed[i],
+			combo_count: self.combo_count[i],
+			last_hit_by: self.last_hit_by[i],
+			stocks: self.stocks[i],
+			state_age: self.state_age.as_ref().map(|x| x[i]),
 			state_flags: self
 				.state_flags
 				.as_ref()
 				.map(|x| x.transpose_one(i, version)),
-			misc_as: self.misc_as.as_ref().map(|x| x.values()[i]),
-			airborne: self.airborne.as_ref().map(|x| x.values()[i]),
-			ground: self.ground.as_ref().map(|x| x.values()[i]),
-			jumps: self.jumps.as_ref().map(|x| x.values()[i]),
-			l_cancel: self.l_cancel.as_ref().map(|x| x.values()[i]),
-			hurtbox_state: self.hurtbox_state.as_ref().map(|x| x.values()[i]),
+			misc_as: self.misc_as.as_ref().map(|x| x[i]),
+			airborne: self.airborne.as_ref().map(|x| x[i]),
+			ground: self.ground.as_ref().map(|x| x[i]),
+			jumps: self.jumps.as_ref().map(|x| x[i]),
+			l_cancel: self.l_cancel.as_ref().map(|x| x[i]),
+			hurtbox_state: self.hurtbox_state.as_ref().map(|x| x[i]),
 			velocities: self
 				.velocities
 				.as_ref()
 				.map(|x| x.transpose_one(i, version)),
-			hitlag: self.hitlag.as_ref().map(|x| x.values()[i]),
-			animation_index: self.animation_index.as_ref().map(|x| x.values()[i]),
-			last_hit_by_instance: self.last_hit_by_instance.as_ref().map(|x| x.values()[i]),
-			instance_id: self.instance_id.as_ref().map(|x| x.values()[i]),
+			hitlag: self.hitlag.as_ref().map(|x| x[i]),
+			animation_index: self.animation_index.as_ref().map(|x| x[i]),
+			last_hit_by_instance: self.last_hit_by_instance.as_ref().map(|x| x[i]),
+			instance_id: self.instance_id.as_ref().map(|x| x[i]),
 		}
 	}
 }
@@ -427,35 +423,35 @@ impl Post {
 #[derive(Debug)]
 pub struct Pre {
 	/// Random seed
-	pub random_seed: PrimitiveArray<UInt32Type>,
+	pub random_seed: Vec<u32>,
 	/// Character’s action state
-	pub state: PrimitiveArray<UInt16Type>,
+	pub state: Vec<u16>,
 	/// Character’s position
 	pub position: Position,
 	/// Direction the character is facing
-	pub direction: PrimitiveArray<Float32Type>,
+	pub direction: Vec<f32>,
 	/// Processed analog joystick position
 	pub joystick: Position,
 	/// Processed analog c-stick position
 	pub cstick: Position,
 	/// Processed analog trigger position
-	pub triggers: PrimitiveArray<Float32Type>,
+	pub triggers: Vec<f32>,
 	/// Processed button-state bitmask
-	pub buttons: PrimitiveArray<UInt32Type>,
+	pub buttons: Vec<u32>,
 	/// Physical button-state bitmask
-	pub buttons_physical: PrimitiveArray<UInt16Type>,
+	pub buttons_physical: Vec<u16>,
 	/// Physical analog trigger positions (useful for IPM)
 	pub triggers_physical: TriggersPhysical,
 	/// *Added: v1.2* Raw joystick x-position
-	pub raw_analog_x: Option<PrimitiveArray<Int8Type>>,
+	pub raw_analog_x: Option<Vec<i8>>,
 	/// *Added: v1.4* Damage taken (percent)
-	pub percent: Option<PrimitiveArray<Float32Type>>,
+	pub percent: Option<Vec<f32>>,
 	/// *Added: v3.15* Raw joystick y-position
-	pub raw_analog_y: Option<PrimitiveArray<Int8Type>>,
+	pub raw_analog_y: Option<Vec<i8>>,
 	/// *Added: v3.17* Raw c-stick x-position
-	pub raw_analog_cstick_x: Option<PrimitiveArray<Int8Type>>,
+	pub raw_analog_cstick_x: Option<Vec<i8>>,
 	/// *Added: v3.17* Raw c-stick y-position
-	pub raw_analog_cstick_y: Option<PrimitiveArray<Int8Type>>,
+	pub raw_analog_cstick_y: Option<Vec<i8>>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<NullBuffer>,
 }
@@ -463,21 +459,21 @@ pub struct Pre {
 impl Pre {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Pre {
 		transpose::Pre {
-			random_seed: self.random_seed.values()[i],
-			state: self.state.values()[i],
+			random_seed: self.random_seed[i],
+			state: self.state[i],
 			position: self.position.transpose_one(i, version),
-			direction: self.direction.values()[i],
+			direction: self.direction[i],
 			joystick: self.joystick.transpose_one(i, version),
 			cstick: self.cstick.transpose_one(i, version),
-			triggers: self.triggers.values()[i],
-			buttons: self.buttons.values()[i],
-			buttons_physical: self.buttons_physical.values()[i],
+			triggers: self.triggers[i],
+			buttons: self.buttons[i],
+			buttons_physical: self.buttons_physical[i],
 			triggers_physical: self.triggers_physical.transpose_one(i, version),
-			raw_analog_x: self.raw_analog_x.as_ref().map(|x| x.values()[i]),
-			percent: self.percent.as_ref().map(|x| x.values()[i]),
-			raw_analog_y: self.raw_analog_y.as_ref().map(|x| x.values()[i]),
-			raw_analog_cstick_x: self.raw_analog_cstick_x.as_ref().map(|x| x.values()[i]),
-			raw_analog_cstick_y: self.raw_analog_cstick_y.as_ref().map(|x| x.values()[i]),
+			raw_analog_x: self.raw_analog_x.as_ref().map(|x| x[i]),
+			percent: self.percent.as_ref().map(|x| x[i]),
+			raw_analog_y: self.raw_analog_y.as_ref().map(|x| x[i]),
+			raw_analog_cstick_x: self.raw_analog_cstick_x.as_ref().map(|x| x[i]),
+			raw_analog_cstick_y: self.raw_analog_cstick_y.as_ref().map(|x| x[i]),
 		}
 	}
 }
@@ -486,9 +482,9 @@ impl Pre {
 #[derive(Debug)]
 pub struct StadiumTransformation {
 	/// The subevent for each transformation. (2 = Initialize, 3 = On monitor, 4 = Previous transformation receding, 5 = New transformation rising, 6 = Finalize, 0 = Finished)
-	pub event: PrimitiveArray<UInt16Type>,
+	pub event: Vec<u16>,
 	/// The current or upcoming transformation. (3 = Fire, 4 = Grass, 5 = Normal, 6 = Rock, 9 = Water)
-	pub r#type: PrimitiveArray<UInt16Type>,
+	pub r#type: Vec<u16>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<NullBuffer>,
 }
@@ -496,8 +492,8 @@ pub struct StadiumTransformation {
 impl StadiumTransformation {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::StadiumTransformation {
 		transpose::StadiumTransformation {
-			event: self.event.values()[i],
-			r#type: self.r#type.values()[i],
+			event: self.event[i],
+			r#type: self.r#type[i],
 		}
 	}
 }
@@ -506,9 +502,9 @@ impl StadiumTransformation {
 #[derive(Debug)]
 pub struct Start {
 	/// Random seed
-	pub random_seed: PrimitiveArray<UInt32Type>,
+	pub random_seed: Vec<u32>,
 	/// *Added: v3.10* Scene frame counter. Starts at 0, and increments every frame (even when paused)
-	pub scene_frame_counter: Option<PrimitiveArray<UInt32Type>>,
+	pub scene_frame_counter: Option<Vec<u32>>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<NullBuffer>,
 }
@@ -516,8 +512,8 @@ pub struct Start {
 impl Start {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Start {
 		transpose::Start {
-			random_seed: self.random_seed.values()[i],
-			scene_frame_counter: self.scene_frame_counter.as_ref().map(|x| x.values()[i]),
+			random_seed: self.random_seed[i],
+			scene_frame_counter: self.scene_frame_counter.as_ref().map(|x| x[i]),
 		}
 	}
 }
@@ -525,30 +521,24 @@ impl Start {
 /// Miscellaneous state flags.
 #[derive(Debug)]
 pub struct StateFlags(
-	pub PrimitiveArray<UInt8Type>,
-	pub PrimitiveArray<UInt8Type>,
-	pub PrimitiveArray<UInt8Type>,
-	pub PrimitiveArray<UInt8Type>,
-	pub PrimitiveArray<UInt8Type>,
+	pub Vec<u8>,
+	pub Vec<u8>,
+	pub Vec<u8>,
+	pub Vec<u8>,
+	pub Vec<u8>,
 );
 
 impl StateFlags {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::StateFlags {
-		transpose::StateFlags(
-			self.0.values()[i],
-			self.1.values()[i],
-			self.2.values()[i],
-			self.3.values()[i],
-			self.4.values()[i],
-		)
+		transpose::StateFlags(self.0[i], self.1[i], self.2[i], self.3[i], self.4[i])
 	}
 }
 
 /// Trigger state.
 #[derive(Debug)]
 pub struct TriggersPhysical {
-	pub l: PrimitiveArray<Float32Type>,
-	pub r: PrimitiveArray<Float32Type>,
+	pub l: Vec<f32>,
+	pub r: Vec<f32>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<NullBuffer>,
 }
@@ -556,8 +546,8 @@ pub struct TriggersPhysical {
 impl TriggersPhysical {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::TriggersPhysical {
 		transpose::TriggersPhysical {
-			l: self.l.values()[i],
-			r: self.r.values()[i],
+			l: self.l[i],
+			r: self.r[i],
 		}
 	}
 }
@@ -566,15 +556,15 @@ impl TriggersPhysical {
 #[derive(Debug)]
 pub struct Velocities {
 	/// Self-induced x-velocity (airborne)
-	pub self_x_air: PrimitiveArray<Float32Type>,
+	pub self_x_air: Vec<f32>,
 	/// Self-induced y-velocity
-	pub self_y: PrimitiveArray<Float32Type>,
+	pub self_y: Vec<f32>,
 	/// Knockback-induced x-velocity
-	pub knockback_x: PrimitiveArray<Float32Type>,
+	pub knockback_x: Vec<f32>,
 	/// Knockback-induced y-velocity
-	pub knockback_y: PrimitiveArray<Float32Type>,
+	pub knockback_y: Vec<f32>,
 	/// Self-induced x-velocity (grounded)
-	pub self_x_ground: PrimitiveArray<Float32Type>,
+	pub self_x_ground: Vec<f32>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<NullBuffer>,
 }
@@ -582,11 +572,11 @@ pub struct Velocities {
 impl Velocities {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Velocities {
 		transpose::Velocities {
-			self_x_air: self.self_x_air.values()[i],
-			self_y: self.self_y.values()[i],
-			knockback_x: self.knockback_x.values()[i],
-			knockback_y: self.knockback_y.values()[i],
-			self_x_ground: self.self_x_ground.values()[i],
+			self_x_air: self.self_x_air[i],
+			self_y: self.self_y[i],
+			knockback_x: self.knockback_x[i],
+			knockback_y: self.knockback_y[i],
+			self_x_ground: self.self_x_ground[i],
 		}
 	}
 }
@@ -594,8 +584,8 @@ impl Velocities {
 /// 2D velocity.
 #[derive(Debug)]
 pub struct Velocity {
-	pub x: PrimitiveArray<Float32Type>,
-	pub y: PrimitiveArray<Float32Type>,
+	pub x: Vec<f32>,
+	pub y: Vec<f32>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<NullBuffer>,
 }
@@ -603,8 +593,8 @@ pub struct Velocity {
 impl Velocity {
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Velocity {
 		transpose::Velocity {
-			x: self.x.values()[i],
-			y: self.y.values()[i],
+			x: self.x[i],
+			y: self.y[i],
 		}
 	}
 }
