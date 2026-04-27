@@ -2,7 +2,7 @@
 
 use crate::{
 	frame::{
-		immutable::{Data, Frame, PortData},
+		immutable::{Data, Frame, PortData, Validity},
 		PortOccupancy,
 	},
 	game::{Port, NUM_PORTS},
@@ -11,7 +11,7 @@ use crate::{
 
 use arrow::{
 	array::{downcast_array, Array, ArrayRef, ListArray, PrimitiveArray, StructArray},
-	buffer::OffsetBuffer,
+	buffer::{NullBuffer, OffsetBuffer, ScalarBuffer},
 	datatypes::{
 		DataType, Field, Fields, Float32Type, Int32Type, Int8Type, UInt16Type, UInt32Type,
 		UInt8Type,
@@ -30,6 +30,28 @@ trait StructArrayConvertible {
 	}
 }
 
+impl From<Option<NullBuffer>> for Validity {
+	fn from(nullbuf: Option<NullBuffer>) -> Validity {
+		let mut validity = Validity::with_capacity(nullbuf.as_ref().map_or(0, |v| v.len()));
+		if let Some(nullbuf) = nullbuf.as_ref() {
+			for value in nullbuf.iter() {
+				validity.push(value);
+			}
+		}
+		validity
+	}
+}
+
+impl From<Validity> for Option<NullBuffer> {
+	fn from(validity: Validity) -> Option<NullBuffer> {
+		if validity.values.capacity() > 0 {
+			Some(NullBuffer::from(validity.values))
+		} else {
+			None
+		}
+	}
+}
+
 impl StructArrayConvertible for Data {
 	fn fields(version: Version) -> Fields {
 		Fields::from(vec![
@@ -43,7 +65,11 @@ impl StructArrayConvertible for Data {
 			Arc::new(self.pre.into_struct_array(version)) as ArrayRef,
 			Arc::new(self.post.into_struct_array(version)) as ArrayRef,
 		];
-		StructArray::new(Self::fields(version), values, self.validity)
+		StructArray::new(
+			Self::fields(version),
+			values,
+			self.validity.into(),
+		)
 	}
 
 	fn from_struct_array(array: StructArray, version: Version) -> Self {
@@ -65,7 +91,7 @@ impl StructArrayConvertible for Data {
 					.clone(),
 				version,
 			),
-			validity: validity,
+			validity: validity.into(),
 		}
 	}
 }
@@ -119,7 +145,7 @@ impl PortData {
 					version,
 				)
 			}),
-			validity: validity,
+			validity: validity.into(),
 		}
 	}
 }
@@ -235,7 +261,7 @@ impl Frame {
 				let item_values = Arc::new(self.item.unwrap().into_struct_array(version));
 				arrays.push(Arc::new(ListArray::new(
 					Self::item_field(version),
-					self.item_offset.unwrap(),
+					OffsetBuffer::new(ScalarBuffer::from(self.item_offset.unwrap())),
 					item_values,
 					None,
 				)) as ArrayRef);
@@ -244,7 +270,7 @@ impl Frame {
 						Arc::new(self.fod_platform.unwrap().into_struct_array(version));
 					arrays.push(Arc::new(ListArray::new(
 						Self::fod_platform_field(version),
-						self.fod_platform_offset.unwrap(),
+						OffsetBuffer::new(ScalarBuffer::from(self.fod_platform_offset.unwrap())),
 						fod_platform_values,
 						None,
 					)) as ArrayRef);
@@ -252,7 +278,7 @@ impl Frame {
 						Arc::new(self.dreamland_whispy.unwrap().into_struct_array(version));
 					arrays.push(Arc::new(ListArray::new(
 						Self::dreamland_whispy_field(version),
-						self.dreamland_whispy_offset.unwrap(),
+						OffsetBuffer::new(ScalarBuffer::from(self.dreamland_whispy_offset.unwrap())),
 						dreamland_whispy_values,
 						None,
 					)) as ArrayRef);
@@ -263,7 +289,7 @@ impl Frame {
 					);
 					arrays.push(Arc::new(ListArray::new(
 						Self::stadium_transformation_field(version),
-						self.stadium_transformation_offset.unwrap(),
+						OffsetBuffer::new(ScalarBuffer::from(self.stadium_transformation_offset.unwrap())),
 						stadium_transformation_values,
 						None,
 					)) as ArrayRef);
@@ -293,22 +319,18 @@ impl Frame {
 		arr: &Arc<dyn Array>,
 		version: Version,
 	) -> (Option<T>, Option<OffsetBuffer<i32>>) {
-		let arrays = arr.as_any().downcast_ref::<ListArray>().unwrap().clone();
-		let offsets = arrays.offsets().clone();
-		let values = T::from_struct_array(
-			arrays
-				.values()
-				.as_any()
-				.downcast_ref::<StructArray>()
-				.unwrap()
-				.clone(),
-			version,
-		);
+		println!("arr offset: {}", arr.offset());
+		let list_array = downcast_array::<ListArray>(arr);
+		println!("list_array offset: {}", list_array.offset());
+		let (_, offsets, values, _) = list_array.into_parts();
+		println!("ptr_offset 1: {}", offsets.inner().inner().ptr_offset());
+		let values = T::from_struct_array(downcast_array::<StructArray>(&values), version);
 		(Some(values), Some(offsets))
 	}
 
 	pub fn from_struct_array(array: StructArray, version: Version) -> Self {
 		let (fields, values, _) = array.into_parts();
+		println!("id offset: {}", values[0].offset());
 		assert_eq!("id", fields[0].name());
 		assert_eq!("ports", fields[1].name());
 		if version.gte(2, 2) {
@@ -363,13 +385,17 @@ impl Frame {
 				)
 			}),
 			item,
-			item_offset,
+			item_offset: item_offset // FIXME: avoid clone
+				.map(|buf| buf.into_inner().into_inner().typed_data().into()),
 			fod_platform,
-			fod_platform_offset,
+			fod_platform_offset: fod_platform_offset
+				.map(|buf| buf.into_inner().into_inner().typed_data().into()),
 			dreamland_whispy,
-			dreamland_whispy_offset,
+			dreamland_whispy_offset: dreamland_whispy_offset
+				.map(|buf| buf.into_inner().into_inner().typed_data().into()),
 			stadium_transformation,
-			stadium_transformation_offset,
+			stadium_transformation_offset: stadium_transformation_offset
+				.map(|buf| buf.into_inner().into_inner().typed_data().into()),
 		}
 	}
 }

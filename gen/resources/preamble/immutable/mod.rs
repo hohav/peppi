@@ -1,29 +1,89 @@
-//! Immutable (fully-parsed) frame data, as Arrow arrays.
+//! Immutable (fully-parsed) frame data, as a struct-of-arrays.
 //!
 //! This is what you get when you parse a game in one shot using [`crate::io::slippi::read`] or
 //! [`crate::io::peppi::read`].
-//!
-//! These arrays can be shared, and cloning them is `O(1)`. See the
-//! [arrow docs](https://docs.rs/arrow/latest/arrow/) for more.
 
 #![allow(unused_variables)]
 
 mod peppi;
 mod slippi;
 
+use std::cmp::max;
 use std::fmt;
+use std::io::Result;
 
-use arrow::buffer::{NullBuffer, OffsetBuffer};
+use byteorder::ReadBytesExt;
 
 use crate::{
-	frame::{self, transpose, Rollbacks},
+	frame::{self, transpose, PortOccupancy, Rollbacks},
 	game::Port,
 	io::slippi::Version,
 };
 
-fn start_end(buf: &Option<OffsetBuffer<i32>>, i: usize) -> (usize, usize) {
-	let b = buf.as_ref().unwrap();
-	(b[i].try_into().unwrap(), b[i + 1].try_into().unwrap())
+type BE = byteorder::BigEndian;
+
+/// TODO: docs, or switch to BitVec?
+#[derive(Debug)]
+pub struct Validity {
+	values: Vec<bool>,
+	len: usize,
+	capacity: usize,
+}
+
+impl Validity {
+	pub fn with_capacity(capacity: usize) -> Self {
+		Validity {
+			values: Vec::new(),
+			len: 0,
+			capacity: capacity,
+		}
+	}
+
+	pub fn len(&self) -> usize {
+		if self.values.capacity() > 0 {
+			self.values.len()
+		} else {
+			self.len
+		}
+	}
+
+	pub fn is_valid(&self, idx: usize) -> bool {
+		if self.values.capacity() > 0 {
+			self.values[idx]
+		} else {
+			true
+		}
+	}
+
+	pub fn push(&mut self, value: bool) {
+		if self.values.capacity() > 0 {
+			self.values.push(value);
+		} else if !value {
+			self.values.reserve(max(self.len + 1, self.capacity));
+			self.values.append(&mut vec![true; self.len]);
+			self.values.push(false);
+		} else {
+			self.len += 1;
+		}
+	}
+
+	pub fn into_vec(self) -> Option<Vec<bool>> {
+		(self.values.capacity() > 0).then(|| self.values)
+	}
+
+	pub fn null_count(&self) -> usize {
+		if self.values.capacity() > 0 {
+			let mut count = 0;
+			for v in &self.values {
+				if !v {
+					count += 1;
+				}
+			}
+			count
+		} else {
+			0
+		}
+	}
 }
 
 /// Frame data for a single character (ICs are two characters).
@@ -31,18 +91,39 @@ fn start_end(buf: &Option<OffsetBuffer<i32>>, i: usize) -> (usize, usize) {
 pub struct Data {
 	pub pre: Pre,
 	pub post: Post,
-	pub validity: Option<NullBuffer>,
+	pub validity: Validity,
 }
 
 impl Data {
+	pub fn with_capacity(capacity: usize, version: Version) -> Self {
+		Self {
+			pre: Pre::with_capacity(capacity, version),
+			post: Post::with_capacity(capacity, version),
+			validity: Validity::with_capacity(capacity),
+		}
+	}
+
+	pub fn len(&self) -> usize {
+		self.pre.len()
+	}
+
+	pub fn append_null(&mut self, version: Version) {
+		self.validity.push(false);
+		self.pre.append_default(version);
+		self.post.append_default(version);
+	}
+
+	pub fn append_default(&mut self, version: Version) {
+		self.validity.push(true);
+		self.pre.append_default(version);
+		self.post.append_default(version);
+	}
+
 	pub fn transpose_one(&self, i: usize, version: Version) -> Option<transpose::Data> {
-		self.validity
-			.as_ref()
-			.map_or(true, |v| v.is_valid(i))
-			.then(|| transpose::Data {
-				pre: self.pre.transpose_one(i, version),
-				post: self.post.transpose_one(i, version),
-			})
+		self.validity.is_valid(i).then(|| transpose::Data {
+			pre: self.pre.transpose_one(i, version),
+			post: self.post.transpose_one(i, version),
+		})
 	}
 }
 
@@ -53,22 +134,41 @@ pub struct PortData {
 	pub leader: Data,
 	/// The "backup" ICs character
 	pub follower: Option<Data>,
-	pub validity: Option<NullBuffer>,
+	pub validity: Validity,
 }
 
 impl PortData {
+	pub fn with_capacity(capacity: usize, version: Version, port: PortOccupancy) -> Self {
+		Self {
+			port: port.port,
+			leader: Data::with_capacity(capacity, version),
+			follower: match port.follower {
+				true => Some(Data::with_capacity(capacity, version)),
+				_ => None,
+			},
+			validity: Validity::with_capacity(capacity),
+		}
+	}
+
+	pub fn len(&self) -> usize {
+		self.leader.len()
+	}
+
+	pub fn append_null(&mut self, version: Version) {
+		self.validity.push(false);
+		self.leader.append_default(version);
+		self.follower.as_mut().map(|f| f.append_default(version));
+	}
+
 	pub fn transpose_one(&self, i: usize, version: Version) -> Option<transpose::PortData> {
-		self.validity
-			.as_ref()
-			.map_or(true, |v| v.is_valid(i))
-			.then(|| transpose::PortData {
-				port: self.port,
-				leader: self.leader.transpose_one(i, version).unwrap(),
-				follower: self
-					.follower
-					.as_ref()
-					.and_then(|f| f.transpose_one(i, version)),
-			})
+		self.validity.is_valid(i).then(|| transpose::PortData {
+			port: self.port,
+			leader: self.leader.transpose_one(i, version).unwrap(),
+			follower: self
+				.follower
+				.as_ref()
+				.and_then(|f| f.transpose_one(i, version)),
+		})
 	}
 }
 
@@ -86,19 +186,63 @@ pub struct Frame {
 	/// Item data
 	pub item: Option<Item>,
 	/// Logically, each frame has its own array of items. But we represent all item data in a flat array, with this field indicating the start of each sub-array
-	pub item_offset: Option<OffsetBuffer<i32>>,
+	pub item_offset: Option<Vec<i32>>,
 
 	pub fod_platform: Option<FodPlatform>,
-	pub fod_platform_offset: Option<OffsetBuffer<i32>>,
+	pub fod_platform_offset: Option<Vec<i32>>,
 
 	pub dreamland_whispy: Option<DreamlandWhispy>,
-	pub dreamland_whispy_offset: Option<OffsetBuffer<i32>>,
+	pub dreamland_whispy_offset: Option<Vec<i32>>,
 
 	pub stadium_transformation: Option<StadiumTransformation>,
-	pub stadium_transformation_offset: Option<OffsetBuffer<i32>>,
+	pub stadium_transformation_offset: Option<Vec<i32>>,
+}
+
+fn make_offsets(capacity: usize) -> Vec<i32> {
+	let mut offsets = Vec::with_capacity(capacity+1);
+	offsets.push(0);
+	offsets
 }
 
 impl Frame {
+	pub fn with_capacity(capacity: usize, version: Version, ports: &[PortOccupancy]) -> Self {
+		Self {
+			id: Vec::with_capacity(capacity),
+			ports: ports
+				.iter()
+				.map(|p| PortData::with_capacity(capacity, version, *p))
+				.collect(),
+			start: version
+				.gte(2, 2)
+				.then(|| Start::with_capacity(capacity, version)),
+			end: version
+				.gte(3, 0)
+				.then(|| End::with_capacity(capacity, version)),
+			item: version.gte(3, 0).then(|| Item::with_capacity(0, version)),
+			item_offset: version
+				.gte(3, 0)
+				.then(|| make_offsets(capacity)),
+			fod_platform: version
+				.gte(3, 18)
+				.then(|| FodPlatform::with_capacity(0, version)),
+			fod_platform_offset: version
+				.gte(3, 18)
+				.then(|| make_offsets(capacity)),
+			dreamland_whispy: version
+				.gte(3, 18)
+				.then(|| DreamlandWhispy::with_capacity(0, version)),
+			dreamland_whispy_offset: version
+				.gte(3, 18)
+				.then(|| make_offsets(capacity)),
+			stadium_transformation: version
+				.gte(3, 18)
+				.then(|| StadiumTransformation::with_capacity(0, version)),
+			stadium_transformation_offset: version
+				.gte(3, 18)
+				.then(|| make_offsets(capacity)),
+		}
+	}
+
 	pub fn len(&self) -> usize {
 		self.id.len()
 	}
@@ -118,42 +262,28 @@ impl Frame {
 				.gte(3, 0)
 				.then(|| self.end.as_ref().unwrap().transpose_one(i, version)),
 			items: version.gte(3, 0).then(|| {
-				let (start, end) = start_end(&self.item_offset, i);
-				(start..end)
+				let range = &self.item_offset.as_ref().unwrap()[i..i+2];
+				(usize::try_from(range[0]).unwrap() .. usize::try_from(range[1]).unwrap())
 					.map(|i| self.item.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
 			fod_platforms: version.gte(3, 18).then(|| {
-				let (start, end) = start_end(&self.fod_platform_offset, i);
-				(start..end)
-					.map(|i| {
-						self.fod_platform
-							.as_ref()
-							.unwrap()
-							.transpose_one(i, version)
-					})
+				let range = &self.fod_platform_offset.as_ref().unwrap()[i..i+2];
+				(usize::try_from(range[0]).unwrap() .. usize::try_from(range[1]).unwrap())
+					.map(|i| self.fod_platform.as_ref().unwrap().transpose_one(i, version)
+					)
 					.collect()
 			}),
 			dreamland_whispys: version.gte(3, 18).then(|| {
-				let (start, end) = start_end(&self.dreamland_whispy_offset, i);
-				(start..end)
-					.map(|i| {
-						self.dreamland_whispy
-							.as_ref()
-							.unwrap()
-							.transpose_one(i, version)
-					})
+				let range = &self.dreamland_whispy_offset.as_ref().unwrap()[i..i+2];
+				(usize::try_from(range[0]).unwrap() .. usize::try_from(range[1]).unwrap())
+					.map(|i| self.dreamland_whispy.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
 			stadium_transformations: version.gte(3, 18).then(|| {
-				let (start, end) = start_end(&self.stadium_transformation_offset, i);
-				(start..end)
-					.map(|i| {
-						self.stadium_transformation
-							.as_ref()
-							.unwrap()
-							.transpose_one(i, version)
-					})
+				let range = &self.stadium_transformation_offset.as_ref().unwrap()[i..i+2];
+				(usize::try_from(range[0]).unwrap() .. usize::try_from(range[1]).unwrap())
+					.map(|i| self.stadium_transformation.as_ref().unwrap().transpose_one(i, version))
 					.collect()
 			}),
 		}

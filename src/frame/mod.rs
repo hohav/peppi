@@ -3,14 +3,10 @@
 //! Peppi represents frame data using Arrow arrays (i.e. "struct-of-arrays").
 //! This allows us to efficiently share frame data with other languages,
 //! and enables simple serialization into a highly-compressible disk format.
-//!
-//! The mutable/immutable distinction is essentially an artifact of the underlying Arrow library.
-//! You'll only encounter mutable frame data if you're parsing live games.
 
 use crate::game::Port;
 
 pub mod immutable;
-pub mod mutable;
 pub mod transpose;
 
 /// Frame indexes start at -123, and reach 0 at "Go!".

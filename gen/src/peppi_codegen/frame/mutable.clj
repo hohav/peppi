@@ -44,8 +44,7 @@
 
 (defn with-capacity-fn
   [fields]
-  (let [bitmap-init [:fn-call "NullBufferBuilder" "new" ["capacity"]]
-		null-buffer-init [:fn-call "NullBufferBuilder" "new" ["capacity"]]]
+  (let [null-buffer-init [:fn-call "NullBufferBuilder" "new" ["capacity"]]]
     [:fn
      {:ret "Self"}
      "with_capacity"
@@ -56,6 +55,18 @@
        "Self"
        (cond->> (mapv (juxt :name with-capacity) fields)
          (named? fields) (append ["validity" null-buffer-init]))]]]))
+
+(defn len-fn
+  [[{nm :name, idx :index} :as fields]]
+  [:fn
+   {:visibility "pub"
+    :ret "usize"}
+   "len"
+   [["&self"]]
+   [:block
+    (if (every? :version fields)
+      [:method-call [:field-get "self" "validity"] "len"]
+      [:method-call [:field-get "self" (or nm idx)] "len"])]])
 
 (defn append-default-primitive
   [target ty]
@@ -128,18 +139,6 @@
       ty                   (read-append-composite target)
       :else                (read-append-null target))))
 
-(defn len-fn
-  [[{nm :name, idx :index} :as fields]]
-  [:fn
-   {:visibility "pub"
-    :ret "usize"}
-   "len"
-   [["&self"]]
-   [:block
-    (if (every? :version fields)
-      [:method-call [:field-get "self" "validity"] "len"]
-      [:method-call [:field-get "self" (or nm idx)] "len"])]])
-
 (defn read-append-fn
   [fields]
   [:fn
@@ -156,8 +155,8 @@
 (defn finish
   [{idx :index, nm :name, ver :version, ty :type}]
   (let [target [:field-get "self" (or nm idx)]]
-	(if (primitive-types ty)
-	  [:fn-call "mem" "take" [[:ref {:mut true} target]]]
+    (if (primitive-types ty)
+      [:fn-call "mem" "take" [[:ref {:mut true} target]]]
       (if ver
         (wrap-map (as-mut target) "x" [:method-call "x" "finish"])
         [:method-call target "finish"]))))
@@ -166,13 +165,13 @@
   [nm fields]
   [:fn
    {:visibility "pub"
-	:ret (list "immutable" nm)}
+    :ret (list "immutable" nm)}
    "finish"
    [["&mut self"]]
    [:block
     [:struct-init
-	 (list "immutable" nm)
-	 (cond->> (mapv (juxt :name finish) fields)
+     (list "immutable" nm)
+     (cond->> (mapv (juxt :name finish) fields)
        (named? fields) (append ["validity"
                                 [:method-call
                                  [:field-get "self" "validity"]
@@ -220,7 +219,7 @@
              (len-fn fields)
              (append-default-fn fields)
              (read-append-fn fields)
-			 (finish-fn nm fields)
+             (finish-fn nm fields)
              (immutable/transpose-one-fn nm fields "values_slice")]])
 
 (defn -main []

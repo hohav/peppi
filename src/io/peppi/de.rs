@@ -6,7 +6,7 @@ use arrow::array::StructArray;
 use arrow_ipc::reader::StreamReader;
 
 use crate::{
-	frame::{immutable::Frame, mutable::Frame as MutableFrame},
+	frame::immutable::Frame,
 	game::{self, immutable::Game, port_occupancy},
 	io::{Result, expect_bytes, peppi, slippi},
 };
@@ -107,8 +107,7 @@ pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<Game> {
 				frames = Some(match opts.map_or(false, |o| o.skip_frames) {
 					true => {
 						let start = start.as_ref().ok_or(err!("missing start"))?;
-						MutableFrame::with_capacity(0, start.slippi.version, &port_occupancy(start))
-							.finish()
+						Frame::with_capacity(0, start.slippi.version, &port_occupancy(start))
 					}
 					_ => read_arrow_frames(file, version)?,
 				});

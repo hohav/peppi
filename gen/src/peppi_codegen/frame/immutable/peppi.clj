@@ -59,7 +59,9 @@
                      "new"
                      [[:fn-call "Self" "fields" ["version"]]
                       "values"
-                      (if (named? fields) "self.validity" "None")]]]
+                      (if (named? fields)
+						[:method-call [:field-get "self" "validity"] "into"]
+						"None")]]]
     [:fn
      {:ret "StructArray"}
      "into_struct_array"
@@ -132,7 +134,7 @@
     [:struct-init
      "Self"
      (cond->> (mapv (juxt :name from-struct-array) fields)
-       (named? fields) (append ["validity" "validity"]))]]])
+       (named? fields) (append ["validity" [:method-call "validity" "into"]]))]]])
 
 (defn struct-impl
   [[nm {:keys [fields]}]]

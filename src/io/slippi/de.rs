@@ -6,14 +6,13 @@ use std::{
 	path::PathBuf,
 };
 
-use arrow::array::OffsetBufferBuilder;
 use byteorder::ReadBytesExt;
 use log::{debug, info, trace, warn};
 
 type BE = byteorder::BigEndian;
 
 use crate::{
-	frame::{self, mutable::Frame as MutableFrame, transpose},
+	frame::{self, immutable::Frame, transpose},
 	game::{
 		self, MAX_PLAYERS, Match, NUM_PORTS, Netplay, Player, PlayerType, Port, Quirks,
 		immutable::Game, port_occupancy, shift_jis::MeleeString,
@@ -67,7 +66,7 @@ struct SplitAccumulator {
 pub struct PartialGame {
 	pub start: game::Start,
 	pub end: Option<game::End>,
-	pub frames: MutableFrame,
+	pub frames: Frame,
 	pub metadata: Option<serde_json::Map<String, serde_json::Value>>,
 	pub gecko_codes: Option<game::GeckoCodes>,
 	pub hash: Option<String>,
@@ -75,11 +74,11 @@ pub struct PartialGame {
 }
 
 impl PartialGame {
-	fn finish(mut self) -> Game {
+	fn finish(self) -> Game {
 		Game {
 			start: self.start,
 			end: self.end,
-			frames: self.frames.finish(),
+			frames: self.frames,
 			metadata: self.metadata,
 			gecko_codes: self.gecko_codes,
 			hash: self.hash,
@@ -127,7 +126,7 @@ impl game::Game for ParseState {
 }
 
 impl ParseState {
-	pub fn frames(&self) -> &MutableFrame {
+	pub fn frames(&self) -> &Frame {
 		&self.game.frames
 	}
 
@@ -628,7 +627,7 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 	let game = PartialGame {
 		start: start.clone(),
 		end: None,
-		frames: MutableFrame::with_capacity(capacity, version, &ports),
+		frames: Frame::with_capacity(capacity, version, &ports),
 		metadata: None,
 		gecko_codes: None,
 		hash: None,
@@ -654,14 +653,6 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 		split_accumulator: Default::default(),
 		skipping_frames: false,
 	})
-}
-
-fn push_offset<T>(offsets: &mut Option<OffsetBufferBuilder<i32>>, new_len: i32) {
-	let old_len = *offsets.as_ref().unwrap().last().unwrap();
-	offsets
-		.as_mut()
-		.unwrap()
-		.push_length(new_len.checked_sub(old_len).unwrap().try_into().unwrap());
 }
 
 /// Parses a single event from `r`.
@@ -758,7 +749,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 						.as_mut()
 						.unwrap()
 						.validity
-						.append_non_null();
+						.push(true);
 					state.game.frames.ports[port_index]
 						.follower
 						.as_mut()
@@ -769,7 +760,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 					state.game.frames.ports[port_index]
 						.leader
 						.validity
-						.append_non_null();
+						.push(true);
 					state.game.frames.ports[port_index]
 						.leader
 						.pre
@@ -801,8 +792,7 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 				let id = r.read_i32::<BE>()?;
 				trace!("Frame end: {}", id);
 				assert_eq!(id, state.last_id().unwrap());
-				push_offset::<u32>(
-					&mut state.game.frames.item_offset,
+				state.game.frames.item_offset.as_mut().unwrap().push(
 					state
 						.game
 						.frames
@@ -815,45 +805,60 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 						.unwrap(),
 				);
 				if state.game.start.slippi.version.gte(3, 18) {
-					push_offset::<u8>(
-						&mut state.game.frames.fod_platform_offset,
-						state
-							.game
-							.frames
-							.fod_platform
-							.as_ref()
-							.unwrap()
-							.platform
-							.len()
-							.try_into()
-							.unwrap(),
-					);
-					push_offset::<u8>(
-						&mut state.game.frames.dreamland_whispy_offset,
-						state
-							.game
-							.frames
-							.dreamland_whispy
-							.as_ref()
-							.unwrap()
-							.direction
-							.len()
-							.try_into()
-							.unwrap(),
-					);
-					push_offset::<u16>(
-						&mut state.game.frames.stadium_transformation_offset,
-						state
-							.game
-							.frames
-							.stadium_transformation
-							.as_ref()
-							.unwrap()
-							.event
-							.len()
-							.try_into()
-							.unwrap(),
-					);
+					state
+						.game
+						.frames
+						.fod_platform_offset
+						.as_mut()
+						.unwrap()
+						.push(
+							state
+								.game
+								.frames
+								.fod_platform
+								.as_ref()
+								.unwrap()
+								.platform
+								.len()
+								.try_into()
+								.unwrap(),
+						);
+					state
+						.game
+						.frames
+						.dreamland_whispy_offset
+						.as_mut()
+						.unwrap()
+						.push(
+							state
+								.game
+								.frames
+								.dreamland_whispy
+								.as_ref()
+								.unwrap()
+								.direction
+								.len()
+								.try_into()
+								.unwrap(),
+						);
+					state
+						.game
+						.frames
+						.stadium_transformation_offset
+						.as_mut()
+						.unwrap()
+						.push(
+							state
+								.game
+								.frames
+								.stadium_transformation
+								.as_ref()
+								.unwrap()
+								.event
+								.len()
+								.try_into()
+								.unwrap(),
+						);
 				}
 				state
 					.game

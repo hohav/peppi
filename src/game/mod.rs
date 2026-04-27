@@ -1,7 +1,4 @@
 //! A single game of Super Smash Brothers Melee.
-//!
-//! The mutable/immutable distinction is essentially an artifact of the underlying Arrow library.
-//! You'll only encounter mutable data if you're parsing live games.
 
 use std::fmt::{self, Debug, Display, Formatter};
 
@@ -17,7 +14,6 @@ use crate::{
 };
 
 pub mod immutable;
-pub mod mutable;
 pub mod shift_jis;
 
 /// How many ports the game supports.
