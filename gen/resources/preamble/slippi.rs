@@ -8,10 +8,7 @@ use std::{
 use byteorder::WriteBytesExt;
 
 use crate::{
-	frame::{
-		immutable::{Data, Frame, PortData},
-		PortOccupancy,
-	},
+	frame::{Data, Frame, PortData, PortOccupancy},
 	io::slippi::{de::Event, Version},
 };
 

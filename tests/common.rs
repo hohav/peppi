@@ -5,7 +5,7 @@ use std::{
 };
 
 use peppi::{
-	game::immutable::Game,
+	game::Game,
 	io::{Result, slippi},
 };
 

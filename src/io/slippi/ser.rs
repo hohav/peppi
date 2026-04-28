@@ -3,10 +3,10 @@ use std::io::Write;
 use byteorder::WriteBytesExt;
 
 use crate::{
-	frame::immutable::{
+	frame::{
 		DreamlandWhispy, End, FodPlatform, Frame, Item, Post, Pre, StadiumTransformation, Start,
 	},
-	game::{self, GeckoCodes, MAX_PLAYERS, NUM_PORTS, Player, PlayerType, Port, immutable::Game},
+	game::{self, Game, GeckoCodes, MAX_PLAYERS, NUM_PORTS, Player, PlayerType, Port},
 	io::{
 		Result,
 		slippi::{self, de::Event},

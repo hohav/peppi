@@ -10,10 +10,7 @@ use std::{
 use byteorder::WriteBytesExt;
 
 use crate::{
-	frame::{
-		PortOccupancy,
-		immutable::{Data, Frame, PortData},
-	},
+	frame::{Data, Frame, PortData, PortOccupancy},
 	io::slippi::{Version, de::Event},
 };
 
@@ -201,7 +198,7 @@ impl Frame {
 	}
 }
 
-use crate::frame::immutable::DreamlandWhispy;
+use crate::frame::DreamlandWhispy;
 
 impl DreamlandWhispy {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -216,7 +213,7 @@ impl DreamlandWhispy {
 	}
 }
 
-use crate::frame::immutable::End;
+use crate::frame::End;
 
 impl End {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -235,7 +232,7 @@ impl End {
 	}
 }
 
-use crate::frame::immutable::FodPlatform;
+use crate::frame::FodPlatform;
 
 impl FodPlatform {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -252,7 +249,7 @@ impl FodPlatform {
 	}
 }
 
-use crate::frame::immutable::Item;
+use crate::frame::Item;
 
 impl Item {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -299,7 +296,7 @@ impl Item {
 	}
 }
 
-use crate::frame::immutable::ItemMisc;
+use crate::frame::ItemMisc;
 
 impl ItemMisc {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -320,7 +317,7 @@ impl ItemMisc {
 	}
 }
 
-use crate::frame::immutable::Position;
+use crate::frame::Position;
 
 impl Position {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -337,7 +334,7 @@ impl Position {
 	}
 }
 
-use crate::frame::immutable::Post;
+use crate::frame::Post;
 
 impl Post {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -426,7 +423,7 @@ impl Post {
 	}
 }
 
-use crate::frame::immutable::Pre;
+use crate::frame::Pre;
 
 impl Pre {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -485,7 +482,7 @@ impl Pre {
 	}
 }
 
-use crate::frame::immutable::StadiumTransformation;
+use crate::frame::StadiumTransformation;
 
 impl StadiumTransformation {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -502,7 +499,7 @@ impl StadiumTransformation {
 	}
 }
 
-use crate::frame::immutable::Start;
+use crate::frame::Start;
 
 impl Start {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -523,7 +520,7 @@ impl Start {
 	}
 }
 
-use crate::frame::immutable::StateFlags;
+use crate::frame::StateFlags;
 
 impl StateFlags {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -546,7 +543,7 @@ impl StateFlags {
 	}
 }
 
-use crate::frame::immutable::TriggersPhysical;
+use crate::frame::TriggersPhysical;
 
 impl TriggersPhysical {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -563,7 +560,7 @@ impl TriggersPhysical {
 	}
 }
 
-use crate::frame::immutable::Velocities;
+use crate::frame::Velocities;
 
 impl Velocities {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
@@ -586,7 +583,7 @@ impl Velocities {
 	}
 }
 
-use crate::frame::immutable::Velocity;
+use crate::frame::Velocity;
 
 impl Velocity {
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {

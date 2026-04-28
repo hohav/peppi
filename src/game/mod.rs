@@ -1,4 +1,9 @@
 //! A single game of Super Smash Brothers Melee.
+//!
+//! This is what you'll get when you parse a game in one shot using [`crate::io::slippi::read`] or
+//! [`crate::io::peppi::read`].
+
+pub mod shift_jis;
 
 use std::fmt::{self, Debug, Display, Formatter};
 
@@ -8,13 +13,10 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use serde_json::{Map, Value};
 
 use crate::{
-	frame::{PortOccupancy, transpose},
+	frame::{Frame, PortOccupancy, transpose},
 	game::shift_jis::MeleeString,
 	io::slippi::{self, Version},
 };
-
-pub mod immutable;
-pub mod shift_jis;
 
 /// How many ports the game supports.
 pub const NUM_PORTS: usize = 4;
@@ -351,20 +353,6 @@ pub struct GeckoCodes {
 	pub actual_size: u32,
 }
 
-pub trait Game {
-	fn start(&self) -> &Start;
-	fn end(&self) -> &Option<End>;
-	fn metadata(&self) -> &Option<Map<String, Value>>;
-	fn gecko_codes(&self) -> &Option<GeckoCodes>;
-
-	/// Duration of the game in frames.
-	fn len(&self) -> usize;
-
-	/// Combines all data for a single frame into a struct.
-	/// Avoid calling this if you need maximum performance.
-	fn frame(&self, idx: usize) -> transpose::Frame;
-}
-
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 /// Slippi quirks that we need to track for round-trip integrity.
 pub struct Quirks {
@@ -380,4 +368,44 @@ pub fn port_occupancy(start: &Start) -> Vec<PortOccupancy> {
 			follower: p.character == ICE_CLIMBERS,
 		})
 		.collect()
+}
+
+#[derive(Debug)]
+pub struct Game {
+	pub start: Start,
+	pub end: Option<End>,
+	pub frames: Frame,
+	pub metadata: Option<Map<String, Value>>,
+	pub gecko_codes: Option<GeckoCodes>,
+	pub hash: Option<String>,
+	pub quirks: Option<Quirks>,
+}
+
+impl Game {
+	pub fn start(&self) -> &Start {
+		&self.start
+	}
+
+	pub fn end(&self) -> &Option<End> {
+		&self.end
+	}
+
+	pub fn metadata(&self) -> &Option<Map<String, Value>> {
+		&self.metadata
+	}
+
+	pub fn gecko_codes(&self) -> &Option<GeckoCodes> {
+		&self.gecko_codes
+	}
+
+	/// Duration of the game in frames.
+	pub fn len(&self) -> usize {
+		self.frames.id.len()
+	}
+
+	/// Combines all data for a single frame into a struct.
+	/// Avoid calling this if you need maximum performance.
+	pub fn frame(&self, idx: usize) -> transpose::Frame {
+		self.frames.transpose_one(idx, self.start.slippi.version)
+	}
 }

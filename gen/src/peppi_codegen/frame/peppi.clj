@@ -1,4 +1,4 @@
-(ns peppi-codegen.frame.immutable.peppi
+(ns peppi-codegen.frame.peppi
   (:require
    [clojure.java.io :as io]
    [peppi-codegen.common :refer :all]
@@ -6,7 +6,7 @@
 
 (defn use-statement
   [[nm _]]
-  [:use (list "crate" "frame" "immutable" nm)])
+  [:use (list "crate" "frame" nm)])
 
 (defn arrow-field
   [{nm :name, ty :type, idx :index}]

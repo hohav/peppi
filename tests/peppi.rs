@@ -11,8 +11,8 @@ use peppi::{
 		transpose::{self, Position},
 	},
 	game::{
-		Bytes, DashBack, End, EndMethod, Language, Match, Netplay, Player, PlayerEnd, PlayerType,
-		Port, Scene, ShieldDrop, Start, Ucf, immutable::Game, shift_jis::MeleeString,
+		Bytes, DashBack, End, EndMethod, Game, Language, Match, Netplay, Player, PlayerEnd,
+		PlayerType, Port, Scene, ShieldDrop, Start, Ucf, shift_jis::MeleeString,
 	},
 	io::{
 		peppi::{self as io_peppi},

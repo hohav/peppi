@@ -3,10 +3,7 @@
 #![allow(unused_variables)]
 
 use crate::{
-	frame::{
-		PortOccupancy,
-		immutable::{Data, Frame, PortData, Validity},
-	},
+	frame::{Data, Frame, PortData, PortOccupancy, Validity},
 	game::{NUM_PORTS, Port},
 	io::slippi::Version,
 };
@@ -402,7 +399,7 @@ impl Frame {
 	}
 }
 
-use crate::frame::immutable::DreamlandWhispy;
+use crate::frame::DreamlandWhispy;
 
 impl StructArrayConvertible for DreamlandWhispy {
 	fn fields(version: Version) -> Fields {
@@ -431,7 +428,7 @@ impl StructArrayConvertible for DreamlandWhispy {
 	}
 }
 
-use crate::frame::immutable::End;
+use crate::frame::End;
 
 impl StructArrayConvertible for End {
 	fn fields(version: Version) -> Fields {
@@ -468,7 +465,7 @@ impl StructArrayConvertible for End {
 	}
 }
 
-use crate::frame::immutable::FodPlatform;
+use crate::frame::FodPlatform;
 
 impl StructArrayConvertible for FodPlatform {
 	fn fields(version: Version) -> Fields {
@@ -503,7 +500,7 @@ impl StructArrayConvertible for FodPlatform {
 	}
 }
 
-use crate::frame::immutable::Item;
+use crate::frame::Item;
 
 impl StructArrayConvertible for Item {
 	fn fields(version: Version) -> Fields {
@@ -622,7 +619,7 @@ impl StructArrayConvertible for Item {
 	}
 }
 
-use crate::frame::immutable::ItemMisc;
+use crate::frame::ItemMisc;
 
 impl StructArrayConvertible for ItemMisc {
 	fn fields(version: Version) -> Fields {
@@ -668,7 +665,7 @@ impl StructArrayConvertible for ItemMisc {
 	}
 }
 
-use crate::frame::immutable::Position;
+use crate::frame::Position;
 
 impl StructArrayConvertible for Position {
 	fn fields(version: Version) -> Fields {
@@ -703,7 +700,7 @@ impl StructArrayConvertible for Position {
 	}
 }
 
-use crate::frame::immutable::Post;
+use crate::frame::Post;
 
 impl StructArrayConvertible for Post {
 	fn fields(version: Version) -> Fields {
@@ -971,7 +968,7 @@ impl StructArrayConvertible for Post {
 	}
 }
 
-use crate::frame::immutable::Pre;
+use crate::frame::Pre;
 
 impl StructArrayConvertible for Pre {
 	fn fields(version: Version) -> Fields {
@@ -1142,7 +1139,7 @@ impl StructArrayConvertible for Pre {
 	}
 }
 
-use crate::frame::immutable::StadiumTransformation;
+use crate::frame::StadiumTransformation;
 
 impl StructArrayConvertible for StadiumTransformation {
 	fn fields(version: Version) -> Fields {
@@ -1177,7 +1174,7 @@ impl StructArrayConvertible for StadiumTransformation {
 	}
 }
 
-use crate::frame::immutable::Start;
+use crate::frame::Start;
 
 impl StructArrayConvertible for Start {
 	fn fields(version: Version) -> Fields {
@@ -1220,7 +1217,7 @@ impl StructArrayConvertible for Start {
 	}
 }
 
-use crate::frame::immutable::StateFlags;
+use crate::frame::StateFlags;
 
 impl StructArrayConvertible for StateFlags {
 	fn fields(version: Version) -> Fields {
@@ -1272,7 +1269,7 @@ impl StructArrayConvertible for StateFlags {
 	}
 }
 
-use crate::frame::immutable::TriggersPhysical;
+use crate::frame::TriggersPhysical;
 
 impl StructArrayConvertible for TriggersPhysical {
 	fn fields(version: Version) -> Fields {
@@ -1307,7 +1304,7 @@ impl StructArrayConvertible for TriggersPhysical {
 	}
 }
 
-use crate::frame::immutable::Velocities;
+use crate::frame::Velocities;
 
 impl StructArrayConvertible for Velocities {
 	fn fields(version: Version) -> Fields {
@@ -1360,7 +1357,7 @@ impl StructArrayConvertible for Velocities {
 	}
 }
 
-use crate::frame::immutable::Velocity;
+use crate::frame::Velocity;
 
 impl StructArrayConvertible for Velocity {
 	fn fields(version: Version) -> Fields {

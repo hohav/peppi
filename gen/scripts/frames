@@ -6,9 +6,8 @@ preamble=resources/preamble
 target=target/frame
 
 cd "$(dirname "$0")/.."
-mkdir -p "$target/immutable"
 
-for x in immutable/mod immutable/slippi immutable/peppi transpose; do
+for x in mod slippi peppi transpose; do
 	echo "generating: src/frame/$x.rs"
 	(
 		echo "$dne"

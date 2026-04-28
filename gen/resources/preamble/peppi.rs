@@ -1,10 +1,7 @@
 #![allow(unused_variables)]
 
 use crate::{
-	frame::{
-		immutable::{Data, Frame, PortData, Validity},
-		PortOccupancy,
-	},
+	frame::{Data, Frame, PortData, PortOccupancy, Validity},
 	game::{Port, NUM_PORTS},
 	io::slippi::Version,
 };

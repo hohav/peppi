@@ -12,10 +12,10 @@ use log::{debug, info, trace, warn};
 type BE = byteorder::BigEndian;
 
 use crate::{
-	frame::{self, immutable::Frame, transpose},
+	frame::{self, Frame, transpose},
 	game::{
-		self, MAX_PLAYERS, Match, NUM_PORTS, Netplay, Player, PlayerType, Port, Quirks,
-		immutable::Game, port_occupancy, shift_jis::MeleeString,
+		self, Game, MAX_PLAYERS, Match, NUM_PORTS, Netplay, Player, PlayerType, Port, Quirks,
+		port_occupancy, shift_jis::MeleeString,
 	},
 	io::{HashingReader, Result, expect_bytes, slippi, ubjson},
 };
@@ -97,35 +97,33 @@ pub struct ParseState {
 	game: PartialGame,
 }
 
-impl game::Game for ParseState {
-	fn start(&self) -> &game::Start {
+impl ParseState {
+	pub fn start(&self) -> &game::Start {
 		&self.game.start
 	}
 
-	fn end(&self) -> &Option<game::End> {
+	pub fn end(&self) -> &Option<game::End> {
 		&self.game.end
 	}
 
-	fn metadata(&self) -> &Option<serde_json::Map<String, serde_json::Value>> {
+	pub fn metadata(&self) -> &Option<serde_json::Map<String, serde_json::Value>> {
 		&self.game.metadata
 	}
 
-	fn gecko_codes(&self) -> &Option<game::GeckoCodes> {
+	pub fn gecko_codes(&self) -> &Option<game::GeckoCodes> {
 		&self.game.gecko_codes
 	}
 
-	fn len(&self) -> usize {
+	pub fn len(&self) -> usize {
 		self.game.frames.len()
 	}
 
-	fn frame(&self, idx: usize) -> transpose::Frame {
+	pub fn frame(&self, idx: usize) -> transpose::Frame {
 		self.game
 			.frames
 			.transpose_one(idx, self.game.start.slippi.version)
 	}
-}
 
-impl ParseState {
 	pub fn frames(&self) -> &Frame {
 		&self.game.frames
 	}

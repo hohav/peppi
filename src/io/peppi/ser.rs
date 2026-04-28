@@ -10,7 +10,7 @@ use arrow_ipc::{
 };
 
 use crate::{
-	game::{immutable::Game, port_occupancy},
+	game::{Game, port_occupancy},
 	io::{peppi, slippi},
 };
 

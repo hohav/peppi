@@ -6,8 +6,8 @@ use arrow::array::StructArray;
 use arrow_ipc::reader::StreamReader;
 
 use crate::{
-	frame::immutable::Frame,
-	game::{self, immutable::Game, port_occupancy},
+	frame::Frame,
+	game::{self, Game, port_occupancy},
 	io::{Result, expect_bytes, peppi, slippi},
 };
 

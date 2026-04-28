@@ -1,26 +1,47 @@
-//! Immutable (fully-parsed) frame data, as a struct-of-arrays.
+//! Frame data representation.
 //!
-//! This is what you get when you parse a game in one shot using [`crate::io::slippi::read`] or
-//! [`crate::io::peppi::read`].
+//! Peppi represents frame data using Arrow arrays (i.e. "struct-of-arrays").
+//! This allows us to efficiently share frame data with other languages,
+//! and enables simple serialization into a highly-compressible disk format.
 
 #![allow(unused_variables)]
 
 mod peppi;
 mod slippi;
+pub mod transpose;
 
-use std::cmp::max;
-use std::fmt;
-use std::io::Result;
+use std::{
+	cmp::max,
+	fmt,
+	io::Result,
+};
 
 use byteorder::ReadBytesExt;
 
 use crate::{
-	frame::{self, transpose, PortOccupancy, Rollbacks},
 	game::Port,
 	io::slippi::Version,
 };
 
 type BE = byteorder::BigEndian;
+
+/// Frame indexes start at -123, and reach 0 at "Go!".
+pub const FIRST_INDEX: i32 = -123;
+
+/// Port number plus ICs-specific discriminant.
+#[derive(Clone, Copy, Debug)]
+pub struct PortOccupancy {
+	pub port: Port,
+	/// For ICs, distinguishes between Nana and Popo.
+	pub follower: bool,
+}
+
+/// Rollback-aware processing typically ignores all but the first or last rollback for a frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Rollbacks {
+	ExceptFirst,
+	ExceptLast,
+}
 
 /// TODO: docs, or switch to BitVec?
 #[derive(Debug)]
@@ -303,11 +324,11 @@ impl Frame {
 	fn rollbacks_<'a>(&self, ids: impl Iterator<Item = (usize, &'a i32)>) -> Vec<bool> {
 		let mut result = vec![false; self.len()];
 		let unique_id_count = self.id.iter().max().map_or(0, |idx| {
-			1 + usize::try_from(idx - frame::FIRST_INDEX).unwrap()
+			1 + usize::try_from(idx - FIRST_INDEX).unwrap()
 		});
 		let mut seen = vec![false; unique_id_count];
 		for (idx, id) in ids {
-			let zero_based_id = usize::try_from(id - frame::FIRST_INDEX).unwrap();
+			let zero_based_id = usize::try_from(id - FIRST_INDEX).unwrap();
 			if !seen[zero_based_id] {
 				seen[zero_based_id] = true;
 				result[idx] = false;
