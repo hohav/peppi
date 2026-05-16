@@ -2,6 +2,7 @@
 
 use encoding_rs::SHIFT_JIS;
 use log::warn;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::io::{Error, Result, err};
@@ -12,7 +13,8 @@ use crate::io::{Error, Result, err};
 /// unusually or inconsistently. For that reason, most users should use
 /// [to_normalized](crate::game::shift_jis::MeleeString::to_normalized) when
 /// working with this type.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct MeleeString(pub String);
 
 impl MeleeString {

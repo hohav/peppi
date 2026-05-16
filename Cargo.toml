@@ -9,21 +9,28 @@ version = "2.1.2"
 exclude = ["benches", "tests"]
 readme = "README.md"
 
+[features]
+arrow = ["dep:arrow", "dep:arrow-ipc"]
+serde = ["dep:serde", "dep:serde_json"]
+peppi-format = ["arrow", "serde"]
+
 [dependencies]
-arrow = "58"
-arrow-ipc = "58"
+arrow = { version = "58", optional = true }
+arrow-ipc = { version = "58", optional = true }
 base64 = "0.22"
 byteorder = "1"
 encoding_rs = "0.8"
 log = "0.4"
 num_enum = "0.7"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0", features = ["preserve_order"] }
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", features = ["preserve_order"], optional = true }
 tar = "0.4"
 thiserror = "2.0"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 
 [dev-dependencies]
+# activate all features, so that `cargo test` runs all tests without needing `--all-features`
+peppi = { path = ".", features = ["peppi-format"] }
 arrow-json = "58"
 criterion = "0.8"
 iai-callgrind = "0.16"

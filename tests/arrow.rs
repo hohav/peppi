@@ -1,9 +1,15 @@
+use std::{fs, io::Cursor, path::Path};
+
 use arrow_json::writer::ArrayWriter;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::io::BufWriter;
 
-use peppi::{frame::PortOccupancy, game::Port};
+use peppi::{
+	frame::PortOccupancy,
+	game::Port,
+	io::{peppi as io_peppi, slippi as io_slippi},
+};
 
 mod common;
 use common::game;
@@ -345,5 +351,58 @@ fn into_struct_array() {
 				"item": []
 			}]),
 		);
+	}
+}
+
+fn _round_trip(in_path: impl AsRef<Path> + Clone) {
+	let bytes1 = fs::read(in_path.clone()).unwrap();
+
+	let slippi_game = io_slippi::read(Cursor::new(bytes1.as_slice()), None).unwrap();
+	let peppi_game = {
+		let mut buf = Vec::new();
+		io_peppi::write(&mut buf, slippi_game, Default::default()).unwrap();
+		io_peppi::read(&mut &*buf, None).unwrap()
+	};
+
+	let mut bytes2 = Vec::with_capacity(bytes1.len());
+	io_slippi::write(&mut bytes2, &peppi_game).unwrap();
+
+	// If we get a perfect byte-wise match, we know we're correct.
+	// If not, we'll try to detect where the difference is.
+	if bytes1 == bytes2 {
+		return;
+	}
+
+	let game2 = io_slippi::read(Cursor::new(bytes2.as_slice()), None).unwrap();
+	let game1 = io_slippi::read(Cursor::new(bytes1.as_slice()), None).unwrap();
+
+	assert_eq!(game1.start, game2.start);
+	assert_eq!(game1.end, game2.end);
+	assert_eq!(game1.metadata, game2.metadata);
+
+	assert_eq!(game1.frames.len(), game2.frames.len());
+	for idx in 0..game1.frames.len() {
+		assert_eq!(
+			game1.frames.transpose_one(idx, game1.start.slippi.version),
+			game2.frames.transpose_one(idx, game2.start.slippi.version),
+		);
+	}
+
+	assert_eq!(bytes1.len(), bytes2.len());
+	assert_eq!(bytes1, bytes2);
+}
+
+#[test]
+fn round_trip() {
+	for entry in fs::read_dir("tests/data")
+		.unwrap()
+		.into_iter()
+		.map(|e| e.unwrap())
+		.filter(|e| match e.file_name().to_str().unwrap() {
+			"unknown_event.slp" | "corrupt.slp" => false,
+			_ => true,
+		}) {
+		println!("{:?}", entry.file_name());
+		_round_trip(entry.path());
 	}
 }

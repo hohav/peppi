@@ -11,7 +11,10 @@ use arrow_ipc::{
 
 use crate::{
 	game::{Game, port_occupancy},
-	io::{peppi, slippi},
+	io::{
+		peppi, slippi,
+		ubjson::{self, JMap},
+	},
 };
 
 /// Options for writing Peppi files.
@@ -54,16 +57,21 @@ pub fn write<W: Write>(w: W, game: Game, opts: Option<&Opts>) -> Result<(), Box<
 		})?,
 		"peppi.json",
 	)?;
-	tar_append(
-		&mut tar,
-		&serde_json::to_vec(&game.metadata)?,
-		"metadata.json",
-	)?;
-	tar_append(&mut tar, &serde_json::to_vec(&game.start)?, "start.json")?;
+	if let Some(metadata) = game.metadata {
+		let mut buf = Vec::<u8>::new();
+		ubjson::write_map(&mut buf, &metadata)?;
+		tar_append(&mut tar, &buf, "metadata.raw")?;
+		tar_append(
+			&mut tar,
+			&serde_json::to_vec(&JMap::from(metadata))?,
+			"metadata.json",
+		)?;
+	}
 	tar_append(&mut tar, &game.start.bytes.0, "start.raw")?;
+	tar_append(&mut tar, &serde_json::to_vec(&game.start)?, "start.json")?;
 	if let Some(end) = &game.end {
-		tar_append(&mut tar, &serde_json::to_vec(end)?, "end.json")?;
 		tar_append(&mut tar, &end.bytes.0, "end.raw")?;
+		tar_append(&mut tar, &serde_json::to_vec(end)?, "end.json")?;
 	}
 
 	if let Some(gecko_codes) = &game.gecko_codes {

@@ -316,18 +316,15 @@ impl Frame {
 		arr: &Arc<dyn Array>,
 		version: Version,
 	) -> (Option<T>, Option<OffsetBuffer<i32>>) {
-		println!("arr offset: {}", arr.offset());
 		let list_array = downcast_array::<ListArray>(arr);
-		println!("list_array offset: {}", list_array.offset());
 		let (_, offsets, values, _) = list_array.into_parts();
-		println!("ptr_offset 1: {}", offsets.inner().inner().ptr_offset());
 		let values = T::from_struct_array(downcast_array::<StructArray>(&values), version);
 		(Some(values), Some(offsets))
 	}
 
 	pub fn from_struct_array(array: StructArray, version: Version) -> Self {
+		// TODO: check that we're not doing any unnecessary copying
 		let (fields, values, _) = array.into_parts();
-		println!("id offset: {}", values[0].offset());
 		assert_eq!("id", fields[0].name());
 		assert_eq!("ports", fields[1].name());
 		if version.gte(2, 2) {
@@ -382,7 +379,7 @@ impl Frame {
 				)
 			}),
 			item,
-			item_offset: item_offset // FIXME: avoid clone
+			item_offset: item_offset
 				.map(|buf| buf.into_inner().into_inner().typed_data().into()),
 			fod_platform,
 			fod_platform_offset: fod_platform_offset

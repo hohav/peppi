@@ -10,6 +10,7 @@ macro_rules! err {
 
 pub(crate) use err;
 
+#[cfg(feature = "peppi-format")]
 pub mod peppi;
 pub mod slippi;
 pub(crate) mod ubjson;
@@ -28,9 +29,11 @@ pub enum Error {
 	#[error("I/O error: {0}")]
 	Io(#[from] std::io::Error),
 
+	#[cfg(feature = "arrow")]
 	#[error("invalid Arrow: {0}")]
 	Arrow(#[from] arrow::error::ArrowError),
 
+	#[cfg(feature = "serde")]
 	#[error("invalid JSON: {0}")]
 	Json(#[from] serde_json::Error),
 

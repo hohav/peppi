@@ -8,10 +8,11 @@ use arrow_ipc::reader::StreamReader;
 use crate::{
 	frame::Frame,
 	game::{self, Game, port_occupancy},
-	io::{Result, expect_bytes, peppi, slippi},
+	io::{
+		Result, expect_bytes, peppi, slippi,
+		ubjson::{JMap, Map, Value, de::read as ubjson_read},
+	},
 };
-
-type JsMap = serde_json::Map<String, serde_json::Value>;
 
 /// Options for parsing Peppi games.
 #[derive(Clone, Debug, Default)]
@@ -57,10 +58,18 @@ fn read_peppi_end<R: Read>(mut r: R) -> Result<game::End> {
 	slippi::de::game_end(&mut &buf[..])
 }
 
-fn read_peppi_metadata<R: Read>(r: R) -> Result<JsMap> {
+fn read_peppi_metadata_json<R: Read>(r: R) -> Result<JMap> {
 	let json_object: serde_json::Value = serde_json::from_reader(r)?;
 	match json_object {
 		serde_json::Value::Object(map) => Ok(map),
+		obj => Err(err!("expected map, got: {:?}", obj)),
+	}
+}
+
+fn read_peppi_metadata_raw<R: Read>(mut r: R) -> Result<Map> {
+	let json_object = ubjson_read(&mut r)?;
+	match json_object {
+		Value::Object(map) => Ok(map),
 		obj => Err(err!("expected map, got: {:?}", obj)),
 	}
 }
@@ -80,7 +89,7 @@ fn read_peppi_gecko_codes<R: Read>(mut r: R) -> Result<game::GeckoCodes> {
 pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<Game> {
 	let mut start: Option<game::Start> = None;
 	let mut end: Option<game::End> = None;
-	let mut metadata: Option<JsMap> = None;
+	let mut metadata: Option<Map> = None;
 	let mut gecko_codes: Option<game::GeckoCodes> = None;
 	let mut frames: Option<Frame> = None;
 	let mut peppi: Option<peppi::Peppi> = None;
@@ -97,7 +106,12 @@ pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<Game> {
 			}
 			Some("start.raw") => start = Some(read_peppi_start(file)?),
 			Some("end.raw") => end = Some(read_peppi_end(file)?),
-			Some("metadata.json") => metadata = Some(read_peppi_metadata(file)?),
+			Some("metadata.raw") => metadata = Some(read_peppi_metadata_raw(file)?),
+			// older versions of Peppi only wrote `metadata.json`, so fall back to that if there was
+			// no `metadata.raw`. This requires that we wrote the former first in the tar
+			Some("metadata.json") if metadata.is_none() => {
+				metadata = Some(read_peppi_metadata_json(file)?.into())
+			}
 			Some("gecko_codes.raw") => gecko_codes = Some(read_peppi_gecko_codes(file)?),
 			Some("frames.arrow") => {
 				let version = start

@@ -3,6 +3,7 @@
 pub mod de;
 pub mod ser;
 
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::{fmt, str};
 
@@ -22,7 +23,8 @@ pub const FILE_SIGNATURE: [u8; 11] = [
 ];
 
 /// Slippi format version.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Version(pub u8, pub u8, pub u8);
 
 impl Version {
@@ -57,7 +59,8 @@ impl fmt::Display for Version {
 }
 
 /// Slippi format options.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Slippi {
 	pub version: Version,
 }

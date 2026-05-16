@@ -8,6 +8,7 @@
 
 #![allow(unused_variables)]
 
+#[cfg(feature = "arrow")]
 mod peppi;
 mod slippi;
 pub mod transpose;

@@ -1,7 +1,7 @@
-use std::{collections::HashSet, fs, io::Cursor, path::Path};
+use std::collections::HashSet;
 
 use pretty_assertions::assert_eq;
-use serde_json::json;
+use serde_json::{Map as JMap, Value as JValue, json};
 
 use ssbm_data::{action_state, character::External, character::Internal, item::Item, stage::Stage};
 
@@ -14,10 +14,7 @@ use peppi::{
 		Bytes, DashBack, End, EndMethod, Game, Language, Match, Netplay, Player, PlayerEnd,
 		PlayerType, Port, Scene, ShieldDrop, Start, Ucf, shift_jis::MeleeString,
 	},
-	io::{
-		peppi::{self as io_peppi},
-		slippi::{self, Slippi, Version},
-	},
+	io::slippi::{Slippi, Version},
 };
 
 mod common;
@@ -52,7 +49,7 @@ fn slippi_old_version() {
 
 	assert_eq!(game.start.slippi.version, Version(0, 1, 0));
 	assert_eq!(
-		serde_json::Value::Object(game.metadata.unwrap()),
+		JValue::Object(game.metadata.unwrap().into()),
 		json!({
 			"startAt": "2018-01-24T06:19:54Z",
 			"playedOn": "dolphin"
@@ -69,7 +66,7 @@ fn basic_game() {
 	let game = game("game");
 
 	assert_eq!(
-		serde_json::Value::Object(game.metadata.unwrap()),
+		JValue::Object(game.metadata.unwrap().into()),
 		json!({
 			"startAt": "2018-06-22T07:52:59Z",
 			"lastFrame": 5085,
@@ -301,7 +298,7 @@ fn skip_frames() {
 fn ics() {
 	let game = game("ics");
 	assert_eq!(
-		game.metadata.unwrap()["players"],
+		JValue::Object(game.metadata.unwrap().into())["players"],
 		json!({
 			"1": {
 				"characters": {
@@ -480,8 +477,8 @@ fn joystick_udlr() {
 fn nintendont() {
 	let game = game("nintendont");
 	assert_eq!(
-		game.metadata.unwrap()["playedOn"],
-		serde_json::Value::String("nintendont".to_string())
+		JValue::Object(game.metadata.unwrap().into())["playedOn"],
+		JValue::String("nintendont".to_string())
 	);
 }
 
@@ -489,7 +486,7 @@ fn nintendont() {
 fn netplay() {
 	let game = game("netplay");
 	assert_eq!(
-		game.metadata.unwrap()["players"],
+		JValue::Object(game.metadata.unwrap().into())["players"],
 		json!({
 			"0": {
 				"names": {
@@ -517,8 +514,8 @@ fn netplay() {
 fn console_name() {
 	let game = game("console_name");
 	assert_eq!(
-		game.metadata.unwrap()["consoleNick"],
-		serde_json::Value::String("Station 1".to_string())
+		JMap::from(game.metadata.unwrap())["consoleNick"],
+		JValue::String("Station 1".to_string())
 	)
 }
 
@@ -850,59 +847,6 @@ fn items() {
 			instance_id: None,
 		}])
 	);
-}
-
-fn _round_trip(in_path: impl AsRef<Path> + Clone) {
-	let bytes1 = fs::read(in_path.clone()).unwrap();
-
-	let slippi_game = slippi::read(Cursor::new(bytes1.as_slice()), None).unwrap();
-	let peppi_game = {
-		let mut buf = Vec::new();
-		io_peppi::write(&mut buf, slippi_game, Default::default()).unwrap();
-		io_peppi::read(&mut &*buf, None).unwrap()
-	};
-
-	let mut bytes2 = Vec::with_capacity(bytes1.len());
-	slippi::write(&mut bytes2, &peppi_game).unwrap();
-
-	// If we get a perfect byte-wise match, we know we're correct.
-	// If not, we'll try to detect where the difference is.
-	if bytes1 == bytes2 {
-		return;
-	}
-
-	let game2 = slippi::read(Cursor::new(bytes2.as_slice()), None).unwrap();
-	let game1 = slippi::read(Cursor::new(bytes1.as_slice()), None).unwrap();
-
-	assert_eq!(game1.start, game2.start);
-	assert_eq!(game1.end, game2.end);
-	assert_eq!(game1.metadata, game2.metadata);
-
-	assert_eq!(game1.frames.len(), game2.frames.len());
-	for idx in 0..game1.frames.len() {
-		assert_eq!(
-			game1.frames.transpose_one(idx, game1.start.slippi.version),
-			game2.frames.transpose_one(idx, game2.start.slippi.version),
-		);
-	}
-
-	assert_eq!(bytes1.len(), bytes2.len());
-	assert_eq!(bytes1, bytes2);
-}
-
-#[test]
-fn round_trip() {
-	for entry in fs::read_dir("tests/data")
-		.unwrap()
-		.into_iter()
-		.map(|e| e.unwrap())
-		.filter(|e| match e.file_name().to_str().unwrap() {
-			"unknown_event.slp" | "corrupt.slp" => false,
-			_ => true,
-		}) {
-		println!("{:?}", entry.file_name());
-		_round_trip(entry.path());
-	}
 }
 
 #[test]

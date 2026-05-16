@@ -6,7 +6,7 @@
 
 #![allow(unused_variables)]
 
-mod peppi;
+#[cfg(feature = "arrow")] mod peppi;
 mod slippi;
 pub mod transpose;
 

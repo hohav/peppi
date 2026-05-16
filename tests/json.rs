@@ -1,5 +1,5 @@
 use pretty_assertions::assert_eq;
-use serde_json::{Value, from_str, json, to_string};
+use serde_json::{Map, Value, from_str, json, to_string};
 
 mod common;
 use common::game;
@@ -8,7 +8,8 @@ use common::game;
 fn json_metadata() {
 	let game = game("v3.12");
 	assert_eq!(
-		from_str::<Value>(&to_string(&game.metadata).unwrap()).unwrap(),
+		from_str::<Value>(&to_string(&Map::<String, Value>::from(game.metadata.unwrap())).unwrap())
+			.unwrap(),
 		json!({
 			"startAt":"2022-06-04T21:58:00Z",
 			"lastFrame":0,

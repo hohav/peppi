@@ -2,7 +2,7 @@
 
 //! Single-frame representation using normal structs.
 //!
-//! Transposing frame data is fairly slow. Work with Arrow arrays when possible.
+//! Transposing frame data is fairly slow. Work with struct-of-arrays when possible.
 
 use crate::game::Port;
 

@@ -2,6 +2,8 @@ use std::io::Write;
 
 use byteorder::WriteBytesExt;
 
+use crate::array_map::ArrayMap;
+
 use crate::{
 	frame::{
 		DreamlandWhispy, End, FodPlatform, Frame, Item, Post, Pre, StadiumTransformation, Start,
@@ -17,37 +19,45 @@ use crate::{
 type BE = byteorder::BigEndian;
 
 struct PayloadSizes {
-	/// Order matters for round-tripping, hence Vec rather than HashMap.
-	sizes: Vec<(u8, u16)>,
+	/// Order matters for round-tripping
+	sizes: ArrayMap<u8, u16>,
 }
 
 impl PayloadSizes {
 	fn new() -> Self {
-		Self { sizes: Vec::new() }
+		Self {
+			sizes: ArrayMap::new(),
+		}
 	}
 
-	fn push(&mut self, event: Event, size: usize) {
-		self.sizes.push((event as u8, size.try_into().unwrap()))
+	fn insert(&mut self, event: Event, size: usize) {
+		self.sizes.insert(event as u8, size.try_into().unwrap());
 	}
 
 	fn raw_size(&self, game: &Game) -> Result<u32> {
 		use Event::*;
 
 		let counts = frame_counts(&game.frames);
-		let sizes: std::collections::HashMap<u8, u16> =
-			self.sizes.iter().map(|(k, v)| (*k, *v)).collect();
-		Ok(1 + 1 + (3 * self.sizes.len() as u32) // Payload sizes
-			+ 1 + sizes[&(GameStart as u8)] as u32 // GameStart
-			+ (1 + sizes[&(GameEnd as u8)] as u32) * game_end_count(game)? // GameEnd
-			+ counts.frame_data * (1 + sizes[&(FramePre as u8)] as u32) // FramePre
-			+ counts.frame_data * (1 + sizes[&(FramePost as u8)] as u32) // FramePost
-			+ sizes.get(&(FrameStart as u8)).map_or(0, |s| counts.frame * (1 + *s as u32)) // FrameStart
-			+ sizes.get(&(FrameEnd as u8)).map_or(0, |s| counts.frame * (1 + *s as u32)) // FrameEnd
-			+ sizes.get(&(Item as u8)).map_or(0, |s| counts.item * (1 + *s as u32)) // Item
-			+ sizes.get(&(FodPlatform as u8)).map_or(0, |s| counts.fod_platform * (1 + *s as u32)) // FodPlatform
-			+ sizes.get(&(DreamlandWhispy as u8)).map_or(0, |s| counts.dreamland_whispy * (1 + *s as u32)) // DreamlandWhispy
-			+ sizes.get(&(StadiumTransformation as u8)).map_or(0, |s| counts.stadium_transformation * (1 + *s as u32)) // StadiumTransformation
-			+ game.gecko_codes.as_ref().map_or(0, gecko_codes_size))
+		let mut result = 1 + 1 + (3 * self.sizes.len() as u32); // Payload sizes
+		for (code, size) in self.sizes.iter() {
+			let size = 1 + *size as u32;
+			result += match Event::try_from(*code).unwrap() {
+				GameStart => size,
+				GameEnd => size * game_end_count(game)?,
+				FramePre => size * counts.frame_data,
+				FramePost => size * counts.frame_data,
+				FrameStart => size * counts.frame,
+				FrameEnd => size * counts.frame,
+				Item => size * counts.item,
+				FodPlatform => size * counts.fod_platform,
+				DreamlandWhispy => size * counts.dreamland_whispy,
+				StadiumTransformation => size * counts.stadium_transformation,
+				GeckoCodes => game.gecko_codes.as_ref().map_or(0, gecko_codes_size),
+				Payloads => 0,
+				MessageSplitter => 0,
+			};
+		}
+		Ok(result)
 	}
 }
 
@@ -70,10 +80,10 @@ fn payload_sizes(game: &Game) -> PayloadSizes {
 	const FRAME_NUMBER: usize = std::mem::size_of::<i32>();
 	const PORT: usize = 2 * std::mem::size_of::<u8>(); // port number + is_follower
 
-	sizes.push(Event::GameStart, game.start.bytes.0.len());
-	sizes.push(Event::FramePre, FRAME_NUMBER + PORT + Pre::size(ver));
-	sizes.push(Event::FramePost, FRAME_NUMBER + PORT + Post::size(ver));
-	sizes.push(
+	sizes.insert(Event::GameStart, game.start.bytes.0.len());
+	sizes.insert(Event::FramePre, FRAME_NUMBER + PORT + Pre::size(ver));
+	sizes.insert(Event::FramePost, FRAME_NUMBER + PORT + Post::size(ver));
+	sizes.insert(
 		Event::GameEnd,
 		game.end
 			.as_ref()
@@ -81,24 +91,24 @@ fn payload_sizes(game: &Game) -> PayloadSizes {
 	);
 
 	if ver.gte(2, 2) {
-		sizes.push(Event::FrameStart, FRAME_NUMBER + Start::size(ver));
+		sizes.insert(Event::FrameStart, FRAME_NUMBER + Start::size(ver));
 		if ver.gte(3, 0) {
-			sizes.push(Event::Item, FRAME_NUMBER + Item::size(ver));
+			sizes.insert(Event::Item, FRAME_NUMBER + Item::size(ver));
 			if ver.gte(3, 0) {
-				sizes.push(Event::FrameEnd, FRAME_NUMBER + End::size(ver));
+				sizes.insert(Event::FrameEnd, FRAME_NUMBER + End::size(ver));
 				if ver.gte(3, 3) {
 					if let Some(codes) = &game.gecko_codes {
 						// discard higher-order bits of actual_size, matching Slippi's behavior
-						sizes.push(Event::GeckoCodes, codes.actual_size as u16 as usize);
-						sizes.push(Event::MessageSplitter, 516);
+						sizes.insert(Event::GeckoCodes, codes.actual_size as u16 as usize);
+						sizes.insert(Event::MessageSplitter, 516);
 					}
 					if ver.gte(3, 18) {
-						sizes.push(Event::FodPlatform, FRAME_NUMBER + FodPlatform::size(ver));
-						sizes.push(
+						sizes.insert(Event::FodPlatform, FRAME_NUMBER + FodPlatform::size(ver));
+						sizes.insert(
 							Event::DreamlandWhispy,
 							FRAME_NUMBER + DreamlandWhispy::size(ver),
 						);
-						sizes.push(
+						sizes.insert(
 							Event::StadiumTransformation,
 							FRAME_NUMBER + StadiumTransformation::size(ver),
 						);
@@ -432,11 +442,8 @@ pub fn write<W: Write>(w: &mut W, game: &Game) -> Result<()> {
 	}
 
 	if let Some(metadata) = &game.metadata {
-		w.write_all(&[
-			0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x7b,
-		])?;
+		w.write_all(&[0x55, 0x08, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61])?;
 		ubjson::write_map(w, metadata)?;
-		w.write_all(&[0x7d])?; // closing brace for `metadata`
 	}
 
 	w.write_all(&[0x7d])?; // closing brace for top-level map

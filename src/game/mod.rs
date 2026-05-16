@@ -7,15 +7,20 @@ pub mod shift_jis;
 
 use std::fmt::{self, Debug, Display, Formatter};
 
-use base64::prelude::{BASE64_STANDARD, Engine};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+
+#[cfg(feature = "serde")]
+use base64::prelude::{BASE64_STANDARD, Engine};
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
-use serde_json::{Map, Value};
 
 use crate::{
 	frame::{Frame, PortOccupancy, transpose},
 	game::shift_jis::MeleeString,
-	io::slippi::{self, Version},
+	io::{
+		slippi::{self, Version},
+		ubjson::Map,
+	},
 };
 
 /// How many ports the game supports.
@@ -29,19 +34,8 @@ pub const ICE_CLIMBERS: u8 = 14;
 
 /// A slot that can be occupied by a player.
 #[repr(u8)]
-#[derive(
-	Clone,
-	Copy,
-	Debug,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Serialize,
-	Deserialize,
-	IntoPrimitive,
-	TryFromPrimitive,
-)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Port {
 	P1 = 0,
 	P2 = 1,
@@ -81,7 +75,8 @@ impl Default for Port {
 
 /// How a player is controlled.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum PlayerType {
 	Human = 0,
 	Cpu = 1,
@@ -89,7 +84,8 @@ pub enum PlayerType {
 }
 
 /// Information about the team a player belongs to.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Team {
 	pub color: u8,
 	pub shade: u8,
@@ -97,7 +93,8 @@ pub struct Team {
 
 /// Dashback fix type.
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum DashBack {
 	Ucf = 1,
 	Arduino = 2,
@@ -105,7 +102,8 @@ pub enum DashBack {
 
 /// Shield drop fix type.
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ShieldDrop {
 	Ucf = 1,
 	Arduino = 2,
@@ -113,33 +111,37 @@ pub enum ShieldDrop {
 
 /// The language the game is set to.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Language {
 	Japanese = 0,
 	English = 1,
 }
 
 /// Information about the "Universal Controller Fix" mod.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Ucf {
 	pub dash_back: Option<DashBack>,
 	pub shield_drop: Option<ShieldDrop>,
 }
 
 /// Netplay name, connect code, and Slippi UID.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Netplay {
 	pub name: MeleeString,
 
 	pub code: MeleeString,
 
 	/// Slippi UID (added: v3.11)
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
 	pub suid: Option<String>,
 }
 
 /// Information about each player such as character, team, stock count, etc.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Player {
 	pub port: Port,
 
@@ -178,20 +180,21 @@ pub struct Player {
 	pub model_scale: f32,
 
 	/// UCF info (added: v1.0)
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
 	pub ucf: Option<Ucf>,
 
 	/// in-game name-tag (added: v1.3)
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
 	pub name_tag: Option<MeleeString>,
 
 	/// netplay info (added: v3.9)
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
 	pub netplay: Option<Netplay>,
 }
 
 /// Major & minor scene numbers.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Scene {
 	pub minor: u8,
 	pub major: u8,
@@ -201,14 +204,17 @@ pub struct Scene {
 #[derive(PartialEq, Eq, Clone, Default)]
 pub struct Bytes(pub Vec<u8>);
 
+#[cfg(feature = "serde")]
 impl Serialize for Bytes {
 	fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
 		serializer.serialize_str(&BASE64_STANDARD.encode(&self.0))
 	}
 }
 
+#[cfg(feature = "serde")]
 struct BytesVisitor;
 
+#[cfg(feature = "serde")]
 impl<'de> de::Visitor<'de> for BytesVisitor {
 	type Value = Bytes;
 
@@ -225,6 +231,7 @@ impl<'de> de::Visitor<'de> for BytesVisitor {
 	}
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Bytes {
 	fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
 		deserializer.deserialize_string(BytesVisitor)
@@ -238,7 +245,8 @@ impl Debug for Bytes {
 }
 
 /// Information about the match a game belongs to.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Match {
 	pub id: String,
 	pub game: u32,
@@ -246,7 +254,8 @@ pub struct Match {
 }
 
 /// Information used to initialize the game such as the game mode, settings, characters & stage.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Start {
 	pub slippi: slippi::Slippi,
 
@@ -276,29 +285,30 @@ pub struct Start {
 	pub bytes: Bytes,
 
 	/// (added: v1.5)
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
 	pub is_pal: Option<bool>,
 
 	/// (added: v2.0)
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
 	pub is_frozen_ps: Option<bool>,
 
 	/// (added: v3.7)
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
 	pub scene: Option<Scene>,
 
 	/// (added: v3.12)
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
 	pub language: Option<Language>,
 
 	/// (added: v3.14)
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
 	pub r#match: Option<Match>,
 }
 
 /// How the game ended.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, TryFromPrimitive)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum EndMethod {
 	Unresolved = 0,
 	Time = 1,
@@ -308,14 +318,16 @@ pub enum EndMethod {
 }
 
 /// Player placements.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct PlayerEnd {
 	pub port: Port,
 	pub placement: u8,
 }
 
 /// Information about the end of the game.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct End {
 	/// how the game ended
 	pub method: EndMethod,
@@ -324,11 +336,11 @@ pub struct End {
 	pub bytes: Bytes,
 
 	/// player who LRAS'd, if any (added: v2.0)
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
 	pub lras_initiator: Option<Option<Port>>,
 
 	/// player-specific data (added: v3.13)
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
 	pub players: Option<Vec<PlayerEnd>>,
 }
 
@@ -353,7 +365,8 @@ pub struct GeckoCodes {
 	pub actual_size: u32,
 }
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 /// Slippi quirks that we need to track for round-trip integrity.
 pub struct Quirks {
 	pub double_game_end: bool,
@@ -375,7 +388,7 @@ pub struct Game {
 	pub start: Start,
 	pub end: Option<End>,
 	pub frames: Frame,
-	pub metadata: Option<Map<String, Value>>,
+	pub metadata: Option<Map>,
 	pub gecko_codes: Option<GeckoCodes>,
 	pub hash: Option<String>,
 	pub quirks: Option<Quirks>,
@@ -390,7 +403,7 @@ impl Game {
 		&self.end
 	}
 
-	pub fn metadata(&self) -> &Option<Map<String, Value>> {
+	pub fn metadata(&self) -> &Option<Map> {
 		&self.metadata
 	}
 

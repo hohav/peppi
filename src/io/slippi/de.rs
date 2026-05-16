@@ -17,7 +17,10 @@ use crate::{
 		self, Game, MAX_PLAYERS, Match, NUM_PORTS, Netplay, Player, PlayerType, Port, Quirks,
 		port_occupancy, shift_jis::MeleeString,
 	},
-	io::{HashingReader, Result, expect_bytes, slippi, ubjson},
+	io::{
+		HashingReader, Result, expect_bytes, slippi,
+		ubjson::{self, Map},
+	},
 };
 
 type PayloadSizes = [Option<NonZeroU16>; 256];
@@ -67,7 +70,7 @@ pub struct PartialGame {
 	pub start: game::Start,
 	pub end: Option<game::End>,
 	pub frames: Frame,
-	pub metadata: Option<serde_json::Map<String, serde_json::Value>>,
+	pub metadata: Option<Map>,
 	pub gecko_codes: Option<game::GeckoCodes>,
 	pub hash: Option<String>,
 	pub quirks: Option<Quirks>,
@@ -106,7 +109,7 @@ impl ParseState {
 		&self.game.end
 	}
 
-	pub fn metadata(&self) -> &Option<serde_json::Map<String, serde_json::Value>> {
+	pub fn metadata(&self) -> &Option<Map> {
 		&self.game.metadata
 	}
 
@@ -941,7 +944,7 @@ pub fn parse_metadata<R: Read>(
 	// Since we already read the opening "{" from the `metadata` value,
 	// we know it's a map. `parse_map` will consume the corresponding "}".
 	let metadata = ubjson::read_map(&mut r)?;
-	info!("Metadata: {}", serde_json::to_string(&metadata)?);
+	info!("Metadata: {:?}", metadata);
 	state.game.metadata = Some(metadata);
 	Ok(())
 }
