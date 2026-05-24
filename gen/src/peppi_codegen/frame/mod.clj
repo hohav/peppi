@@ -79,52 +79,6 @@
                              ["true"]]])
      true (into (nested-version-ifs append-default fields)))])
 
-(defn read-append-primitive
-  [target ty]
-  [:method-call
-   {:unwrap true}
-   [:method-call
-    {:generics (when-not (#{"u8" "i8"} ty) ["BE"])}
-    "r"
-    (str "read_" ty)]
-   "map"
-   [[:closure
-     [["x"]]
-     [[:method-call
-       target
-       "push"
-       ["x"]]]]]])
-
-(defn read-append-composite
-  [target]
-  [:method-call
-   {:unwrap true}
-   target
-   "read_append"
-   ["r" "version"]])
-
-(defn read-append
-  [{nm :name, ty :type, ver :version, idx :index}]
-  (let [target (cond-> [:field-get "self" (or nm idx)]
-                 ver ((comp unwrap as-mut)))]
-    (cond
-      (primitive-types ty) (read-append-primitive target ty)
-      ty                   (read-append-composite target)
-      :else                (throw (ex-info "unsupported type" {:type ty})))))
-
-(defn read-append-fn
-  [fields]
-  [:fn
-   {:visibility "pub"
-    :ret ["Result" "()"]}
-   "read_append"
-   [["&mut self"]
-    ["r" "&mut &[u8]"]
-    ["version" "Version"]]
-   (cond->> (into [:block] (nested-version-ifs read-append fields))
-     (named? fields) (append [:method-call [:field-get "self" "validity"] "push" ["true"]])
-     true (append [:struct-init "Ok" [[nil [:unit]]]]))])
-
 (defn struct-field
   [{nm :name, ty :type, ver :version, desc :description}]
   [:struct-field
@@ -195,7 +149,6 @@
   [:impl nm [(with-capacity-fn fields)
              (len-fn fields)
              (append-default-fn fields)
-             (read-append-fn fields)
              (transpose-one-fn nm fields "values")]])
 
 (defn -main []

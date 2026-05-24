@@ -5,7 +5,7 @@ use std::{
 	mem::size_of,
 };
 
-use byteorder::WriteBytesExt;
+use byteorder::{ReadBytesExt, WriteBytesExt};
 
 use crate::{
 	frame::{Data, Frame, PortData, PortOccupancy},

@@ -7,7 +7,7 @@ use std::{
 	mem::size_of,
 };
 
-use byteorder::WriteBytesExt;
+use byteorder::{ReadBytesExt, WriteBytesExt};
 
 use crate::{
 	frame::{Data, Frame, PortData, PortOccupancy},
@@ -201,6 +201,12 @@ impl Frame {
 use crate::frame::DreamlandWhispy;
 
 impl DreamlandWhispy {
+	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u8().map(|x| self.direction.push(x))?;
+		self.validity.push(true);
+		Ok(())
+	}
+
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		w.write_u8(self.direction[i])?;
 		Ok(())
@@ -216,6 +222,15 @@ impl DreamlandWhispy {
 use crate::frame::End;
 
 impl End {
+	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		if version.gte(3, 7) {
+			r.read_i32::<BE>()
+				.map(|x| self.latest_finalized_frame.as_mut().unwrap().push(x))?
+		};
+		self.validity.push(true);
+		Ok(())
+	}
+
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		if version.gte(3, 7) {
 			w.write_i32::<BE>(self.latest_finalized_frame.as_ref().unwrap()[i])?
@@ -235,6 +250,13 @@ impl End {
 use crate::frame::FodPlatform;
 
 impl FodPlatform {
+	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u8().map(|x| self.platform.push(x))?;
+		r.read_f32::<BE>().map(|x| self.height.push(x))?;
+		self.validity.push(true);
+		Ok(())
+	}
+
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		w.write_u8(self.platform[i])?;
 		w.write_f32::<BE>(self.height[i])?;
@@ -252,6 +274,29 @@ impl FodPlatform {
 use crate::frame::Item;
 
 impl Item {
+	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u16::<BE>().map(|x| self.r#type.push(x))?;
+		r.read_u8().map(|x| self.state.push(x))?;
+		r.read_f32::<BE>().map(|x| self.direction.push(x))?;
+		self.velocity.read_append(r, version)?;
+		self.position.read_append(r, version)?;
+		r.read_u16::<BE>().map(|x| self.damage.push(x))?;
+		r.read_f32::<BE>().map(|x| self.timer.push(x))?;
+		r.read_u32::<BE>().map(|x| self.id.push(x))?;
+		if version.gte(3, 2) {
+			self.misc.as_mut().unwrap().read_append(r, version)?;
+			if version.gte(3, 6) {
+				r.read_i8().map(|x| self.owner.as_mut().unwrap().push(x))?;
+				if version.gte(3, 16) {
+					r.read_u16::<BE>()
+						.map(|x| self.instance_id.as_mut().unwrap().push(x))?
+				}
+			}
+		};
+		self.validity.push(true);
+		Ok(())
+	}
+
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		w.write_u16::<BE>(self.r#type[i])?;
 		w.write_u8(self.state[i])?;
@@ -299,6 +344,14 @@ impl Item {
 use crate::frame::ItemMisc;
 
 impl ItemMisc {
+	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u8().map(|x| self.0.push(x))?;
+		r.read_u8().map(|x| self.1.push(x))?;
+		r.read_u8().map(|x| self.2.push(x))?;
+		r.read_u8().map(|x| self.3.push(x))?;
+		Ok(())
+	}
+
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		w.write_u8(self.0[i])?;
 		w.write_u8(self.1[i])?;
@@ -320,6 +373,13 @@ impl ItemMisc {
 use crate::frame::Position;
 
 impl Position {
+	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_f32::<BE>().map(|x| self.x.push(x))?;
+		r.read_f32::<BE>().map(|x| self.y.push(x))?;
+		self.validity.push(true);
+		Ok(())
+	}
+
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		w.write_f32::<BE>(self.x[i])?;
 		w.write_f32::<BE>(self.y[i])?;
@@ -337,6 +397,59 @@ impl Position {
 use crate::frame::Post;
 
 impl Post {
+	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u8().map(|x| self.character.push(x))?;
+		r.read_u16::<BE>().map(|x| self.state.push(x))?;
+		self.position.read_append(r, version)?;
+		r.read_f32::<BE>().map(|x| self.direction.push(x))?;
+		r.read_f32::<BE>().map(|x| self.percent.push(x))?;
+		r.read_f32::<BE>().map(|x| self.shield.push(x))?;
+		r.read_u8().map(|x| self.last_attack_landed.push(x))?;
+		r.read_u8().map(|x| self.combo_count.push(x))?;
+		r.read_u8().map(|x| self.last_hit_by.push(x))?;
+		r.read_u8().map(|x| self.stocks.push(x))?;
+		if version.gte(0, 2) {
+			r.read_f32::<BE>()
+				.map(|x| self.state_age.as_mut().unwrap().push(x))?;
+			if version.gte(2, 0) {
+				self.state_flags.as_mut().unwrap().read_append(r, version)?;
+				r.read_f32::<BE>()
+					.map(|x| self.misc_as.as_mut().unwrap().push(x))?;
+				r.read_u8()
+					.map(|x| self.airborne.as_mut().unwrap().push(x))?;
+				r.read_u16::<BE>()
+					.map(|x| self.ground.as_mut().unwrap().push(x))?;
+				r.read_u8().map(|x| self.jumps.as_mut().unwrap().push(x))?;
+				r.read_u8()
+					.map(|x| self.l_cancel.as_mut().unwrap().push(x))?;
+				if version.gte(2, 1) {
+					r.read_u8()
+						.map(|x| self.hurtbox_state.as_mut().unwrap().push(x))?;
+					if version.gte(3, 5) {
+						self.velocities.as_mut().unwrap().read_append(r, version)?;
+						if version.gte(3, 8) {
+							r.read_f32::<BE>()
+								.map(|x| self.hitlag.as_mut().unwrap().push(x))?;
+							if version.gte(3, 11) {
+								r.read_u32::<BE>()
+									.map(|x| self.animation_index.as_mut().unwrap().push(x))?;
+								if version.gte(3, 16) {
+									r.read_u16::<BE>().map(|x| {
+										self.last_hit_by_instance.as_mut().unwrap().push(x)
+									})?;
+									r.read_u16::<BE>()
+										.map(|x| self.instance_id.as_mut().unwrap().push(x))?
+								}
+							}
+						}
+					}
+				}
+			}
+		};
+		self.validity.push(true);
+		Ok(())
+	}
+
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		w.write_u8(self.character[i])?;
 		w.write_u16::<BE>(self.state[i])?;
@@ -426,6 +539,39 @@ impl Post {
 use crate::frame::Pre;
 
 impl Pre {
+	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u32::<BE>().map(|x| self.random_seed.push(x))?;
+		r.read_u16::<BE>().map(|x| self.state.push(x))?;
+		self.position.read_append(r, version)?;
+		r.read_f32::<BE>().map(|x| self.direction.push(x))?;
+		self.joystick.read_append(r, version)?;
+		self.cstick.read_append(r, version)?;
+		r.read_f32::<BE>().map(|x| self.triggers.push(x))?;
+		r.read_u32::<BE>().map(|x| self.buttons.push(x))?;
+		r.read_u16::<BE>().map(|x| self.buttons_physical.push(x))?;
+		self.triggers_physical.read_append(r, version)?;
+		if version.gte(1, 2) {
+			r.read_i8()
+				.map(|x| self.raw_analog_x.as_mut().unwrap().push(x))?;
+			if version.gte(1, 4) {
+				r.read_f32::<BE>()
+					.map(|x| self.percent.as_mut().unwrap().push(x))?;
+				if version.gte(3, 15) {
+					r.read_i8()
+						.map(|x| self.raw_analog_y.as_mut().unwrap().push(x))?;
+					if version.gte(3, 17) {
+						r.read_i8()
+							.map(|x| self.raw_analog_cstick_x.as_mut().unwrap().push(x))?;
+						r.read_i8()
+							.map(|x| self.raw_analog_cstick_y.as_mut().unwrap().push(x))?
+					}
+				}
+			}
+		};
+		self.validity.push(true);
+		Ok(())
+	}
+
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		w.write_u32::<BE>(self.random_seed[i])?;
 		w.write_u16::<BE>(self.state[i])?;
@@ -485,6 +631,13 @@ impl Pre {
 use crate::frame::StadiumTransformation;
 
 impl StadiumTransformation {
+	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u16::<BE>().map(|x| self.event.push(x))?;
+		r.read_u16::<BE>().map(|x| self.r#type.push(x))?;
+		self.validity.push(true);
+		Ok(())
+	}
+
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		w.write_u16::<BE>(self.event[i])?;
 		w.write_u16::<BE>(self.r#type[i])?;
@@ -502,6 +655,16 @@ impl StadiumTransformation {
 use crate::frame::Start;
 
 impl Start {
+	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u32::<BE>().map(|x| self.random_seed.push(x))?;
+		if version.gte(3, 10) {
+			r.read_u32::<BE>()
+				.map(|x| self.scene_frame_counter.as_mut().unwrap().push(x))?
+		};
+		self.validity.push(true);
+		Ok(())
+	}
+
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		w.write_u32::<BE>(self.random_seed[i])?;
 		if version.gte(3, 10) {
@@ -523,6 +686,15 @@ impl Start {
 use crate::frame::StateFlags;
 
 impl StateFlags {
+	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_u8().map(|x| self.0.push(x))?;
+		r.read_u8().map(|x| self.1.push(x))?;
+		r.read_u8().map(|x| self.2.push(x))?;
+		r.read_u8().map(|x| self.3.push(x))?;
+		r.read_u8().map(|x| self.4.push(x))?;
+		Ok(())
+	}
+
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		w.write_u8(self.0[i])?;
 		w.write_u8(self.1[i])?;
@@ -546,6 +718,13 @@ impl StateFlags {
 use crate::frame::TriggersPhysical;
 
 impl TriggersPhysical {
+	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_f32::<BE>().map(|x| self.l.push(x))?;
+		r.read_f32::<BE>().map(|x| self.r.push(x))?;
+		self.validity.push(true);
+		Ok(())
+	}
+
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		w.write_f32::<BE>(self.l[i])?;
 		w.write_f32::<BE>(self.r[i])?;
@@ -563,6 +742,16 @@ impl TriggersPhysical {
 use crate::frame::Velocities;
 
 impl Velocities {
+	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_f32::<BE>().map(|x| self.self_x_air.push(x))?;
+		r.read_f32::<BE>().map(|x| self.self_y.push(x))?;
+		r.read_f32::<BE>().map(|x| self.knockback_x.push(x))?;
+		r.read_f32::<BE>().map(|x| self.knockback_y.push(x))?;
+		r.read_f32::<BE>().map(|x| self.self_x_ground.push(x))?;
+		self.validity.push(true);
+		Ok(())
+	}
+
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		w.write_f32::<BE>(self.self_x_air[i])?;
 		w.write_f32::<BE>(self.self_y[i])?;
@@ -586,6 +775,13 @@ impl Velocities {
 use crate::frame::Velocity;
 
 impl Velocity {
+	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		r.read_f32::<BE>().map(|x| self.x.push(x))?;
+		r.read_f32::<BE>().map(|x| self.y.push(x))?;
+		self.validity.push(true);
+		Ok(())
+	}
+
 	fn write<W: Write>(&self, w: &mut W, version: Version, i: usize) -> Result<()> {
 		w.write_f32::<BE>(self.x[i])?;
 		w.write_f32::<BE>(self.y[i])?;

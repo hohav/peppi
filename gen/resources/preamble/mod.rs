@@ -10,20 +10,12 @@
 mod slippi;
 pub mod transpose;
 
-use std::{
-	cmp::max,
-	fmt,
-	io::Result,
-};
-
-use byteorder::ReadBytesExt;
+use std::{cmp::max, fmt};
 
 use crate::{
 	game::Port,
 	io::slippi::Version,
 };
-
-type BE = byteorder::BigEndian;
 
 /// Frame indexes start at -123, and reach 0 at "Go!".
 pub const FIRST_INDEX: i32 = -123;

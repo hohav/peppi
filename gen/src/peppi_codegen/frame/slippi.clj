@@ -8,6 +8,52 @@
   [[nm _]]
   [:use (list "crate" "frame" nm)])
 
+(defn read-append-primitive
+  [target ty]
+  [:method-call
+   {:unwrap true}
+   [:method-call
+    {:generics (when-not (#{"u8" "i8"} ty) ["BE"])}
+    "r"
+    (str "read_" ty)]
+   "map"
+   [[:closure
+     [["x"]]
+     [[:method-call
+       target
+       "push"
+       ["x"]]]]]])
+
+(defn read-append-composite
+  [target]
+  [:method-call
+   {:unwrap true}
+   target
+   "read_append"
+   ["r" "version"]])
+
+(defn read-append
+  [{nm :name, ty :type, ver :version, idx :index}]
+  (let [target (cond-> [:field-get "self" (or nm idx)]
+                 ver ((comp unwrap as-mut)))]
+    (cond
+      (primitive-types ty) (read-append-primitive target ty)
+      ty                   (read-append-composite target)
+      :else                (throw (ex-info "unsupported type" {:type ty})))))
+
+(defn read-append-fn
+  [fields]
+  [:fn
+   {:visibility "pub"
+    :ret ["Result" "()"]}
+   "read_append"
+   [["&mut self"]
+    ["r" "&mut &[u8]"]
+    ["version" "Version"]]
+   (cond->> (into [:block] (nested-version-ifs read-append fields))
+     (named? fields) (append [:method-call [:field-get "self" "validity"] "push" ["true"]])
+     true (append [:struct-init "Ok" [[nil [:unit]]]]))])
+
 (defn write-field-primitive
   [target {ty :type}]
   [:method-call
@@ -68,7 +114,8 @@
 
 (defn struct-impl
   [[nm {:keys [fields]}]]
-  [:impl nm [(write-fn fields)
+  [:impl nm [(read-append-fn fields)
+             (write-fn fields)
              (size-fn fields)]])
 
 (defn -main []

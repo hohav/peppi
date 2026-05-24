@@ -2,12 +2,12 @@
 
 use crate::{
 	frame::{Data, Frame, PortData, PortOccupancy, Validity},
-	game::{Port, NUM_PORTS},
+	game::{NUM_PORTS, Port},
 	io::slippi::Version,
 };
 
 use arrow::{
-	array::{downcast_array, Array, ArrayRef, ListArray, PrimitiveArray, StructArray},
+	array::{Array, ArrayRef, ListArray, PrimitiveArray, StructArray, downcast_array},
 	buffer::{NullBuffer, OffsetBuffer, ScalarBuffer},
 	datatypes::{
 		DataType, Field, Fields, Float32Type, Int32Type, Int8Type, UInt16Type, UInt32Type,

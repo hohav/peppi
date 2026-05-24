@@ -13,13 +13,9 @@ mod peppi;
 mod slippi;
 pub mod transpose;
 
-use std::{cmp::max, fmt, io::Result};
-
-use byteorder::ReadBytesExt;
+use std::{cmp::max, fmt};
 
 use crate::{game::Port, io::slippi::Version};
-
-type BE = byteorder::BigEndian;
 
 /// Frame indexes start at -123, and reach 0 at "Go!".
 pub const FIRST_INDEX: i32 = -123;
@@ -377,12 +373,6 @@ impl DreamlandWhispy {
 		self.direction.push(0u8)
 	}
 
-	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.direction.push(x))?;
-		self.validity.push(true);
-		Ok(())
-	}
-
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::DreamlandWhispy {
 		transpose::DreamlandWhispy {
 			direction: self.direction[i],
@@ -417,15 +407,6 @@ impl End {
 		if version.gte(3, 7) {
 			self.latest_finalized_frame.as_mut().unwrap().push(0i32)
 		}
-	}
-
-	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		if version.gte(3, 7) {
-			r.read_i32::<BE>()
-				.map(|x| self.latest_finalized_frame.as_mut().unwrap().push(x))?
-		};
-		self.validity.push(true);
-		Ok(())
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::End {
@@ -464,13 +445,6 @@ impl FodPlatform {
 		self.validity.push(true);
 		self.platform.push(0u8);
 		self.height.push(0f32)
-	}
-
-	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.platform.push(x))?;
-		r.read_f32::<BE>().map(|x| self.height.push(x))?;
-		self.validity.push(true);
-		Ok(())
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::FodPlatform {
@@ -556,29 +530,6 @@ impl Item {
 		}
 	}
 
-	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u16::<BE>().map(|x| self.r#type.push(x))?;
-		r.read_u8().map(|x| self.state.push(x))?;
-		r.read_f32::<BE>().map(|x| self.direction.push(x))?;
-		self.velocity.read_append(r, version)?;
-		self.position.read_append(r, version)?;
-		r.read_u16::<BE>().map(|x| self.damage.push(x))?;
-		r.read_f32::<BE>().map(|x| self.timer.push(x))?;
-		r.read_u32::<BE>().map(|x| self.id.push(x))?;
-		if version.gte(3, 2) {
-			self.misc.as_mut().unwrap().read_append(r, version)?;
-			if version.gte(3, 6) {
-				r.read_i8().map(|x| self.owner.as_mut().unwrap().push(x))?;
-				if version.gte(3, 16) {
-					r.read_u16::<BE>()
-						.map(|x| self.instance_id.as_mut().unwrap().push(x))?
-				}
-			}
-		};
-		self.validity.push(true);
-		Ok(())
-	}
-
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Item {
 		transpose::Item {
 			r#type: self.r#type[i],
@@ -621,14 +572,6 @@ impl ItemMisc {
 		self.3.push(0u8)
 	}
 
-	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.0.push(x))?;
-		r.read_u8().map(|x| self.1.push(x))?;
-		r.read_u8().map(|x| self.2.push(x))?;
-		r.read_u8().map(|x| self.3.push(x))?;
-		Ok(())
-	}
-
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::ItemMisc {
 		transpose::ItemMisc(self.0[i], self.1[i], self.2[i], self.3[i])
 	}
@@ -661,13 +604,6 @@ impl Position {
 		self.validity.push(true);
 		self.x.push(0f32);
 		self.y.push(0f32)
-	}
-
-	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>().map(|x| self.x.push(x))?;
-		r.read_f32::<BE>().map(|x| self.y.push(x))?;
-		self.validity.push(true);
-		Ok(())
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Position {
@@ -813,59 +749,6 @@ impl Post {
 		}
 	}
 
-	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.character.push(x))?;
-		r.read_u16::<BE>().map(|x| self.state.push(x))?;
-		self.position.read_append(r, version)?;
-		r.read_f32::<BE>().map(|x| self.direction.push(x))?;
-		r.read_f32::<BE>().map(|x| self.percent.push(x))?;
-		r.read_f32::<BE>().map(|x| self.shield.push(x))?;
-		r.read_u8().map(|x| self.last_attack_landed.push(x))?;
-		r.read_u8().map(|x| self.combo_count.push(x))?;
-		r.read_u8().map(|x| self.last_hit_by.push(x))?;
-		r.read_u8().map(|x| self.stocks.push(x))?;
-		if version.gte(0, 2) {
-			r.read_f32::<BE>()
-				.map(|x| self.state_age.as_mut().unwrap().push(x))?;
-			if version.gte(2, 0) {
-				self.state_flags.as_mut().unwrap().read_append(r, version)?;
-				r.read_f32::<BE>()
-					.map(|x| self.misc_as.as_mut().unwrap().push(x))?;
-				r.read_u8()
-					.map(|x| self.airborne.as_mut().unwrap().push(x))?;
-				r.read_u16::<BE>()
-					.map(|x| self.ground.as_mut().unwrap().push(x))?;
-				r.read_u8().map(|x| self.jumps.as_mut().unwrap().push(x))?;
-				r.read_u8()
-					.map(|x| self.l_cancel.as_mut().unwrap().push(x))?;
-				if version.gte(2, 1) {
-					r.read_u8()
-						.map(|x| self.hurtbox_state.as_mut().unwrap().push(x))?;
-					if version.gte(3, 5) {
-						self.velocities.as_mut().unwrap().read_append(r, version)?;
-						if version.gte(3, 8) {
-							r.read_f32::<BE>()
-								.map(|x| self.hitlag.as_mut().unwrap().push(x))?;
-							if version.gte(3, 11) {
-								r.read_u32::<BE>()
-									.map(|x| self.animation_index.as_mut().unwrap().push(x))?;
-								if version.gte(3, 16) {
-									r.read_u16::<BE>().map(|x| {
-										self.last_hit_by_instance.as_mut().unwrap().push(x)
-									})?;
-									r.read_u16::<BE>()
-										.map(|x| self.instance_id.as_mut().unwrap().push(x))?
-								}
-							}
-						}
-					}
-				}
-			}
-		};
-		self.validity.push(true);
-		Ok(())
-	}
-
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Post {
 		transpose::Post {
 			character: self.character[i],
@@ -994,39 +877,6 @@ impl Pre {
 		}
 	}
 
-	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u32::<BE>().map(|x| self.random_seed.push(x))?;
-		r.read_u16::<BE>().map(|x| self.state.push(x))?;
-		self.position.read_append(r, version)?;
-		r.read_f32::<BE>().map(|x| self.direction.push(x))?;
-		self.joystick.read_append(r, version)?;
-		self.cstick.read_append(r, version)?;
-		r.read_f32::<BE>().map(|x| self.triggers.push(x))?;
-		r.read_u32::<BE>().map(|x| self.buttons.push(x))?;
-		r.read_u16::<BE>().map(|x| self.buttons_physical.push(x))?;
-		self.triggers_physical.read_append(r, version)?;
-		if version.gte(1, 2) {
-			r.read_i8()
-				.map(|x| self.raw_analog_x.as_mut().unwrap().push(x))?;
-			if version.gte(1, 4) {
-				r.read_f32::<BE>()
-					.map(|x| self.percent.as_mut().unwrap().push(x))?;
-				if version.gte(3, 15) {
-					r.read_i8()
-						.map(|x| self.raw_analog_y.as_mut().unwrap().push(x))?;
-					if version.gte(3, 17) {
-						r.read_i8()
-							.map(|x| self.raw_analog_cstick_x.as_mut().unwrap().push(x))?;
-						r.read_i8()
-							.map(|x| self.raw_analog_cstick_y.as_mut().unwrap().push(x))?
-					}
-				}
-			}
-		};
-		self.validity.push(true);
-		Ok(())
-	}
-
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Pre {
 		transpose::Pre {
 			random_seed: self.random_seed[i],
@@ -1079,13 +929,6 @@ impl StadiumTransformation {
 		self.r#type.push(0u16)
 	}
 
-	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u16::<BE>().map(|x| self.event.push(x))?;
-		r.read_u16::<BE>().map(|x| self.r#type.push(x))?;
-		self.validity.push(true);
-		Ok(())
-	}
-
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::StadiumTransformation {
 		transpose::StadiumTransformation {
 			event: self.event[i],
@@ -1125,16 +968,6 @@ impl Start {
 		if version.gte(3, 10) {
 			self.scene_frame_counter.as_mut().unwrap().push(0u32)
 		}
-	}
-
-	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u32::<BE>().map(|x| self.random_seed.push(x))?;
-		if version.gte(3, 10) {
-			r.read_u32::<BE>()
-				.map(|x| self.scene_frame_counter.as_mut().unwrap().push(x))?
-		};
-		self.validity.push(true);
-		Ok(())
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Start {
@@ -1178,15 +1011,6 @@ impl StateFlags {
 		self.4.push(0u8)
 	}
 
-	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.0.push(x))?;
-		r.read_u8().map(|x| self.1.push(x))?;
-		r.read_u8().map(|x| self.2.push(x))?;
-		r.read_u8().map(|x| self.3.push(x))?;
-		r.read_u8().map(|x| self.4.push(x))?;
-		Ok(())
-	}
-
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::StateFlags {
 		transpose::StateFlags(self.0[i], self.1[i], self.2[i], self.3[i], self.4[i])
 	}
@@ -1219,13 +1043,6 @@ impl TriggersPhysical {
 		self.validity.push(true);
 		self.l.push(0f32);
 		self.r.push(0f32)
-	}
-
-	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>().map(|x| self.l.push(x))?;
-		r.read_f32::<BE>().map(|x| self.r.push(x))?;
-		self.validity.push(true);
-		Ok(())
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::TriggersPhysical {
@@ -1279,16 +1096,6 @@ impl Velocities {
 		self.self_x_ground.push(0f32)
 	}
 
-	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>().map(|x| self.self_x_air.push(x))?;
-		r.read_f32::<BE>().map(|x| self.self_y.push(x))?;
-		r.read_f32::<BE>().map(|x| self.knockback_x.push(x))?;
-		r.read_f32::<BE>().map(|x| self.knockback_y.push(x))?;
-		r.read_f32::<BE>().map(|x| self.self_x_ground.push(x))?;
-		self.validity.push(true);
-		Ok(())
-	}
-
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Velocities {
 		transpose::Velocities {
 			self_x_air: self.self_x_air[i],
@@ -1327,13 +1134,6 @@ impl Velocity {
 		self.validity.push(true);
 		self.x.push(0f32);
 		self.y.push(0f32)
-	}
-
-	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>().map(|x| self.x.push(x))?;
-		r.read_f32::<BE>().map(|x| self.y.push(x))?;
-		self.validity.push(true);
-		Ok(())
 	}
 
 	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Velocity {
