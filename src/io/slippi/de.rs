@@ -12,7 +12,7 @@ use log::{debug, info, trace, warn};
 type BE = byteorder::BigEndian;
 
 use crate::{
-	frame::{self, Frame, transpose},
+	frame::{self, Frames, Reader},
 	game::{
 		self, Game, MAX_PLAYERS, Match, NUM_PORTS, Netplay, Player, PlayerType, Port, Quirks,
 		port_occupancy, shift_jis::MeleeString,
@@ -66,18 +66,18 @@ struct SplitAccumulator {
 	actual_size: u32,
 }
 
-pub struct PartialGame {
+pub struct PartialGame<F: Frames+Reader> {
 	pub start: game::Start,
 	pub end: Option<game::End>,
-	pub frames: Frame,
+	pub frames: F,
 	pub metadata: Option<Map>,
 	pub gecko_codes: Option<game::GeckoCodes>,
 	pub hash: Option<String>,
 	pub quirks: Option<Quirks>,
 }
 
-impl PartialGame {
-	fn finish(self) -> Game {
+impl <F: Frames+Reader> PartialGame<F> {
+	fn finish(self) -> Game<F> {
 		Game {
 			start: self.start,
 			end: self.end,
@@ -90,17 +90,17 @@ impl PartialGame {
 	}
 }
 
-pub struct ParseState {
+pub struct ParseState<F: Frames+Reader> {
 	payload_sizes: PayloadSizes,
 	bytes_read: usize,
 	event_counts: HashMap<u8, usize>,
 	split_accumulator: SplitAccumulator,
-	port_indexes: [usize; 4],
+	port_indexes: [u8; NUM_PORTS],
 	skipping_frames: bool,
-	game: PartialGame,
+	game: PartialGame<F>,
 }
 
-impl ParseState {
+impl <F: Frames+Reader> ParseState<F> {
 	pub fn start(&self) -> &game::Start {
 		&self.game.start
 	}
@@ -121,13 +121,15 @@ impl ParseState {
 		self.game.frames.len()
 	}
 
+	/*
 	pub fn frame(&self, idx: usize) -> transpose::Frame {
 		self.game
 			.frames
 			.transpose_one(idx, self.game.start.slippi.version)
 	}
+	*/
 
-	pub fn frames(&self) -> &Frame {
+	pub fn frames(&self) -> &F {
 		&self.game.frames
 	}
 
@@ -135,26 +137,14 @@ impl ParseState {
 		self.bytes_read
 	}
 
+	/*
 	fn last_id(&self) -> Option<i32> {
 		self.game.frames.id.last().map(|id| *id)
 	}
+	*/
 
-	fn frame_open(&mut self, id: i32) {
-		self.game.frames.id.push(id);
-	}
-
-	fn frame_close(&mut self) {
-		let len = self.game.frames.len();
-		for p in &mut self.game.frames.ports {
-			while p.len() < len {
-				p.append_null(self.game.start.slippi.version);
-			}
-			if let Some(f) = &mut p.follower {
-				while f.len() < len {
-					f.append_null(self.game.start.slippi.version);
-				}
-			}
-		}
+	fn port_count(&self) -> usize {
+		self.game.start.players.len()
 	}
 }
 
@@ -510,14 +500,13 @@ fn handle_splitter_event(buf: &[u8], accumulator: &mut SplitAccumulator) -> Resu
 fn debug_write_event(
 	buf: &[u8],
 	code: u8,
-	state: Option<&ParseState>,
+	count: usize,
 	debug: &Debug,
 ) -> Result<()> {
 	// write the event's raw data to "{debug.dir}/{code}/{count}",
 	// where `count` is how many of that event we've seen already
 	let code_dir = debug.dir.join(format!("{}", code));
 	fs::create_dir_all(&code_dir)?;
-	let count = state.map_or(0, |s| *s.event_counts.get(&code).unwrap_or(&0));
 	let mut f = File::create(code_dir.join(format!("{}", count)))?;
 	f.write_all(buf)?;
 	Ok(())
@@ -548,7 +537,7 @@ fn parse_payloads<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<(usize, Payl
 	let buf = &mut &buf[..];
 
 	if let Some(ref d) = opts.as_ref().and_then(|o| o.debug.as_ref()) {
-		debug_write_event(&buf, code, None, d)?;
+		debug_write_event(&buf, code, 0, d)?;
 	}
 
 	let mut sizes: PayloadSizes = [None; 256];
@@ -597,7 +586,7 @@ fn parse_game_start<R: Read>(
 	r.read_exact(&mut buf)?;
 
 	if let Some(ref d) = opts.as_ref().and_then(|o| o.debug.as_ref()) {
-		debug_write_event(&buf, code, None, d)?;
+		debug_write_event(&buf, code, 0, d)?;
 	}
 
 	match Event::try_from(code) {
@@ -615,7 +604,7 @@ pub fn parse_header<R: Read>(mut r: R, _opts: Option<&Opts>) -> Result<u32> {
 	Ok(r.read_u32::<BE>()?)
 }
 
-pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState> {
+pub fn parse_start<R: Read, F: Frames+Reader>(mut r: R, opts: Option<&Opts>) -> Result<ParseState<F>> {
 	let (bytes_read, payload_sizes) = parse_payloads(&mut r, opts)?;
 	let (bytes_read, start) = parse_game_start(&mut r, &payload_sizes, bytes_read, opts)?;
 
@@ -628,7 +617,7 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 	let game = PartialGame {
 		start: start.clone(),
 		end: None,
-		frames: Frame::with_capacity(capacity, version, &ports),
+		frames: F::with_capacity(capacity, version, &ports),
 		metadata: None,
 		gecko_codes: None,
 		hash: None,
@@ -636,9 +625,9 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 	};
 
 	let port_indexes = {
-		let mut result = [0, 0, 0, 0];
+		let mut result = [NUM_PORTS as u8; NUM_PORTS];
 		for (i, p) in ports.into_iter().enumerate() {
-			result[p.port as usize] = i;
+			result[p.port as usize] = i.try_into().unwrap();
 		}
 		result
 	};
@@ -659,7 +648,7 @@ pub fn parse_start<R: Read>(mut r: R, opts: Option<&Opts>) -> Result<ParseState>
 /// Parses a single event from `r`.
 ///
 /// Returns the event code that was parsed.
-pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts>) -> Result<u8> {
+pub fn parse_event<R: Read, F: Frames+Reader>(mut r: R, state: &mut ParseState<F>, opts: Option<&Opts>) -> Result<u8> {
 	let mut code = r.read_u8()?;
 
 	if state.skipping_frames && code != Event::GameEnd as u8 {
@@ -690,11 +679,12 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 	};
 
 	if let Some(ref d) = opts.as_ref().and_then(|o| o.debug.as_ref()) {
-		debug_write_event(&buf, code, Some(state), d)?;
+		debug_write_event(&buf, code, *state.event_counts.get(&code).unwrap_or(&0), d)?;
 	}
 
 	*state.event_counts.entry(code).or_default() += 1;
 
+	let version = state.game.start.slippi.version;
 	let event = Event::try_from(code).ok();
 	if let Some(event) = event {
 		use Event::*;
@@ -711,216 +701,82 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 			GameEnd => state.game.end = Some(game_end(&mut &*buf)?),
 			FrameStart => {
 				// no FrameEnd events before v3.0, so simulate it
-				if state.game.start.slippi.version.lt(3, 0) {
-					state.frame_close();
+				if version.lt(3, 0) {
+					state.game.frames.close(version, state.port_count());
 				}
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
 				trace!("Frame start: {}", id);
-				state.frame_open(id);
-				state
-					.game
-					.frames
-					.start
-					.as_mut()
-					.unwrap()
-					.read_append(r, state.game.start.slippi.version)?;
+				state.game.frames.open(version, id, state.port_count());
+				state.game.frames.read_start(r, version)?;
 			}
 			FramePre => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
-				let port = r.read_u8()?;
-				let is_follower = r.read_u8()? != 0;
+				let port = Port::try_from(r.read_u8()?).unwrap();
+				let follower = r.read_u8()? != 0;
 				trace!("Frame pre: {}:{}", id, port);
-				if state.game.start.slippi.version.gte(2, 2) {
-					assert_eq!(id, state.last_id().unwrap());
+
+				// Ensure `Reader::open` has been called for the current frame.
+				// Normally this happens via `FrameStart`, but those don't exist
+				// prior to v2.2 so we compensate here.
+				if version.gte(2, 2) {
+					assert_eq!(id, state.game.frames.last_id().unwrap());
 				} else {
 					// no Frame Start events before v2.2, but also no rollbacks
-					let last_id = state.last_id().unwrap_or(frame::FIRST_INDEX - 1);
+					let last_id = state.game.frames.last_id().unwrap_or(frame::FIRST_INDEX - 1);
 					if last_id + 1 == id {
-						state.frame_open(id);
+						state.game.frames.open(version, id, state.port_count());
 					} else {
 						assert_eq!(id, last_id);
 					}
 				}
-				let port_index = state.port_indexes[port as usize];
-				if is_follower {
-					state.game.frames.ports[port_index]
-						.follower
-						.as_mut()
-						.unwrap()
-						.validity
-						.push(true);
-					state.game.frames.ports[port_index]
-						.follower
-						.as_mut()
-						.unwrap()
-						.pre
-						.read_append(r, state.game.start.slippi.version)?;
-				} else {
-					state.game.frames.ports[port_index]
-						.leader
-						.validity
-						.push(true);
-					state.game.frames.ports[port_index]
-						.leader
-						.pre
-						.read_append(r, state.game.start.slippi.version)?;
-				}
+				state.game.frames.read_pre(r, version, id, state.port_indexes[port as usize], port, follower)?;
 			}
 			FramePost => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
-				let port = r.read_u8()?;
-				let is_follower = r.read_u8()? != 0;
+				let port = Port::try_from(r.read_u8()?).unwrap();
+				let follower = r.read_u8()? != 0;
 				trace!("Frame post: {}:{}", id, port);
-				assert_eq!(id, state.last_id().unwrap());
-				match is_follower {
-					true => state.game.frames.ports[state.port_indexes[port as usize]]
-						.follower
-						.as_mut()
-						.unwrap()
-						.post
-						.read_append(r, state.game.start.slippi.version)?,
-					_ => state.game.frames.ports[state.port_indexes[port as usize]]
-						.leader
-						.post
-						.read_append(r, state.game.start.slippi.version)?,
-				};
+				assert_eq!(id, state.game.frames.last_id().unwrap());
+				state.game.frames.read_post(r, version, id, state.port_indexes[port as usize], port, follower)?;
 			}
 			FrameEnd => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
 				trace!("Frame end: {}", id);
-				assert_eq!(id, state.last_id().unwrap());
-				state.game.frames.item_offset.as_mut().unwrap().push(
-					state
-						.game
-						.frames
-						.item
-						.as_ref()
-						.unwrap()
-						.id
-						.len()
-						.try_into()
-						.unwrap(),
-				);
-				if state.game.start.slippi.version.gte(3, 18) {
-					state
-						.game
-						.frames
-						.fod_platform_offset
-						.as_mut()
-						.unwrap()
-						.push(
-							state
-								.game
-								.frames
-								.fod_platform
-								.as_ref()
-								.unwrap()
-								.platform
-								.len()
-								.try_into()
-								.unwrap(),
-						);
-					state
-						.game
-						.frames
-						.dreamland_whispy_offset
-						.as_mut()
-						.unwrap()
-						.push(
-							state
-								.game
-								.frames
-								.dreamland_whispy
-								.as_ref()
-								.unwrap()
-								.direction
-								.len()
-								.try_into()
-								.unwrap(),
-						);
-					state
-						.game
-						.frames
-						.stadium_transformation_offset
-						.as_mut()
-						.unwrap()
-						.push(
-							state
-								.game
-								.frames
-								.stadium_transformation
-								.as_ref()
-								.unwrap()
-								.event
-								.len()
-								.try_into()
-								.unwrap(),
-						);
-				}
-				state
-					.game
-					.frames
-					.end
-					.as_mut()
-					.unwrap()
-					.read_append(r, state.game.start.slippi.version)?;
-				state.frame_close();
+				assert_eq!(id, state.game.frames.last_id().unwrap());
+				state.game.frames.read_end(r, version)?;
+				state.game.frames.close(version, state.port_count());
 			}
 			Item => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
 				trace!("Frame item: {}", id);
-				assert_eq!(id, state.last_id().unwrap());
-				state
-					.game
-					.frames
-					.item
-					.as_mut()
-					.unwrap()
-					.read_append(r, state.game.start.slippi.version)?;
+				assert_eq!(id, state.game.frames.last_id().unwrap());
+				state.game.frames.read_item(r, version)?;
 			}
 			FodPlatform => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
 				trace!("FOD platform: {}", id);
-				assert_eq!(id, state.last_id().unwrap());
-				state
-					.game
-					.frames
-					.fod_platform
-					.as_mut()
-					.unwrap()
-					.read_append(r, state.game.start.slippi.version)?;
+				assert_eq!(id, state.game.frames.last_id().unwrap());
+				state.game.frames.read_fod_platform(r, version)?;
 			}
 			DreamlandWhispy => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
 				trace!("Dreamland Whispy: {}", id);
-				assert_eq!(id, state.last_id().unwrap());
-				state
-					.game
-					.frames
-					.dreamland_whispy
-					.as_mut()
-					.unwrap()
-					.read_append(r, state.game.start.slippi.version)?;
+				assert_eq!(id, state.game.frames.last_id().unwrap());
+				state.game.frames.read_dreamland_whispy(r, version)?;
 			}
 			StadiumTransformation => {
 				let r = &mut &*buf;
 				let id = r.read_i32::<BE>()?;
 				trace!("Stadium transformation: {}", id);
-				assert_eq!(id, state.last_id().unwrap());
-				state
-					.game
-					.frames
-					.stadium_transformation
-					.as_mut()
-					.unwrap()
-					.read_append(r, state.game.start.slippi.version)?;
+				assert_eq!(id, state.game.frames.last_id().unwrap());
+				state.game.frames.read_stadium_transformation(r, version)?;
 			}
 		};
 	}
@@ -930,9 +786,9 @@ pub fn parse_event<R: Read>(mut r: R, state: &mut ParseState, opts: Option<&Opts
 }
 
 /// Assumes you already consumed the `U`, because that's how you know if there's metadata.
-pub fn parse_metadata<R: Read>(
+pub fn parse_metadata<R: Read, F: Frames+Reader>(
 	mut r: R,
-	state: &mut ParseState,
+	state: &mut ParseState<F>,
 	_opts: Option<&Opts>,
 ) -> Result<()> {
 	expect_bytes(
@@ -950,7 +806,7 @@ pub fn parse_metadata<R: Read>(
 }
 
 /// Reads a Slippi (`.slp`) replay from `r`.
-pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
+pub fn read<R: Read + Seek, F: Frames+Reader>(r: R, opts: Option<&Opts>) -> Result<Game<F>> {
 	let hash = opts.map_or(false, |o| o.compute_hash);
 	// Wrap so we can hash all the bytes we've read at the end.
 	let mut r = HashingReader::new(r, hash);
@@ -959,7 +815,7 @@ pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
 	let raw_len = parse_header(&mut r, opts)? as usize;
 	info!("Raw length: {} bytes", raw_len);
 
-	let mut state = parse_start(&mut r, opts)?;
+	let mut state: ParseState<F> = parse_start(&mut r, opts)?;
 
 	if opts.map_or(false, |o| o.skip_frames) {
 		// Skip to GameEnd, which we assume is the last event in the stream!
@@ -995,7 +851,7 @@ pub fn read<R: Read + Seek>(r: R, opts: Option<&Opts>) -> Result<Game> {
 	// FrameEnd doesn't exist until v3.0, so we simulate it in FrameStart/FramePre.
 	// But that means there can be a "dangling" frame that we need to close here.
 	if state.game.start.slippi.version.lt(3, 0) {
-		state.frame_close();
+		state.game.frames.close(state.game.start.slippi.version, state.port_count());
 	}
 
 	info!("Frames: {}", state.game.frames.len());

@@ -139,7 +139,7 @@
 (defmethod struct-decl false
   [[nm {:keys [description fields]}]]
   [:tuple-struct
-   {:attrs {:derive ["Debug"]}
+   {:attrs {:derive ["Clone" "Debug" "Default"]}
     :docstring description}
    nm
    (mapv tuple-struct-field fields)])

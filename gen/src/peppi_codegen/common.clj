@@ -246,7 +246,7 @@
   ([props target nm]
    (emit-expr* props target nm []))
   ([{:keys [unwrap generics]} target nm args]
-   (format "%s%s%s(%s)"
+   (format "%s%s%s(%s)%s"
            (or (some-> target emit-type (str "::")) "")
            nm
            (or (some-> generics emit-generics) "")
@@ -286,7 +286,7 @@
                  (mapv (comp emit-expr second))
                  (str/join ", ")))))
 
-#_(defmethod emit-expr* :tuple-struct-init
+(defmethod emit-expr* :tuple-struct-init
   [_ nm fields]
   (format "%s(%s)"
           nm

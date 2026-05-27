@@ -1,9 +1,11 @@
+use peppi::frame::Frame;
+
 mod common;
 use common::game;
 
 #[test]
 fn crazy_name_tags() {
-	let game = game("crazy_name_tags");
+	let game = game::<Frame>("crazy_name_tags");
 	let tag1 = game.start.players[0].name_tag.as_ref().unwrap();
 	let tag2 = game.start.players[1].name_tag.as_ref().unwrap();
 	let tag3 = game.start.players[2].name_tag.as_ref().unwrap();

@@ -1,4 +1,9 @@
-use std::collections::HashSet;
+use std::{
+	borrow::Cow,
+	collections::HashSet,
+	fs,
+	path::Path,
+};
 
 use pretty_assertions::assert_eq;
 use serde_json::{Map as JMap, Value as JValue, json};
@@ -7,6 +12,8 @@ use ssbm_data::{action_state, character::External, character::Internal, item::It
 
 use peppi::{
 	frame::{
+		Frame,
+		Frames,
 		Rollbacks,
 		transpose::{self, Position},
 	},
@@ -26,7 +33,7 @@ struct Buttons {
 	logical: u32,
 }
 
-fn button_seq(game: &Game) -> Vec<Buttons> {
+fn button_seq(game: &Game<Frame>) -> Vec<Buttons> {
 	let mut last_buttons: Option<Buttons> = None;
 	let mut button_seq = vec![];
 	for idx in 0..game.frames.len() {
@@ -44,7 +51,7 @@ fn button_seq(game: &Game) -> Vec<Buttons> {
 
 #[test]
 fn slippi_old_version() {
-	let game = game("v0.1");
+	let game: Game<Frame> = game("v0.1");
 	let players = game.start.players;
 
 	assert_eq!(game.start.slippi.version, Version(0, 1, 0));
@@ -63,7 +70,7 @@ fn slippi_old_version() {
 
 #[test]
 fn basic_game() {
-	let game = game("game");
+	let game: Game<Frame> = game("game");
 
 	assert_eq!(
 		JValue::Object(game.metadata.unwrap().into()),
@@ -186,8 +193,8 @@ fn basic_game() {
 	assert_eq!(game.frames.len(), 5209);
 
 	assert_eq!(
-		game.frames.transpose_one(1000, game.start.slippi.version),
-		transpose::Frame {
+		game.frames.frame(1000, game.start.slippi.version),
+		Cow::Owned(transpose::Frame {
 			id: 877,
 			ports: vec![
 				Some(transpose::PortData {
@@ -279,14 +286,14 @@ fn basic_game() {
 				}),
 			],
 			..Default::default()
-		}
+		})
 	);
 }
 
 #[test]
 fn skip_frames() {
-	let g1 = read_game(get_path("game"), false).unwrap();
-	let g2 = read_game(get_path("game"), true).unwrap();
+	let g1: Game<Frame> = read_game(get_path("game"), false).unwrap();
+	let g2: Game<Frame> = read_game(get_path("game"), true).unwrap();
 
 	assert_eq!(g1.start, g2.start);
 	assert_eq!(g1.end, g2.end);
@@ -296,7 +303,7 @@ fn skip_frames() {
 
 #[test]
 fn ics() {
-	let game = game("ics");
+	let game: Game<Frame> = game("ics");
 	assert_eq!(
 		JValue::Object(game.metadata.unwrap().into())["players"],
 		json!({
@@ -320,14 +327,14 @@ fn ics() {
 #[test]
 fn ucf() {
 	assert_eq!(
-		game("shield_drop").start.players[0].ucf,
+		game::<Frame>("shield_drop").start.players[0].ucf,
 		Some(Ucf {
 			dash_back: None,
 			shield_drop: Some(ShieldDrop::Ucf),
 		})
 	);
 	assert_eq!(
-		game("dash_back").start.players[0].ucf,
+		game::<Frame>("dash_back").start.players[0].ucf,
 		Some(Ucf {
 			dash_back: Some(DashBack::Ucf),
 			shield_drop: None,
@@ -337,7 +344,7 @@ fn ucf() {
 
 #[test]
 fn buttons_lzrs() {
-	let game = game("buttons_lrzs");
+	let game: Game<Frame> = game("buttons_lrzs");
 	assert_eq!(
 		button_seq(&game),
 		vec![
@@ -371,7 +378,7 @@ fn buttons_lzrs() {
 
 #[test]
 fn buttons_abxy() {
-	let game = game("buttons_abxy");
+	let game: Game<Frame> = game("buttons_abxy");
 	assert_eq!(
 		button_seq(&game),
 		vec![
@@ -397,7 +404,7 @@ fn buttons_abxy() {
 
 #[test]
 fn dpad_udlr() {
-	let game = game("dpad_udlr");
+	let game: Game<Frame> = game("dpad_udlr");
 	assert_eq!(
 		button_seq(&game),
 		vec![
@@ -423,7 +430,7 @@ fn dpad_udlr() {
 
 #[test]
 fn cstick_udlr() {
-	let game = game("cstick_udlr");
+	let game: Game<Frame> = game("cstick_udlr");
 	assert_eq!(
 		button_seq(&game),
 		vec![
@@ -449,7 +456,7 @@ fn cstick_udlr() {
 
 #[test]
 fn joystick_udlr() {
-	let game = game("joystick_udlr");
+	let game: Game<Frame> = game("joystick_udlr");
 	assert_eq!(
 		button_seq(&game),
 		vec![
@@ -475,7 +482,7 @@ fn joystick_udlr() {
 
 #[test]
 fn nintendont() {
-	let game = game("nintendont");
+	let game: Game<Frame> = game("nintendont");
 	assert_eq!(
 		JValue::Object(game.metadata.unwrap().into())["playedOn"],
 		JValue::String("nintendont".to_string())
@@ -484,7 +491,7 @@ fn nintendont() {
 
 #[test]
 fn netplay() {
-	let game = game("netplay");
+	let game: Game<Frame> = game("netplay");
 	assert_eq!(
 		JValue::Object(game.metadata.unwrap().into())["players"],
 		json!({
@@ -512,7 +519,7 @@ fn netplay() {
 
 #[test]
 fn console_name() {
-	let game = game("console_name");
+	let game: Game<Frame> = game("console_name");
 	assert_eq!(
 		JMap::from(game.metadata.unwrap())["consoleNick"],
 		JValue::String("Station 1".to_string())
@@ -521,13 +528,13 @@ fn console_name() {
 
 #[test]
 fn v2() {
-	let game = game("v2.0");
+	let game: Game<Frame> = game("v2.0");
 	assert_eq!(game.start.slippi.version, Version(2, 0, 1));
 }
 
 #[test]
 fn v3_12() {
-	let game = game("v3.12");
+	let game: Game<Frame> = game("v3.12");
 
 	assert_eq!(
 		game.start,
@@ -641,7 +648,7 @@ fn v3_12() {
 
 #[test]
 fn v3_13() {
-	let game = game("v3.13");
+	let game: Game<Frame> = game("v3.13");
 	assert_eq!(
 		game.end,
 		Some(End {
@@ -664,7 +671,7 @@ fn v3_13() {
 
 #[test]
 fn v3_14() {
-	let game = game("v3.16");
+	let game: Game<Frame> = game("v3.16");
 	assert_eq!(
 		game.start.r#match,
 		Some(Match {
@@ -677,10 +684,10 @@ fn v3_14() {
 
 #[test]
 fn v3_15() {
-	let game = game("v3.16");
+	let game: Game<Frame> = game("v3.16");
 	assert_eq!(
 		game.frames
-			.transpose_one(200, game.start.slippi.version)
+			.frame(200, game.start.slippi.version)
 			.ports[0]
 			.as_ref()
 			.unwrap()
@@ -693,7 +700,7 @@ fn v3_15() {
 
 #[test]
 fn v3_16() {
-	let game = game("v3.16");
+	let game: Game<Frame> = game("v3.16");
 	let player1_ids = game.frames.ports[0]
 		.leader
 		.post
@@ -742,16 +749,16 @@ fn v3_16() {
 
 #[test]
 fn v3_18() {
-	let game = game("v3.18");
+	let game: Game<Frame> = game("v3.18");
 	assert_eq!(
 		game.frames
-			.transpose_one(822, game.start.slippi.version)
+			.frame(822, game.start.slippi.version)
 			.fod_platforms,
 		Some(vec![])
 	);
 	assert_eq!(
 		game.frames
-			.transpose_one(823, game.start.slippi.version)
+			.frame(823, game.start.slippi.version)
 			.fod_platforms,
 		Some(vec![transpose::FodPlatform {
 			platform: 1,
@@ -764,17 +771,17 @@ fn v3_18() {
 fn unknown_event() {
 	// shouldn't panic
 	// TODO: check for warning
-	game("unknown_event");
+	game::<Frame>("unknown_event");
 }
 
 #[test]
 fn corrupt_replay() {
-	assert!(matches!(read_game(get_path("corrupt"), false), Err(_)));
+	assert!(matches!(read_game::<Frame>(get_path("corrupt"), false), Err(_)));
 }
 
 #[test]
 fn zelda_sheik_transformation() {
-	let game = game("transform");
+	let game: Game<Frame> = game("transform");
 	assert_eq!(
 		game.frames.ports[1].leader.pre.state[400],
 		action_state::Zelda::TransformGround as u16,
@@ -783,10 +790,10 @@ fn zelda_sheik_transformation() {
 
 #[test]
 fn items() {
-	let game = game("items");
+	let game: Game<Frame> = game("items");
 	assert_eq!(
 		game.frames
-			.transpose_one(121, game.start.slippi.version)
+			.frame(121, game.start.slippi.version)
 			.items,
 		Some(vec![transpose::Item {
 			id: 0,
@@ -807,7 +814,7 @@ fn items() {
 	);
 	assert_eq!(
 		game.frames
-			.transpose_one(275, game.start.slippi.version)
+			.frame(275, game.start.slippi.version)
 			.items,
 		Some(vec![transpose::Item {
 			id: 1,
@@ -828,7 +835,7 @@ fn items() {
 	);
 	assert_eq!(
 		game.frames
-			.transpose_one(503, game.start.slippi.version)
+			.frame(503, game.start.slippi.version)
 			.items,
 		Some(vec![transpose::Item {
 			id: 2,
@@ -851,7 +858,7 @@ fn items() {
 
 #[test]
 fn rollbacks() {
-	let game = game("ics2");
+	let game: Game<Frame> = game("ics2");
 	assert_eq!(game.frames.len(), 9530);
 	assert_eq!(game.frames.id[473..477], [350, 351, 351, 352]);
 	assert_eq!(
@@ -864,4 +871,37 @@ fn rollbacks() {
 		[false, true, false, false],
 		"returns true for first instance of frame 351"
 	);
+}
+
+fn _soa_vs_aos(path: impl AsRef<Path> + Clone) {
+	let soa: Game<Frame> = read_game(path.clone(), false).unwrap();
+	let aos: Game<Vec<transpose::Frame>> = read_game(path.clone(), false).unwrap();
+
+	assert_eq!(aos.start,        soa.start);
+	assert_eq!(aos.end,          soa.end);
+	assert_eq!(aos.metadata,     soa.metadata);
+	assert_eq!(aos.gecko_codes,  soa.gecko_codes);
+	assert_eq!(aos.frames.len(), soa.frames.len());
+
+	let mut idx = 0;
+
+	for f in &aos.frames {
+		assert_eq!(Cow::Borrowed(f), soa.frames.frame(idx, soa.start.slippi.version));
+		idx += 1;
+	}
+}
+
+#[test]
+fn soa_vs_aos() {
+	for entry in fs::read_dir("tests/data")
+		.unwrap()
+		.into_iter()
+		.map(|e| e.unwrap())
+		.filter(|e| match e.file_name().to_str().unwrap() {
+			"unknown_event.slp" | "corrupt.slp" => false,
+			_ => true,
+		}) {
+		println!("{:?}", entry.file_name());
+		_soa_vs_aos(entry.path());
+	}
 }

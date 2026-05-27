@@ -10,6 +10,7 @@ use arrow_ipc::{
 };
 
 use crate::{
+	frame::{Frame, Frames},
 	game::{Game, port_occupancy},
 	io::{
 		peppi, slippi,
@@ -44,7 +45,7 @@ fn tar_append<W: Write, P: AsRef<Path>>(
 /// Writes a replay to `w` in Peppi (`.slpp`) format.
 ///
 /// Returns an error if the game's version is higher than `MAX_SUPPORTED_VERSION`.
-pub fn write<W: Write>(w: W, game: Game, opts: Option<&Opts>) -> Result<(), Box<dyn Error>> {
+pub fn write<W: Write>(w: W, game: Game<Frame>, opts: Option<&Opts>) -> Result<(), Box<dyn Error>> {
 	slippi::assert_max_version(game.start.slippi.version)?;
 
 	let mut tar = tar::Builder::new(w);
@@ -80,7 +81,7 @@ pub fn write<W: Write>(w: W, game: Game, opts: Option<&Opts>) -> Result<(), Box<
 		tar_append(&mut tar, &buf, "gecko_codes.raw")?;
 	}
 
-	if game.frames.id.len() > 0 {
+	if game.frames.len() > 0 {
 		let ports = port_occupancy(&game.start);
 		let frames = game
 			.frames

@@ -15,7 +15,7 @@ use base64::prelude::{BASE64_STANDARD, Engine};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 
 use crate::{
-	frame::{Frame, PortOccupancy, transpose},
+	frame::{Frames, PortOccupancy},
 	game::shift_jis::MeleeString,
 	io::{
 		slippi::{self, Version},
@@ -384,17 +384,17 @@ pub fn port_occupancy(start: &Start) -> Vec<PortOccupancy> {
 }
 
 #[derive(Debug)]
-pub struct Game {
+pub struct Game<F: Frames> {
 	pub start: Start,
 	pub end: Option<End>,
-	pub frames: Frame,
+	pub frames: F,
 	pub metadata: Option<Map>,
 	pub gecko_codes: Option<GeckoCodes>,
 	pub hash: Option<String>,
 	pub quirks: Option<Quirks>,
 }
 
-impl Game {
+impl <F: Frames> Game<F> {
 	pub fn start(&self) -> &Start {
 		&self.start
 	}
@@ -409,16 +409,5 @@ impl Game {
 
 	pub fn gecko_codes(&self) -> &Option<GeckoCodes> {
 		&self.gecko_codes
-	}
-
-	/// Duration of the game in frames.
-	pub fn len(&self) -> usize {
-		self.frames.id.len()
-	}
-
-	/// Combines all data for a single frame into a struct.
-	/// Avoid calling this if you need maximum performance.
-	pub fn frame(&self, idx: usize) -> transpose::Frame {
-		self.frames.transpose_one(idx, self.start.slippi.version)
 	}
 }

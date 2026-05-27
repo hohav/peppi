@@ -13,7 +13,12 @@ mod peppi;
 mod slippi;
 pub mod transpose;
 
-use std::{cmp::max, fmt};
+use std::{
+	borrow::Cow,
+	cmp::max,
+	fmt,
+	io::{Result, Write},
+};
 
 use crate::{game::Port, io::slippi::Version};
 
@@ -180,9 +185,28 @@ impl PortData {
 			follower: self
 				.follower
 				.as_ref()
-				.and_then(|f| f.transpose_one(i, version)),
+				.and_then(|f| f.transpose_one(i, version).map(|f| Box::new(f))),
 		})
 	}
+}
+
+#[derive(Debug)]
+pub struct EventCounts {
+	pub(crate) frame: u32,
+	pub(crate) frame_data: u32,
+	pub(crate) item: u32,
+	pub(crate) fod_platform: u32,
+	pub(crate) dreamland_whispy: u32,
+	pub(crate) stadium_transformation: u32,
+}
+
+// TODO: rename (soa::Frame, aos::Frame)
+pub trait Frames {
+	fn with_capacity(capacity: usize, version: Version, ports: &[PortOccupancy]) -> Self;
+	fn len(&self) -> usize;
+	fn last_id(&self) -> Option<i32>;
+	fn frame(&self, idx: usize, version: Version) -> Cow<'_, transpose::Frame>;
+	fn event_counts(&self) -> EventCounts;
 }
 
 /// All frame data for a single game, in struct-of-arrays format.
@@ -218,42 +242,49 @@ fn make_offsets(capacity: usize) -> Vec<i32> {
 }
 
 impl Frame {
-	pub fn with_capacity(capacity: usize, version: Version, ports: &[PortOccupancy]) -> Self {
-		Self {
-			id: Vec::with_capacity(capacity),
-			ports: ports
-				.iter()
-				.map(|p| PortData::with_capacity(capacity, version, *p))
-				.collect(),
-			start: version
-				.gte(2, 2)
-				.then(|| Start::with_capacity(capacity, version)),
-			end: version
-				.gte(3, 0)
-				.then(|| End::with_capacity(capacity, version)),
-			item: version.gte(3, 0).then(|| Item::with_capacity(0, version)),
-			item_offset: version.gte(3, 0).then(|| make_offsets(capacity)),
-			fod_platform: version
-				.gte(3, 18)
-				.then(|| FodPlatform::with_capacity(0, version)),
-			fod_platform_offset: version.gte(3, 18).then(|| make_offsets(capacity)),
-			dreamland_whispy: version
-				.gte(3, 18)
-				.then(|| DreamlandWhispy::with_capacity(0, version)),
-			dreamland_whispy_offset: version.gte(3, 18).then(|| make_offsets(capacity)),
-			stadium_transformation: version
-				.gte(3, 18)
-				.then(|| StadiumTransformation::with_capacity(0, version)),
-			stadium_transformation_offset: version.gte(3, 18).then(|| make_offsets(capacity)),
+	/// Frames IDs may appear multiple times due to rollbacks. This fn lets you
+	/// "dedupe" rollbacks, by returning `true` for all but one of each unique
+	/// frame ID. The value returned at index `i` corresponds to `self.id[i]`.
+	pub fn rollbacks(&self, keep: Rollbacks) -> Vec<bool> {
+		use Rollbacks::*;
+		match keep {
+			ExceptFirst => self.rollbacks_(self.id.iter().enumerate()),
+			ExceptLast => self.rollbacks_(self.id.iter().enumerate().rev()),
 		}
 	}
 
-	pub fn len(&self) -> usize {
+	fn rollbacks_<'a>(&self, ids: impl Iterator<Item = (usize, &'a i32)>) -> Vec<bool> {
+		let mut result = vec![false; self.len()];
+		let unique_id_count = self
+			.id
+			.iter()
+			.max()
+			.map_or(0, |idx| 1 + usize::try_from(idx - FIRST_INDEX).unwrap());
+		let mut seen = vec![false; unique_id_count];
+		for (idx, id) in ids {
+			let zero_based_id = usize::try_from(id - FIRST_INDEX).unwrap();
+			if !seen[zero_based_id] {
+				seen[zero_based_id] = true;
+				result[idx] = false;
+			} else {
+				result[idx] = true;
+			}
+		}
+		result
+	}
+}
+
+impl Frames for Frame {
+	fn len(&self) -> usize {
 		self.id.len()
 	}
 
-	pub fn transpose_one(&self, i: usize, version: Version) -> transpose::Frame {
-		transpose::Frame {
+	fn last_id(&self) -> Option<i32> {
+		self.id.last().copied()
+	}
+
+	fn frame(&self, i: usize, version: Version) -> Cow<'_, transpose::Frame> {
+		Cow::Owned(transpose::Frame {
 			id: self.id[i],
 			ports: self
 				.ports
@@ -305,38 +336,69 @@ impl Frame {
 					})
 					.collect()
 			}),
+		})
+	}
+
+	fn with_capacity(capacity: usize, version: Version, ports: &[PortOccupancy]) -> Self {
+		Self {
+			id: Vec::with_capacity(capacity),
+			ports: ports
+				.iter()
+				.map(|p| PortData::with_capacity(capacity, version, *p))
+				.collect(),
+			start: version
+				.gte(2, 2)
+				.then(|| Start::with_capacity(capacity, version)),
+			end: version
+				.gte(3, 0)
+				.then(|| End::with_capacity(capacity, version)),
+			item: version.gte(3, 0).then(|| Item::with_capacity(0, version)),
+			item_offset: version.gte(3, 0).then(|| make_offsets(capacity)),
+			fod_platform: version
+				.gte(3, 18)
+				.then(|| FodPlatform::with_capacity(0, version)),
+			fod_platform_offset: version.gte(3, 18).then(|| make_offsets(capacity)),
+			dreamland_whispy: version
+				.gte(3, 18)
+				.then(|| DreamlandWhispy::with_capacity(0, version)),
+			dreamland_whispy_offset: version.gte(3, 18).then(|| make_offsets(capacity)),
+			stadium_transformation: version
+				.gte(3, 18)
+				.then(|| StadiumTransformation::with_capacity(0, version)),
+			stadium_transformation_offset: version.gte(3, 18).then(|| make_offsets(capacity)),
 		}
 	}
 
-	/// Frames IDs may appear multiple times due to rollbacks. This fn lets you
-	/// "dedupe" rollbacks, by returning `true` for all but one of each unique
-	/// frame ID. The value returned at index `i` corresponds to `self.id[i]`.
-	pub fn rollbacks(&self, keep: Rollbacks) -> Vec<bool> {
-		use Rollbacks::*;
-		match keep {
-			ExceptFirst => self.rollbacks_(self.id.iter().enumerate()),
-			ExceptLast => self.rollbacks_(self.id.iter().enumerate().rev()),
+	fn event_counts(&self) -> EventCounts {
+		let len = self.len();
+		EventCounts {
+			frame: len.try_into().unwrap(),
+			frame_data: self
+				.ports
+				.iter()
+				.map(|p| {
+					len - p.validity.null_count()
+						+ p.follower
+							.as_ref()
+							.map_or(0, |f| len - f.validity.null_count())
+				})
+				.sum::<usize>()
+				.try_into()
+				.unwrap(),
+			item: self.item.as_ref().map_or(0, |i| i.id.len() as u32),
+			fod_platform: self
+				.fod_platform
+				.as_ref()
+				.map_or(0, |i| i.platform.len() as u32),
+			dreamland_whispy: self
+				.dreamland_whispy
+				.as_ref()
+				.map_or(0, |i| i.direction.len() as u32),
+			stadium_transformation: self
+				.stadium_transformation
+				.as_ref()
+				.map_or(0, |i| i.event.len() as u32),
 		}
-	}
-
-	fn rollbacks_<'a>(&self, ids: impl Iterator<Item = (usize, &'a i32)>) -> Vec<bool> {
-		let mut result = vec![false; self.len()];
-		let unique_id_count = self
-			.id
-			.iter()
-			.max()
-			.map_or(0, |idx| 1 + usize::try_from(idx - FIRST_INDEX).unwrap());
-		let mut seen = vec![false; unique_id_count];
-		for (idx, id) in ids {
-			let zero_based_id = usize::try_from(id - FIRST_INDEX).unwrap();
-			if !seen[zero_based_id] {
-				seen[zero_based_id] = true;
-				result[idx] = false;
-			} else {
-				result[idx] = true;
-			}
-		}
-		result
 	}
 }
 
@@ -344,6 +406,39 @@ impl fmt::Debug for Frame {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
 		write!(f, "Frame {{ len: {} }}", self.id.len())
 	}
+}
+
+pub trait Writer {
+	fn write<W: Write>(&self, w: &mut W, version: Version) -> Result<()>;
+}
+
+pub trait Reader {
+	fn open(&mut self, version: Version, id: i32, port_count: usize);
+	fn close(&mut self, version: Version, port_count: usize);
+	fn read_start(&mut self, r: &mut &[u8], version: Version) -> Result<()>;
+	fn read_pre(
+		&mut self,
+		r: &mut &[u8],
+		version: Version,
+		id: i32,
+		port_index: u8,
+		port: Port,
+		follower: bool,
+	) -> Result<()>;
+	fn read_post(
+		&mut self,
+		r: &mut &[u8],
+		version: Version,
+		id: i32,
+		port_index: u8,
+		port: Port,
+		follower: bool,
+	) -> Result<()>;
+	fn read_item(&mut self, r: &mut &[u8], version: Version) -> Result<()>;
+	fn read_fod_platform(&mut self, r: &mut &[u8], version: Version) -> Result<()>;
+	fn read_dreamland_whispy(&mut self, r: &mut &[u8], version: Version) -> Result<()>;
+	fn read_stadium_transformation(&mut self, r: &mut &[u8], version: Version) -> Result<()>;
+	fn read_end(&mut self, r: &mut &[u8], version: Version) -> Result<()>;
 }
 
 /// This event only occurs on Dreamland 64, and is sent whenever Whispy changes blow directions.
@@ -548,7 +643,7 @@ impl Item {
 }
 
 /// Miscellaneous item state.
-#[derive(Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ItemMisc(pub Vec<u8>, pub Vec<u8>, pub Vec<u8>, pub Vec<u8>);
 
 impl ItemMisc {
@@ -979,7 +1074,7 @@ impl Start {
 }
 
 /// Miscellaneous state flags.
-#[derive(Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct StateFlags(
 	pub Vec<u8>,
 	pub Vec<u8>,

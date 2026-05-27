@@ -6,8 +6,8 @@ use serde_json::json;
 use std::io::BufWriter;
 
 use peppi::{
-	frame::PortOccupancy,
-	game::Port,
+	frame::{Frame, Frames, PortOccupancy},
+	game::{Game, Port},
 	io::{peppi as io_peppi, slippi as io_slippi},
 };
 
@@ -16,7 +16,7 @@ use common::game;
 
 #[test]
 fn into_struct_array() {
-	let game = game("v3.12");
+	let game = game::<Frame>("v3.12");
 	let ports = vec![
 		PortOccupancy {
 			port: Port::P1,
@@ -373,8 +373,8 @@ fn _round_trip(in_path: impl AsRef<Path> + Clone) {
 		return;
 	}
 
-	let game2 = io_slippi::read(Cursor::new(bytes2.as_slice()), None).unwrap();
-	let game1 = io_slippi::read(Cursor::new(bytes1.as_slice()), None).unwrap();
+	let game2: Game<Frame> = io_slippi::read(Cursor::new(bytes2.as_slice()), None).unwrap();
+	let game1: Game<Frame> = io_slippi::read(Cursor::new(bytes1.as_slice()), None).unwrap();
 
 	assert_eq!(game1.start, game2.start);
 	assert_eq!(game1.end, game2.end);
@@ -383,8 +383,8 @@ fn _round_trip(in_path: impl AsRef<Path> + Clone) {
 	assert_eq!(game1.frames.len(), game2.frames.len());
 	for idx in 0..game1.frames.len() {
 		assert_eq!(
-			game1.frames.transpose_one(idx, game1.start.slippi.version),
-			game2.frames.transpose_one(idx, game2.start.slippi.version),
+			game1.frames.frame(idx, game1.start.slippi.version),
+			game2.frames.frame(idx, game2.start.slippi.version),
 		);
 	}
 

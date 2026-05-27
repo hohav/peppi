@@ -6,7 +6,7 @@ use crate::array_map::ArrayMap;
 
 use crate::{
 	frame::{
-		DreamlandWhispy, End, FodPlatform, Frame, Item, Post, Pre, StadiumTransformation, Start,
+		DreamlandWhispy, End, FodPlatform, Frames, Item, Post, Pre, StadiumTransformation, Start, Writer
 	},
 	game::{self, Game, GeckoCodes, MAX_PLAYERS, NUM_PORTS, Player, PlayerType, Port},
 	io::{
@@ -34,10 +34,10 @@ impl PayloadSizes {
 		self.sizes.insert(event as u8, size.try_into().unwrap());
 	}
 
-	fn raw_size(&self, game: &Game) -> Result<u32> {
+	fn raw_size<F: Frames>(&self, game: &Game<F>) -> Result<u32> {
 		use Event::*;
 
-		let counts = frame_counts(&game.frames);
+		let counts = game.frames.event_counts();
 		let mut result = 1 + 1 + (3 * self.sizes.len() as u32); // Payload sizes
 		for (code, size) in self.sizes.iter() {
 			let size = 1 + *size as u32;
@@ -61,7 +61,7 @@ impl PayloadSizes {
 	}
 }
 
-fn game_end_count(game: &Game) -> Result<u32> {
+fn game_end_count<F: Frames>(game: &Game<F>) -> Result<u32> {
 	match (
 		game.end.is_some(),
 		game.quirks.map_or(false, |q| q.double_game_end),
@@ -73,7 +73,7 @@ fn game_end_count(game: &Game) -> Result<u32> {
 	}
 }
 
-fn payload_sizes(game: &Game) -> PayloadSizes {
+fn payload_sizes<F: Frames>(game: &Game<F>) -> PayloadSizes {
 	let mut sizes = PayloadSizes::new();
 	let ver = game.start.slippi.version.clone();
 
@@ -358,48 +358,6 @@ fn game_end<W: Write>(w: &mut W, e: &game::End, ver: slippi::Version) -> Result<
 	Ok(())
 }
 
-#[derive(Debug)]
-struct FrameCounts {
-	frame: u32,
-	frame_data: u32,
-	item: u32,
-	fod_platform: u32,
-	dreamland_whispy: u32,
-	stadium_transformation: u32,
-}
-
-fn frame_counts(frames: &Frame) -> FrameCounts {
-	let len = frames.len();
-	FrameCounts {
-		frame: len.try_into().unwrap(),
-		frame_data: frames
-			.ports
-			.iter()
-			.map(|p| {
-				len - p.leader.validity.null_count()
-					+ p.follower
-						.as_ref()
-						.map_or(0, |f| len - f.validity.null_count())
-			})
-			.sum::<usize>()
-			.try_into()
-			.unwrap(),
-		item: frames.item.as_ref().map_or(0, |i| i.id.len() as u32),
-		fod_platform: frames
-			.fod_platform
-			.as_ref()
-			.map_or(0, |i| i.platform.len() as u32),
-		dreamland_whispy: frames
-			.dreamland_whispy
-			.as_ref()
-			.map_or(0, |i| i.direction.len() as u32),
-		stadium_transformation: frames
-			.stadium_transformation
-			.as_ref()
-			.map_or(0, |i| i.event.len() as u32),
-	}
-}
-
 fn gecko_codes_size(gecko_codes: &GeckoCodes) -> u32 {
 	assert_eq!(gecko_codes.bytes.len() % 512, 0);
 	let num_blocks = u32::try_from(gecko_codes.bytes.len()).unwrap() / 512;
@@ -409,7 +367,7 @@ fn gecko_codes_size(gecko_codes: &GeckoCodes) -> u32 {
 /// Writes a replay to `w` in Slippi (`.slp`) format.
 ///
 /// Returns an error if the game's version is higher than `MAX_SUPPORTED_VERSION`.
-pub fn write<W: Write>(w: &mut W, game: &Game) -> Result<()> {
+pub fn write<W: Write, F: Frames+Writer>(w: &mut W, game: &Game<F>) -> Result<()> {
 	slippi::assert_max_version(game.start.slippi.version)?;
 
 	let payload_sizes = payload_sizes(game);

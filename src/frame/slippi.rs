@@ -10,8 +10,8 @@ use std::{
 use byteorder::{ReadBytesExt, WriteBytesExt};
 
 use crate::{
-	frame::{Data, Frame, PortData, PortOccupancy},
-	io::slippi::{Version, de::Event},
+	frame::{Data, Frame, Frames, Port, PortData, PortOccupancy, Reader, Writer},
+	io::slippi::{de::Event, Version},
 };
 
 type BE = byteorder::BigEndian;
@@ -23,13 +23,13 @@ impl Data {
 		version: Version,
 		idx: usize,
 		frame_id: i32,
-		port: PortOccupancy,
+		occ: PortOccupancy,
 	) -> Result<()> {
 		if self.validity.is_valid(idx) {
 			w.write_u8(Event::FramePre as u8)?;
 			w.write_i32::<BE>(frame_id)?;
-			w.write_u8(port.port as u8)?;
-			w.write_u8(match port.follower {
+			w.write_u8(occ.port as u8)?;
+			w.write_u8(match occ.follower {
 				true => 1,
 				_ => 0,
 			})?;
@@ -44,13 +44,13 @@ impl Data {
 		version: Version,
 		idx: usize,
 		frame_id: i32,
-		port: PortOccupancy,
+		occ: PortOccupancy,
 	) -> Result<()> {
 		if self.validity.is_valid(idx) {
 			w.write_u8(Event::FramePost as u8)?;
 			w.write_i32::<BE>(frame_id)?;
-			w.write_u8(port.port as u8)?;
-			w.write_u8(match port.follower {
+			w.write_u8(occ.port as u8)?;
+			w.write_u8(match occ.follower {
 				true => 1,
 				_ => 0,
 			})?;
@@ -68,32 +68,36 @@ impl PortData {
 		idx: usize,
 		frame_id: i32,
 	) -> Result<()> {
-		self.leader.write_pre(
-			w,
-			version,
-			idx,
-			frame_id,
-			PortOccupancy {
-				port: self.port,
-				follower: false,
-			},
-		)?;
-		self.follower.as_ref().map_or(Ok(()), |f| {
-			if f.validity.is_valid(idx) {
-				f.write_pre(
-					w,
-					version,
-					idx,
-					frame_id,
-					PortOccupancy {
-						port: self.port,
-						follower: true,
-					},
-				)
-			} else {
-				Ok(())
-			}
-		})
+		if self.validity.is_valid(idx) {
+			self.leader.write_pre(
+				w,
+				version,
+				idx,
+				frame_id,
+				PortOccupancy {
+					port: self.port,
+					follower: false,
+				},
+			)?;
+			self.follower.as_ref().map_or(Ok(()), |f| {
+				if f.validity.is_valid(idx) {
+					f.write_pre(
+						w,
+						version,
+						idx,
+						frame_id,
+						PortOccupancy {
+							port: self.port,
+							follower: true,
+						},
+					)
+				} else {
+					Ok(())
+				}
+			})
+		} else {
+			Ok(())
+		}
 	}
 
 	fn write_post<W: Write>(
@@ -103,37 +107,41 @@ impl PortData {
 		idx: usize,
 		frame_id: i32,
 	) -> Result<()> {
-		self.leader.write_post(
-			w,
-			version,
-			idx,
-			frame_id,
-			PortOccupancy {
-				port: self.port,
-				follower: false,
-			},
-		)?;
-		self.follower.as_ref().map_or(Ok(()), |f| {
-			if f.validity.is_valid(idx) {
-				f.write_post(
-					w,
-					version,
-					idx,
-					frame_id,
-					PortOccupancy {
-						port: self.port,
-						follower: true,
-					},
-				)
-			} else {
-				Ok(())
-			}
-		})
+		if self.validity.is_valid(idx) {
+			self.leader.write_post(
+				w,
+				version,
+				idx,
+				frame_id,
+				PortOccupancy {
+					port: self.port,
+					follower: false,
+				},
+			)?;
+			self.follower.as_ref().map_or(Ok(()), |f| {
+				if f.validity.is_valid(idx) {
+					f.write_post(
+						w,
+						version,
+						idx,
+						frame_id,
+						PortOccupancy {
+							port: self.port,
+							follower: true,
+						},
+					)
+				} else {
+					Ok(())
+				}
+			})
+		} else {
+			Ok(())
+		}
 	}
 }
 
-impl Frame {
-	pub fn write<W: Write>(&self, w: &mut W, version: Version) -> Result<()> {
+impl Writer for Frame {
+	fn write<W: Write>(&self, w: &mut W, version: Version) -> Result<()> {
 		for (idx, &frame_id) in self.id.iter().enumerate() {
 			if version.gte(2, 2) {
 				w.write_u8(Event::FrameStart as u8)?;
@@ -198,11 +206,136 @@ impl Frame {
 	}
 }
 
+impl Reader for Frame {
+	fn open(&mut self, version: Version, id: i32, port_count: usize) {
+		self.id.push(id);
+	}
+
+	fn close(&mut self, version: Version, port_count: usize) {
+		let len = self.len();
+		for p in &mut self.ports {
+			while p.len() < len {
+				p.append_null(version);
+			}
+			if let Some(f) = &mut p.follower {
+				while f.len() < len {
+					f.append_null(version);
+				}
+			}
+		}
+
+		if version.gte(3, 0) {
+			self.item_offset
+				.as_mut()
+				.unwrap()
+				.push(self.item.as_ref().unwrap().id.len().try_into().unwrap());
+
+			if version.gte(3, 18) {
+				self.fod_platform_offset.as_mut().unwrap().push(
+					self.fod_platform
+						.as_ref()
+						.unwrap()
+						.platform
+						.len()
+						.try_into()
+						.unwrap(),
+				);
+				self.dreamland_whispy_offset.as_mut().unwrap().push(
+					self.dreamland_whispy
+						.as_ref()
+						.unwrap()
+						.direction
+						.len()
+						.try_into()
+						.unwrap(),
+				);
+				self.stadium_transformation_offset.as_mut().unwrap().push(
+					self.stadium_transformation
+						.as_ref()
+						.unwrap()
+						.event
+						.len()
+						.try_into()
+						.unwrap(),
+				);
+			}
+		}
+	}
+
+	fn read_start(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		self.start.as_mut().unwrap().read_append(r, version)
+	}
+
+	fn read_pre(
+		&mut self,
+		r: &mut &[u8],
+		version: Version,
+		id: i32,
+		port_index: u8,
+		port: Port,
+		follower: bool,
+	) -> Result<()> {
+		let port_data = &mut self.ports[port_index as usize];
+		if !follower {
+			port_data.validity.push(true);
+		}
+		let character = match follower {
+			true => port_data.follower.as_mut().unwrap(),
+			_ => &mut port_data.leader,
+		};
+		character.validity.push(true);
+		character.pre.read_append(r, version)
+	}
+
+	fn read_post(
+		&mut self,
+		r: &mut &[u8],
+		version: Version,
+		id: i32,
+		port_index: u8,
+		port: Port,
+		follower: bool,
+	) -> Result<()> {
+		let port_data = &mut self.ports[port_index as usize];
+		let character = match follower {
+			true => port_data.follower.as_mut().unwrap(),
+			_ => &mut port_data.leader,
+		};
+		character.post.read_append(r, version)
+	}
+
+	fn read_item(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		self.item.as_mut().unwrap().read_append(r, version)
+	}
+
+	fn read_fod_platform(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		self.fod_platform.as_mut().unwrap().read_append(r, version)
+	}
+
+	fn read_dreamland_whispy(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		self.dreamland_whispy
+			.as_mut()
+			.unwrap()
+			.read_append(r, version)
+	}
+
+	fn read_stadium_transformation(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		self.stadium_transformation
+			.as_mut()
+			.unwrap()
+			.read_append(r, version)
+	}
+
+	fn read_end(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
+		self.end.as_mut().unwrap().read_append(r, version)
+	}
+}
+
 use crate::frame::DreamlandWhispy;
 
 impl DreamlandWhispy {
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.direction.push(x))?;
+		self.direction.push(r.read_u8()?);
 		self.validity.push(true);
 		Ok(())
 	}
@@ -224,8 +357,10 @@ use crate::frame::End;
 impl End {
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
 		if version.gte(3, 7) {
-			r.read_i32::<BE>()
-				.map(|x| self.latest_finalized_frame.as_mut().unwrap().push(x))?
+			self.latest_finalized_frame
+				.as_mut()
+				.unwrap()
+				.push(r.read_i32::<BE>()?)
 		};
 		self.validity.push(true);
 		Ok(())
@@ -251,8 +386,8 @@ use crate::frame::FodPlatform;
 
 impl FodPlatform {
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.platform.push(x))?;
-		r.read_f32::<BE>().map(|x| self.height.push(x))?;
+		self.platform.push(r.read_u8()?);
+		self.height.push(r.read_f32::<BE>()?);
 		self.validity.push(true);
 		Ok(())
 	}
@@ -275,21 +410,20 @@ use crate::frame::Item;
 
 impl Item {
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u16::<BE>().map(|x| self.r#type.push(x))?;
-		r.read_u8().map(|x| self.state.push(x))?;
-		r.read_f32::<BE>().map(|x| self.direction.push(x))?;
+		self.r#type.push(r.read_u16::<BE>()?);
+		self.state.push(r.read_u8()?);
+		self.direction.push(r.read_f32::<BE>()?);
 		self.velocity.read_append(r, version)?;
 		self.position.read_append(r, version)?;
-		r.read_u16::<BE>().map(|x| self.damage.push(x))?;
-		r.read_f32::<BE>().map(|x| self.timer.push(x))?;
-		r.read_u32::<BE>().map(|x| self.id.push(x))?;
+		self.damage.push(r.read_u16::<BE>()?);
+		self.timer.push(r.read_f32::<BE>()?);
+		self.id.push(r.read_u32::<BE>()?);
 		if version.gte(3, 2) {
 			self.misc.as_mut().unwrap().read_append(r, version)?;
 			if version.gte(3, 6) {
-				r.read_i8().map(|x| self.owner.as_mut().unwrap().push(x))?;
+				self.owner.as_mut().unwrap().push(r.read_i8()?);
 				if version.gte(3, 16) {
-					r.read_u16::<BE>()
-						.map(|x| self.instance_id.as_mut().unwrap().push(x))?
+					self.instance_id.as_mut().unwrap().push(r.read_u16::<BE>()?)
 				}
 			}
 		};
@@ -345,10 +479,10 @@ use crate::frame::ItemMisc;
 
 impl ItemMisc {
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.0.push(x))?;
-		r.read_u8().map(|x| self.1.push(x))?;
-		r.read_u8().map(|x| self.2.push(x))?;
-		r.read_u8().map(|x| self.3.push(x))?;
+		self.0.push(r.read_u8()?);
+		self.1.push(r.read_u8()?);
+		self.2.push(r.read_u8()?);
+		self.3.push(r.read_u8()?);
 		Ok(())
 	}
 
@@ -374,8 +508,8 @@ use crate::frame::Position;
 
 impl Position {
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>().map(|x| self.x.push(x))?;
-		r.read_f32::<BE>().map(|x| self.y.push(x))?;
+		self.x.push(r.read_f32::<BE>()?);
+		self.y.push(r.read_f32::<BE>()?);
 		self.validity.push(true);
 		Ok(())
 	}
@@ -398,47 +532,42 @@ use crate::frame::Post;
 
 impl Post {
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.character.push(x))?;
-		r.read_u16::<BE>().map(|x| self.state.push(x))?;
+		self.character.push(r.read_u8()?);
+		self.state.push(r.read_u16::<BE>()?);
 		self.position.read_append(r, version)?;
-		r.read_f32::<BE>().map(|x| self.direction.push(x))?;
-		r.read_f32::<BE>().map(|x| self.percent.push(x))?;
-		r.read_f32::<BE>().map(|x| self.shield.push(x))?;
-		r.read_u8().map(|x| self.last_attack_landed.push(x))?;
-		r.read_u8().map(|x| self.combo_count.push(x))?;
-		r.read_u8().map(|x| self.last_hit_by.push(x))?;
-		r.read_u8().map(|x| self.stocks.push(x))?;
+		self.direction.push(r.read_f32::<BE>()?);
+		self.percent.push(r.read_f32::<BE>()?);
+		self.shield.push(r.read_f32::<BE>()?);
+		self.last_attack_landed.push(r.read_u8()?);
+		self.combo_count.push(r.read_u8()?);
+		self.last_hit_by.push(r.read_u8()?);
+		self.stocks.push(r.read_u8()?);
 		if version.gte(0, 2) {
-			r.read_f32::<BE>()
-				.map(|x| self.state_age.as_mut().unwrap().push(x))?;
+			self.state_age.as_mut().unwrap().push(r.read_f32::<BE>()?);
 			if version.gte(2, 0) {
 				self.state_flags.as_mut().unwrap().read_append(r, version)?;
-				r.read_f32::<BE>()
-					.map(|x| self.misc_as.as_mut().unwrap().push(x))?;
-				r.read_u8()
-					.map(|x| self.airborne.as_mut().unwrap().push(x))?;
-				r.read_u16::<BE>()
-					.map(|x| self.ground.as_mut().unwrap().push(x))?;
-				r.read_u8().map(|x| self.jumps.as_mut().unwrap().push(x))?;
-				r.read_u8()
-					.map(|x| self.l_cancel.as_mut().unwrap().push(x))?;
+				self.misc_as.as_mut().unwrap().push(r.read_f32::<BE>()?);
+				self.airborne.as_mut().unwrap().push(r.read_u8()?);
+				self.ground.as_mut().unwrap().push(r.read_u16::<BE>()?);
+				self.jumps.as_mut().unwrap().push(r.read_u8()?);
+				self.l_cancel.as_mut().unwrap().push(r.read_u8()?);
 				if version.gte(2, 1) {
-					r.read_u8()
-						.map(|x| self.hurtbox_state.as_mut().unwrap().push(x))?;
+					self.hurtbox_state.as_mut().unwrap().push(r.read_u8()?);
 					if version.gte(3, 5) {
 						self.velocities.as_mut().unwrap().read_append(r, version)?;
 						if version.gte(3, 8) {
-							r.read_f32::<BE>()
-								.map(|x| self.hitlag.as_mut().unwrap().push(x))?;
+							self.hitlag.as_mut().unwrap().push(r.read_f32::<BE>()?);
 							if version.gte(3, 11) {
-								r.read_u32::<BE>()
-									.map(|x| self.animation_index.as_mut().unwrap().push(x))?;
+								self.animation_index
+									.as_mut()
+									.unwrap()
+									.push(r.read_u32::<BE>()?);
 								if version.gte(3, 16) {
-									r.read_u16::<BE>().map(|x| {
-										self.last_hit_by_instance.as_mut().unwrap().push(x)
-									})?;
-									r.read_u16::<BE>()
-										.map(|x| self.instance_id.as_mut().unwrap().push(x))?
+									self.last_hit_by_instance
+										.as_mut()
+										.unwrap()
+										.push(r.read_u16::<BE>()?);
+									self.instance_id.as_mut().unwrap().push(r.read_u16::<BE>()?)
 								}
 							}
 						}
@@ -540,30 +669,31 @@ use crate::frame::Pre;
 
 impl Pre {
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u32::<BE>().map(|x| self.random_seed.push(x))?;
-		r.read_u16::<BE>().map(|x| self.state.push(x))?;
+		self.random_seed.push(r.read_u32::<BE>()?);
+		self.state.push(r.read_u16::<BE>()?);
 		self.position.read_append(r, version)?;
-		r.read_f32::<BE>().map(|x| self.direction.push(x))?;
+		self.direction.push(r.read_f32::<BE>()?);
 		self.joystick.read_append(r, version)?;
 		self.cstick.read_append(r, version)?;
-		r.read_f32::<BE>().map(|x| self.triggers.push(x))?;
-		r.read_u32::<BE>().map(|x| self.buttons.push(x))?;
-		r.read_u16::<BE>().map(|x| self.buttons_physical.push(x))?;
+		self.triggers.push(r.read_f32::<BE>()?);
+		self.buttons.push(r.read_u32::<BE>()?);
+		self.buttons_physical.push(r.read_u16::<BE>()?);
 		self.triggers_physical.read_append(r, version)?;
 		if version.gte(1, 2) {
-			r.read_i8()
-				.map(|x| self.raw_analog_x.as_mut().unwrap().push(x))?;
+			self.raw_analog_x.as_mut().unwrap().push(r.read_i8()?);
 			if version.gte(1, 4) {
-				r.read_f32::<BE>()
-					.map(|x| self.percent.as_mut().unwrap().push(x))?;
+				self.percent.as_mut().unwrap().push(r.read_f32::<BE>()?);
 				if version.gte(3, 15) {
-					r.read_i8()
-						.map(|x| self.raw_analog_y.as_mut().unwrap().push(x))?;
+					self.raw_analog_y.as_mut().unwrap().push(r.read_i8()?);
 					if version.gte(3, 17) {
-						r.read_i8()
-							.map(|x| self.raw_analog_cstick_x.as_mut().unwrap().push(x))?;
-						r.read_i8()
-							.map(|x| self.raw_analog_cstick_y.as_mut().unwrap().push(x))?
+						self.raw_analog_cstick_x
+							.as_mut()
+							.unwrap()
+							.push(r.read_i8()?);
+						self.raw_analog_cstick_y
+							.as_mut()
+							.unwrap()
+							.push(r.read_i8()?)
 					}
 				}
 			}
@@ -632,8 +762,8 @@ use crate::frame::StadiumTransformation;
 
 impl StadiumTransformation {
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u16::<BE>().map(|x| self.event.push(x))?;
-		r.read_u16::<BE>().map(|x| self.r#type.push(x))?;
+		self.event.push(r.read_u16::<BE>()?);
+		self.r#type.push(r.read_u16::<BE>()?);
 		self.validity.push(true);
 		Ok(())
 	}
@@ -656,10 +786,12 @@ use crate::frame::Start;
 
 impl Start {
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u32::<BE>().map(|x| self.random_seed.push(x))?;
+		self.random_seed.push(r.read_u32::<BE>()?);
 		if version.gte(3, 10) {
-			r.read_u32::<BE>()
-				.map(|x| self.scene_frame_counter.as_mut().unwrap().push(x))?
+			self.scene_frame_counter
+				.as_mut()
+				.unwrap()
+				.push(r.read_u32::<BE>()?)
 		};
 		self.validity.push(true);
 		Ok(())
@@ -687,11 +819,11 @@ use crate::frame::StateFlags;
 
 impl StateFlags {
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_u8().map(|x| self.0.push(x))?;
-		r.read_u8().map(|x| self.1.push(x))?;
-		r.read_u8().map(|x| self.2.push(x))?;
-		r.read_u8().map(|x| self.3.push(x))?;
-		r.read_u8().map(|x| self.4.push(x))?;
+		self.0.push(r.read_u8()?);
+		self.1.push(r.read_u8()?);
+		self.2.push(r.read_u8()?);
+		self.3.push(r.read_u8()?);
+		self.4.push(r.read_u8()?);
 		Ok(())
 	}
 
@@ -719,8 +851,8 @@ use crate::frame::TriggersPhysical;
 
 impl TriggersPhysical {
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>().map(|x| self.l.push(x))?;
-		r.read_f32::<BE>().map(|x| self.r.push(x))?;
+		self.l.push(r.read_f32::<BE>()?);
+		self.r.push(r.read_f32::<BE>()?);
 		self.validity.push(true);
 		Ok(())
 	}
@@ -743,11 +875,11 @@ use crate::frame::Velocities;
 
 impl Velocities {
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>().map(|x| self.self_x_air.push(x))?;
-		r.read_f32::<BE>().map(|x| self.self_y.push(x))?;
-		r.read_f32::<BE>().map(|x| self.knockback_x.push(x))?;
-		r.read_f32::<BE>().map(|x| self.knockback_y.push(x))?;
-		r.read_f32::<BE>().map(|x| self.self_x_ground.push(x))?;
+		self.self_x_air.push(r.read_f32::<BE>()?);
+		self.self_y.push(r.read_f32::<BE>()?);
+		self.knockback_x.push(r.read_f32::<BE>()?);
+		self.knockback_y.push(r.read_f32::<BE>()?);
+		self.self_x_ground.push(r.read_f32::<BE>()?);
 		self.validity.push(true);
 		Ok(())
 	}
@@ -776,8 +908,8 @@ use crate::frame::Velocity;
 
 impl Velocity {
 	pub fn read_append(&mut self, r: &mut &[u8], version: Version) -> Result<()> {
-		r.read_f32::<BE>().map(|x| self.x.push(x))?;
-		r.read_f32::<BE>().map(|x| self.y.push(x))?;
+		self.x.push(r.read_f32::<BE>()?);
+		self.y.push(r.read_f32::<BE>()?);
 		self.validity.push(true);
 		Ok(())
 	}

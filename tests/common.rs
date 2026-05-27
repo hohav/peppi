@@ -5,11 +5,12 @@ use std::{
 };
 
 use peppi::{
+	frame::{Frames, Reader},
 	game::Game,
 	io::{Result, slippi},
 };
 
-pub fn read_game(path: impl AsRef<Path>, skip_frames: bool) -> Result<Game> {
+pub fn read_game<F: Frames+Reader>(path: impl AsRef<Path>, skip_frames: bool) -> Result<Game<F>> {
 	let mut buf = BufReader::new(File::open(path).unwrap());
 	slippi::read(
 		&mut buf,
@@ -24,6 +25,6 @@ pub fn get_path(name: &str) -> PathBuf {
 	format!("tests/data/{}.slp", name).into()
 }
 
-pub fn game(name: &str) -> Game {
+pub fn game<F: Frames+Reader>(name: &str) -> Game<F> {
 	read_game(get_path(name), false).unwrap()
 }

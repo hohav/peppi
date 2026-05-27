@@ -11,18 +11,13 @@
 (defn read-append-primitive
   [target ty]
   [:method-call
-   {:unwrap true}
-   [:method-call
-    {:generics (when-not (#{"u8" "i8"} ty) ["BE"])}
-    "r"
-    (str "read_" ty)]
-   "map"
-   [[:closure
-     [["x"]]
-     [[:method-call
-       target
-       "push"
-       ["x"]]]]]])
+   target
+   "push"
+   [[:method-call
+	 {:unwrap true
+      :generics (when-not (#{"u8" "i8"} ty) ["BE"])}
+     "r"
+     (str "read_" ty)]]])
 
 (defn read-append-composite
   [target]

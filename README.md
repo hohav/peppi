@@ -23,11 +23,15 @@ One-shot `.slp` parsing with [slippi::read](https://docs.rs/peppi/latest/peppi/i
 
 ```rust
 use std::{fs, io};
-use peppi::io::slippi::read;
+use peppi::{
+    frame::Frame,
+    game::Game,
+    io::slippi::read,
+};
 
 fn main() {
     let mut r = io::BufReader::new(fs::File::open("tests/data/game.slp").unwrap());
-    let game = read(&mut r, None).unwrap();
+    let game: Game<Frame> = read(&mut r, None).unwrap();
     println!("{:#?}", game);
 }
 ```
@@ -37,8 +41,11 @@ fn main() {
 
 ```rust
 use std::{fs, io};
-use peppi::io::slippi::read;
-use peppi::frame::Rollbacks;
+use peppi::{
+    frame::{Frame, Frames, Rollbacks},
+    game::Game,
+    io::slippi::read,
+};
 
 // `ssbm-data` provides enums for characters, stages, action states, etc.
 // You can just hard-code constants instead, if you prefer.
@@ -47,7 +54,7 @@ use ssbm_data::action_state::Common::{self, *};
 /// Print the frames on which each player died.
 fn main() {
     let mut r = io::BufReader::new(fs::File::open("tests/data/game.slp").unwrap());
-    let game = read(&mut r, None).unwrap();
+    let game: Game<Frame> = read(&mut r, None).unwrap();
 
     let mut is_dead = vec![false; game.frames.ports.len()];
     let rollbacks = game.frames.rollbacks(Rollbacks::ExceptLast);
@@ -92,7 +99,10 @@ fn main() {
 use std::fs;
 use std::io::BufReader;
 use byteorder::ReadBytesExt;
-use peppi::io::slippi::de;
+use peppi::{
+    frame::Frame,
+    io::slippi::de::{self, ParseState},
+};
 
 fn main() {
     let mut r = BufReader::new(fs::File::open("tests/data/game.slp").unwrap());
@@ -101,7 +111,7 @@ fn main() {
     let size = de::parse_header(&mut r, None).unwrap() as usize;
 
     // payload sizes & game start
-    let mut state = de::parse_start(&mut r, None).unwrap();
+    let mut state: ParseState<Frame> = de::parse_start(&mut r, None).unwrap();
 
     // loop until we hit GameEnd or run out of bytes
     while de::parse_event(&mut r, &mut state, None).unwrap() != de::Event::GameEnd as u8

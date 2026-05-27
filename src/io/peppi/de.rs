@@ -6,7 +6,7 @@ use arrow::array::StructArray;
 use arrow_ipc::reader::StreamReader;
 
 use crate::{
-	frame::Frame,
+	frame::{Frame, Frames},
 	game::{self, Game, port_occupancy},
 	io::{
 		Result, expect_bytes, peppi, slippi,
@@ -86,7 +86,7 @@ fn read_peppi_gecko_codes<R: Read>(mut r: R) -> Result<game::GeckoCodes> {
 }
 
 /// Reads a Peppi (`.slpp`) replay from `r`.
-pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<Game> {
+pub fn read<R: Read>(r: R, opts: Option<&Opts>) -> Result<Game<Frame>> {
 	let mut start: Option<game::Start> = None;
 	let mut end: Option<game::End> = None;
 	let mut metadata: Option<Map> = None;

@@ -4,16 +4,16 @@
 
 use crate::{
 	frame::{Data, Frame, PortData, PortOccupancy, Validity},
-	game::{NUM_PORTS, Port},
+	game::{Port, NUM_PORTS},
 	io::slippi::Version,
 };
 
 use arrow::{
-	array::{Array, ArrayRef, ListArray, PrimitiveArray, StructArray, downcast_array},
+	array::{downcast_array, Array, ArrayRef, ListArray, PrimitiveArray, StructArray},
 	buffer::{NullBuffer, OffsetBuffer, ScalarBuffer},
 	datatypes::{
-		DataType, Field, Fields, Float32Type, Int8Type, Int32Type, UInt8Type, UInt16Type,
-		UInt32Type,
+		DataType, Field, Fields, Float32Type, Int32Type, Int8Type, UInt16Type, UInt32Type,
+		UInt8Type,
 	},
 };
 
@@ -117,7 +117,7 @@ impl PortData {
 		if let Some(follower) = self.follower {
 			values.push(Arc::new(follower.into_struct_array(version)) as ArrayRef);
 		}
-		StructArray::new(Self::fields(version, port), values, None)
+		StructArray::new(Self::fields(version, port), values, self.validity.into())
 	}
 
 	fn from_struct_array(array: StructArray, version: Version, port: Port) -> Self {
