@@ -96,6 +96,11 @@ pub struct Post {
 	pub animation_index: Option<u32>,
 	pub last_hit_by_instance: Option<u16>,
 	pub instance_id: Option<u16>,
+	pub stored_charge: Option<u8>,
+	pub spent_flags: Option<u8>,
+	pub wall_jumps_used: Option<u8>,
+	pub character_byte: Option<u8>,
+	pub character_value: Option<u32>,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]

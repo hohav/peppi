@@ -744,7 +744,34 @@ impl StructArrayConvertible for Post {
 											"instance_id",
 											DataType::UInt16,
 											false,
-										))
+										));
+										if version.gte(3, 20) {
+											fields.push(Field::new(
+												"stored_charge",
+												DataType::UInt8,
+												false,
+											));
+											fields.push(Field::new(
+												"spent_flags",
+												DataType::UInt8,
+												false,
+											));
+											fields.push(Field::new(
+												"wall_jumps_used",
+												DataType::UInt8,
+												false,
+											));
+											fields.push(Field::new(
+												"character_byte",
+												DataType::UInt8,
+												false,
+											));
+											fields.push(Field::new(
+												"character_value",
+												DataType::UInt32,
+												false,
+											))
+										}
 									}
 								}
 							}
@@ -787,7 +814,14 @@ impl StructArrayConvertible for Post {
 								values.push(self.animation_index.unwrap().boxed());
 								if version.gte(3, 16) {
 									values.push(self.last_hit_by_instance.unwrap().boxed());
-									values.push(self.instance_id.unwrap().boxed())
+									values.push(self.instance_id.unwrap().boxed());
+									if version.gte(3, 20) {
+										values.push(self.stored_charge.unwrap().boxed());
+										values.push(self.spent_flags.unwrap().boxed());
+										values.push(self.wall_jumps_used.unwrap().boxed());
+										values.push(self.character_byte.unwrap().boxed());
+										values.push(self.character_value.unwrap().boxed())
+									}
 								}
 							}
 						}
@@ -929,6 +963,36 @@ impl StructArrayConvertible for Post {
 			instance_id: values.get(22).map(|x| {
 				x.as_any()
 					.downcast_ref::<PrimitiveArray<u16>>()
+					.unwrap()
+					.clone()
+			}),
+			stored_charge: values.get(23).map(|x| {
+				x.as_any()
+					.downcast_ref::<PrimitiveArray<u8>>()
+					.unwrap()
+					.clone()
+			}),
+			spent_flags: values.get(24).map(|x| {
+				x.as_any()
+					.downcast_ref::<PrimitiveArray<u8>>()
+					.unwrap()
+					.clone()
+			}),
+			wall_jumps_used: values.get(25).map(|x| {
+				x.as_any()
+					.downcast_ref::<PrimitiveArray<u8>>()
+					.unwrap()
+					.clone()
+			}),
+			character_byte: values.get(26).map(|x| {
+				x.as_any()
+					.downcast_ref::<PrimitiveArray<u8>>()
+					.unwrap()
+					.clone()
+			}),
+			character_value: values.get(27).map(|x| {
+				x.as_any()
+					.downcast_ref::<PrimitiveArray<u32>>()
 					.unwrap()
 					.clone()
 			}),

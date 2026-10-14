@@ -761,6 +761,112 @@ fn v3_18() {
 	);
 }
 
+/// A copy of a replay with 8 bytes from `extra` appended to every post-frame event,
+/// its size in the Event Payloads event raised to match, and its version set to `version`.
+fn widen_post_frames(bytes: &[u8], version: Version, extra: impl Fn(&[u8]) -> [u8; 8]) -> Vec<u8> {
+	let raw_len = u32::from_be_bytes(bytes[11..15].try_into().unwrap()) as usize;
+	let raw = &bytes[15..15 + raw_len];
+	let payloads_len = raw[1] as usize;
+	let mut sizes = [0usize; 256];
+	let mut out = raw[..1 + payloads_len].to_vec();
+	for at in (2..1 + payloads_len).step_by(3) {
+		sizes[raw[at] as usize] = u16::from_be_bytes([raw[at + 1], raw[at + 2]]) as usize;
+		if raw[at] == 0x38 {
+			out[at + 1..at + 3].copy_from_slice(&(sizes[0x38] as u16 + 8).to_be_bytes());
+		}
+	}
+	let mut pos = 1 + payloads_len;
+	while pos < raw.len() {
+		let code = raw[pos] as usize;
+		let mut event = raw[pos..pos + 1 + sizes[code]].to_vec();
+		if code == 0x36 {
+			event[1..4].copy_from_slice(&[version.0, version.1, version.2]);
+		}
+		if code == 0x38 {
+			let e = extra(&event);
+			event.extend_from_slice(&e);
+		}
+		out.extend_from_slice(&event);
+		pos += 1 + sizes[code];
+	}
+	let mut file = bytes[..11].to_vec();
+	file.extend_from_slice(&(out.len() as u32).to_be_bytes());
+	file.extend_from_slice(&out);
+	file.extend_from_slice(&bytes[15 + raw_len..]);
+	file
+}
+
+/// Made-up v3.20 values for a post-frame event, from its frame and port.
+fn stored_state(frame: i32, port: u8) -> [u8; 8] {
+	let value = (frame as f32 / 4.0).to_bits().to_be_bytes();
+	[
+		(frame + port as i32) as u8,
+		0x01 << port,
+		(frame & 7) as u8,
+		0x40 + port,
+		value[0],
+		value[1],
+		value[2],
+		value[3],
+	]
+}
+
+#[test]
+fn v3_20() {
+	// No recorded v3.20 replay exists yet, so this widens the v3.18 one
+	let bytes = fs::read(get_path("v3.18")).unwrap();
+	let widened = widen_post_frames(&bytes, Version(3, 20, 0), |post| {
+		stored_state(i32::from_be_bytes(post[1..5].try_into().unwrap()), post[5])
+	});
+	let original = game("v3.18");
+	let game = slippi::read(Cursor::new(widened.as_slice()), None).unwrap();
+	assert_eq!(game.start.slippi.version, Version(3, 20, 0));
+	assert!(original.frames.ports[0].leader.post.stored_charge.is_none());
+
+	let ids = game.frames.id.values();
+	for (p, port) in game.frames.ports.iter().enumerate() {
+		let post = &port.leader.post;
+		for idx in 0..game.frames.len() {
+			let [charge, spent, wall_jumps, byte, v0, v1, v2, v3] = stored_state(ids[idx], p as u8);
+			assert_eq!(post.stored_charge.as_ref().unwrap().values()[idx], charge);
+			assert_eq!(post.spent_flags.as_ref().unwrap().values()[idx], spent);
+			assert_eq!(
+				post.wall_jumps_used.as_ref().unwrap().values()[idx],
+				wall_jumps
+			);
+			assert_eq!(post.character_byte.as_ref().unwrap().values()[idx], byte);
+			assert_eq!(
+				post.character_value.as_ref().unwrap().values()[idx],
+				u32::from_be_bytes([v0, v1, v2, v3])
+			);
+		}
+	}
+
+	// Every other field reads as before
+	assert_eq!(game.frames.len(), original.frames.len());
+	for idx in 0..game.frames.len() {
+		let mut frame = game.frames.transpose_one(idx, game.start.slippi.version);
+		for port in frame.ports.iter_mut() {
+			for data in std::iter::once(&mut port.leader).chain(port.follower.as_mut()) {
+				data.post.stored_charge = None;
+				data.post.spent_flags = None;
+				data.post.wall_jumps_used = None;
+				data.post.character_byte = None;
+				data.post.character_value = None;
+			}
+		}
+		assert_eq!(
+			frame,
+			original
+				.frames
+				.transpose_one(idx, original.start.slippi.version)
+		);
+	}
+
+	// And it writes back byte for byte, through the peppi format too
+	_round_trip_bytes(widened);
+}
+
 #[test]
 fn unknown_event() {
 	// shouldn't panic
@@ -851,8 +957,10 @@ fn items() {
 }
 
 fn _round_trip(in_path: impl AsRef<Path> + Clone) {
-	let bytes1 = fs::read(in_path.clone()).unwrap();
+	_round_trip_bytes(fs::read(in_path.clone()).unwrap());
+}
 
+fn _round_trip_bytes(bytes1: Vec<u8>) {
 	let slippi_game = slippi::read(Cursor::new(bytes1.as_slice()), None).unwrap();
 	let peppi_game = {
 		let mut buf = Vec::new();

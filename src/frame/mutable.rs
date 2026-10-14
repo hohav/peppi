@@ -635,6 +635,16 @@ pub struct Post {
 	pub last_hit_by_instance: Option<MutablePrimitiveArray<u16>>,
 	/// *Added: v3.16* Unique, serial ID for each new action state across all characters. Resets to 0 on death
 	pub instance_id: Option<MutablePrimitiveArray<u16>>,
+	/// *Added: v3.20* Charge kept between uses of a move (Giant Punch, Charge Shot, Shadow Ball, needles, Oil Panic, or Kirby’s copy of one), as the game counts it
+	pub stored_charge: Option<MutablePrimitiveArray<u8>>,
+	/// *Added: v3.20* Things used and not yet given back: 0x01 neutral special lift, 0x02 side special lift, 0x04 down special lift, 0x08 Peach’s float, 0x10 aerial tether
+	pub spent_flags: Option<MutablePrimitiveArray<u8>>,
+	/// *Added: v3.20* Wall jumps since the character last touched the ground
+	pub wall_jumps_used: Option<MutablePrimitiveArray<u8>>,
+	/// *Added: v3.20* Kirby: copied ability (internal character ID, 4 = none). Mr. Game & Watch: last Judge number (low nibble) and the one before it (high nibble)
+	pub character_byte: Option<MutablePrimitiveArray<u8>>,
+	/// *Added: v3.20* Raw bits. Bowser’s Fire Breath fuel, Kirby’s copy of it, or Peach’s float frames left (use `f32::from_bits`); Mr. Game & Watch’s Oil Panic damage (an `i32`)
+	pub character_value: Option<MutablePrimitiveArray<u32>>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<MutableBitmap>,
 }
@@ -691,6 +701,21 @@ impl Post {
 			instance_id: version
 				.gte(3, 16)
 				.then(|| MutablePrimitiveArray::<u16>::with_capacity(capacity)),
+			stored_charge: version
+				.gte(3, 20)
+				.then(|| MutablePrimitiveArray::<u8>::with_capacity(capacity)),
+			spent_flags: version
+				.gte(3, 20)
+				.then(|| MutablePrimitiveArray::<u8>::with_capacity(capacity)),
+			wall_jumps_used: version
+				.gte(3, 20)
+				.then(|| MutablePrimitiveArray::<u8>::with_capacity(capacity)),
+			character_byte: version
+				.gte(3, 20)
+				.then(|| MutablePrimitiveArray::<u8>::with_capacity(capacity)),
+			character_value: version
+				.gte(3, 20)
+				.then(|| MutablePrimitiveArray::<u32>::with_capacity(capacity)),
 			validity: None,
 		}
 	}
@@ -733,7 +758,14 @@ impl Post {
 								self.animation_index.as_mut().unwrap().push_null();
 								if version.gte(3, 16) {
 									self.last_hit_by_instance.as_mut().unwrap().push_null();
-									self.instance_id.as_mut().unwrap().push_null()
+									self.instance_id.as_mut().unwrap().push_null();
+									if version.gte(3, 20) {
+										self.stored_charge.as_mut().unwrap().push_null();
+										self.spent_flags.as_mut().unwrap().push_null();
+										self.wall_jumps_used.as_mut().unwrap().push_null();
+										self.character_byte.as_mut().unwrap().push_null();
+										self.character_value.as_mut().unwrap().push_null()
+									}
 								}
 							}
 						}
@@ -785,8 +817,26 @@ impl Post {
 									r.read_u16::<BE>().map(|x| {
 										self.last_hit_by_instance.as_mut().unwrap().push(Some(x))
 									})?;
-									r.read_u16::<BE>()
-										.map(|x| self.instance_id.as_mut().unwrap().push(Some(x)))?
+									r.read_u16::<BE>().map(|x| {
+										self.instance_id.as_mut().unwrap().push(Some(x))
+									})?;
+									if version.gte(3, 20) {
+										r.read_u8().map(|x| {
+											self.stored_charge.as_mut().unwrap().push(Some(x))
+										})?;
+										r.read_u8().map(|x| {
+											self.spent_flags.as_mut().unwrap().push(Some(x))
+										})?;
+										r.read_u8().map(|x| {
+											self.wall_jumps_used.as_mut().unwrap().push(Some(x))
+										})?;
+										r.read_u8().map(|x| {
+											self.character_byte.as_mut().unwrap().push(Some(x))
+										})?;
+										r.read_u32::<BE>().map(|x| {
+											self.character_value.as_mut().unwrap().push(Some(x))
+										})?
+									}
 								}
 							}
 						}
@@ -829,6 +879,11 @@ impl Post {
 			animation_index: self.animation_index.as_ref().map(|x| x.values()[i]),
 			last_hit_by_instance: self.last_hit_by_instance.as_ref().map(|x| x.values()[i]),
 			instance_id: self.instance_id.as_ref().map(|x| x.values()[i]),
+			stored_charge: self.stored_charge.as_ref().map(|x| x.values()[i]),
+			spent_flags: self.spent_flags.as_ref().map(|x| x.values()[i]),
+			wall_jumps_used: self.wall_jumps_used.as_ref().map(|x| x.values()[i]),
+			character_byte: self.character_byte.as_ref().map(|x| x.values()[i]),
+			character_value: self.character_value.as_ref().map(|x| x.values()[i]),
 		}
 	}
 }
