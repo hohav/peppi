@@ -372,7 +372,18 @@ impl Post {
 									w.write_u16::<BE>(
 										self.last_hit_by_instance.as_ref().unwrap().value(i),
 									)?;
-									w.write_u16::<BE>(self.instance_id.as_ref().unwrap().value(i))?
+									w.write_u16::<BE>(self.instance_id.as_ref().unwrap().value(i))?;
+									if version.gte(3, 21) {
+										w.write_u8(self.stored_charge.as_ref().unwrap().value(i))?;
+										w.write_u8(self.spent_flags.as_ref().unwrap().value(i))?;
+										w.write_u8(
+											self.wall_jumps_used.as_ref().unwrap().value(i),
+										)?;
+										w.write_u8(self.character_byte.as_ref().unwrap().value(i))?;
+										w.write_u32::<BE>(
+											self.character_value.as_ref().unwrap().value(i),
+										)?
+									}
 								}
 							}
 						}
@@ -414,7 +425,14 @@ impl Post {
 								size += size_of::<u32>();
 								if version.gte(3, 16) {
 									size += size_of::<u16>();
-									size += size_of::<u16>()
+									size += size_of::<u16>();
+									if version.gte(3, 21) {
+										size += size_of::<u8>();
+										size += size_of::<u8>();
+										size += size_of::<u8>();
+										size += size_of::<u8>();
+										size += size_of::<u32>()
+									}
 								}
 							}
 						}
