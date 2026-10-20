@@ -486,9 +486,9 @@ pub struct Post {
 	pub last_hit_by_instance: Option<PrimitiveArray<u16>>,
 	/// *Added: v3.16* Unique, serial ID for each new action state across all characters. Resets to 0 on death
 	pub instance_id: Option<PrimitiveArray<u16>>,
-	/// *Added: v3.20* Charge kept between uses of a move (Giant Punch, Charge Shot, Shadow Ball, needles, Oil Panic, or Kirby’s copy of one), as the game counts it
+	/// *Added: v3.20* Charge kept between uses of a move (Giant Punch, Charge Shot, Shadow Ball, needles, Oil Panic, or Kirby’s copy of one), as the game counts it. Zelda: the needles Sheik holds while Zelda is in play
 	pub stored_charge: Option<PrimitiveArray<u8>>,
-	/// *Added: v3.20* Things used and not yet given back: 0x01 neutral special lift, 0x02 side special lift, 0x04 down special lift, 0x08 Peach’s float, 0x10 aerial tether
+	/// *Added: v3.20* Things used and not yet given back: 0x01 neutral special lift, 0x02 side special lift, 0x04 down special lift, 0x08 Peach’s float, 0x10 aerial tether, 0x20 air item catch
 	pub spent_flags: Option<PrimitiveArray<u8>>,
 	/// *Added: v3.20* Wall jumps since the character last touched the ground
 	pub wall_jumps_used: Option<PrimitiveArray<u8>>,

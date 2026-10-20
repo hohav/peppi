@@ -308,13 +308,13 @@
 				"name": "stored_charge",
 				"type": "u8",
 				"version": "3.20",
-				"description": "Charge kept between uses of a move (Giant Punch, Charge Shot, Shadow Ball, needles, Oil Panic, or Kirby’s copy of one), as the game counts it"
+				"description": "Charge kept between uses of a move (Giant Punch, Charge Shot, Shadow Ball, needles, Oil Panic, or Kirby’s copy of one), as the game counts it. Zelda: the needles Sheik holds while Zelda is in play"
 			},
 			{
 				"name": "spent_flags",
 				"type": "u8",
 				"version": "3.20",
-				"description": "Things used and not yet given back: 0x01 neutral special lift, 0x02 side special lift, 0x04 down special lift, 0x08 Peach’s float, 0x10 aerial tether"
+				"description": "Things used and not yet given back: 0x01 neutral special lift, 0x02 side special lift, 0x04 down special lift, 0x08 Peach’s float, 0x10 aerial tether, 0x20 air item catch"
 			},
 			{
 				"name": "wall_jumps_used",
