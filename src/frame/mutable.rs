@@ -635,15 +635,15 @@ pub struct Post {
 	pub last_hit_by_instance: Option<MutablePrimitiveArray<u16>>,
 	/// *Added: v3.16* Unique, serial ID for each new action state across all characters. Resets to 0 on death
 	pub instance_id: Option<MutablePrimitiveArray<u16>>,
-	/// *Added: v3.20* Charge kept between uses of a move (Giant Punch, Charge Shot, Shadow Ball, needles, Oil Panic, or Kirby’s copy of one), as the game counts it. Zelda: the needles Sheik holds while Zelda is in play
+	/// *Added: v3.21* Charge kept between uses of a move (Giant Punch, Charge Shot, Shadow Ball, needles, Oil Panic, or Kirby’s copy of one), as the game counts it. Zelda: the needles Sheik holds while Zelda is in play
 	pub stored_charge: Option<MutablePrimitiveArray<u8>>,
-	/// *Added: v3.20* Things used and not yet given back: 0x01 neutral special lift, 0x02 side special lift, 0x04 down special lift, 0x08 Peach’s float, 0x10 aerial tether, 0x20 air item catch
+	/// *Added: v3.21* Things used and not yet given back: 0x01 neutral special lift, 0x02 side special lift, 0x04 down special lift, 0x08 Peach’s float, 0x10 aerial tether, 0x20 air item catch
 	pub spent_flags: Option<MutablePrimitiveArray<u8>>,
-	/// *Added: v3.20* Wall jumps since the character last touched the ground
+	/// *Added: v3.21* Wall jumps since the character last touched the ground
 	pub wall_jumps_used: Option<MutablePrimitiveArray<u8>>,
-	/// *Added: v3.20* Kirby: copied ability (internal character ID, 4 = none). Mr. Game & Watch: last Judge number (low nibble) and the one before it (high nibble)
+	/// *Added: v3.21* Kirby: copied ability (internal character ID, 4 = none). Mr. Game & Watch: last Judge number (low nibble) and the one before it (high nibble)
 	pub character_byte: Option<MutablePrimitiveArray<u8>>,
-	/// *Added: v3.20* Raw bits. Bowser’s Fire Breath fuel, Kirby’s copy of it, or Peach’s float frames left (use `f32::from_bits`); Mr. Game & Watch’s Oil Panic damage (an `i32`)
+	/// *Added: v3.21* Raw bits. Bowser’s Fire Breath fuel, Kirby’s copy of it, or Peach’s float frames left (use `f32::from_bits`); Mr. Game & Watch’s Oil Panic damage (an `i32`)
 	pub character_value: Option<MutablePrimitiveArray<u32>>,
 	/// Indicates which indexes are valid (`None` means "all valid"). Invalid indexes can occur on frames where a character is absent (ICs or 2v2 games)
 	pub validity: Option<MutableBitmap>,
@@ -702,19 +702,19 @@ impl Post {
 				.gte(3, 16)
 				.then(|| MutablePrimitiveArray::<u16>::with_capacity(capacity)),
 			stored_charge: version
-				.gte(3, 20)
+				.gte(3, 21)
 				.then(|| MutablePrimitiveArray::<u8>::with_capacity(capacity)),
 			spent_flags: version
-				.gte(3, 20)
+				.gte(3, 21)
 				.then(|| MutablePrimitiveArray::<u8>::with_capacity(capacity)),
 			wall_jumps_used: version
-				.gte(3, 20)
+				.gte(3, 21)
 				.then(|| MutablePrimitiveArray::<u8>::with_capacity(capacity)),
 			character_byte: version
-				.gte(3, 20)
+				.gte(3, 21)
 				.then(|| MutablePrimitiveArray::<u8>::with_capacity(capacity)),
 			character_value: version
-				.gte(3, 20)
+				.gte(3, 21)
 				.then(|| MutablePrimitiveArray::<u32>::with_capacity(capacity)),
 			validity: None,
 		}
@@ -759,7 +759,7 @@ impl Post {
 								if version.gte(3, 16) {
 									self.last_hit_by_instance.as_mut().unwrap().push_null();
 									self.instance_id.as_mut().unwrap().push_null();
-									if version.gte(3, 20) {
+									if version.gte(3, 21) {
 										self.stored_charge.as_mut().unwrap().push_null();
 										self.spent_flags.as_mut().unwrap().push_null();
 										self.wall_jumps_used.as_mut().unwrap().push_null();
@@ -820,7 +820,7 @@ impl Post {
 									r.read_u16::<BE>().map(|x| {
 										self.instance_id.as_mut().unwrap().push(Some(x))
 									})?;
-									if version.gte(3, 20) {
+									if version.gte(3, 21) {
 										r.read_u8().map(|x| {
 											self.stored_charge.as_mut().unwrap().push(Some(x))
 										})?;

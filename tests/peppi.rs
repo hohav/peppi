@@ -761,19 +761,33 @@ fn v3_18() {
 	);
 }
 
-/// A copy of a replay with 8 bytes from `extra` appended to every post-frame event,
-/// its size in the Event Payloads event raised to match, and its version set to `version`.
+/// Bytes v3.20 added to Game Start (ranked rating and bot status), which peppi doesn't parse.
+const V3_20_GAME_START_EXTRA: usize = 52;
+
+/// A copy of a pre-v3.20 replay with its version set to `version` and its events widened to
+/// match: from v3.20, 52 patterned bytes appended to Game Start; from v3.21, 8 bytes from `extra`
+/// appended to every post-frame event. Their sizes in the Event Payloads event are raised to match.
 fn widen_post_frames(bytes: &[u8], version: Version, extra: impl Fn(&[u8]) -> [u8; 8]) -> Vec<u8> {
+	let start_extra = if version.gte(3, 20) {
+		V3_20_GAME_START_EXTRA
+	} else {
+		0
+	};
+	let post_extra = if version.gte(3, 21) { 8 } else { 0 };
 	let raw_len = u32::from_be_bytes(bytes[11..15].try_into().unwrap()) as usize;
 	let raw = &bytes[15..15 + raw_len];
 	let payloads_len = raw[1] as usize;
 	let mut sizes = [0usize; 256];
 	let mut out = raw[..1 + payloads_len].to_vec();
 	for at in (2..1 + payloads_len).step_by(3) {
-		sizes[raw[at] as usize] = u16::from_be_bytes([raw[at + 1], raw[at + 2]]) as usize;
-		if raw[at] == 0x38 {
-			out[at + 1..at + 3].copy_from_slice(&(sizes[0x38] as u16 + 8).to_be_bytes());
-		}
+		let code = raw[at] as usize;
+		sizes[code] = u16::from_be_bytes([raw[at + 1], raw[at + 2]]) as usize;
+		let grow = match code {
+			0x36 => start_extra,
+			0x38 => post_extra,
+			_ => 0,
+		};
+		out[at + 1..at + 3].copy_from_slice(&((sizes[code] + grow) as u16).to_be_bytes());
 	}
 	let mut pos = 1 + payloads_len;
 	while pos < raw.len() {
@@ -781,8 +795,9 @@ fn widen_post_frames(bytes: &[u8], version: Version, extra: impl Fn(&[u8]) -> [u
 		let mut event = raw[pos..pos + 1 + sizes[code]].to_vec();
 		if code == 0x36 {
 			event[1..4].copy_from_slice(&[version.0, version.1, version.2]);
+			event.extend((0..start_extra).map(|i| 0xa0 ^ i as u8));
 		}
-		if code == 0x38 {
+		if code == 0x38 && post_extra > 0 {
 			let e = extra(&event);
 			event.extend_from_slice(&e);
 		}
@@ -796,7 +811,7 @@ fn widen_post_frames(bytes: &[u8], version: Version, extra: impl Fn(&[u8]) -> [u
 	file
 }
 
-/// Made-up v3.20 values for a post-frame event, from its frame and port.
+/// Made-up v3.21 values for a post-frame event, from its frame and port.
 fn stored_state(frame: i32, port: u8) -> [u8; 8] {
 	let value = (frame as f32 / 4.0).to_bits().to_be_bytes();
 	[
@@ -813,14 +828,31 @@ fn stored_state(frame: i32, port: u8) -> [u8; 8] {
 
 #[test]
 fn v3_20() {
-	// No recorded v3.20 replay exists yet, so this widens the v3.18 one
+	// A longer Game Start than peppi parses: the extra bytes are kept, not read or dropped
 	let bytes = fs::read(get_path("v3.18")).unwrap();
-	let widened = widen_post_frames(&bytes, Version(3, 20, 0), |post| {
+	let widened = widen_post_frames(&bytes, Version(3, 20, 0), |_| unreachable!());
+	let original = game("v3.18");
+	let game = slippi::read(Cursor::new(widened.as_slice()), None).unwrap();
+	assert_eq!(game.start.slippi.version, Version(3, 20, 0));
+	assert_eq!(
+		game.start.bytes.0.len(),
+		original.start.bytes.0.len() + V3_20_GAME_START_EXTRA
+	);
+	assert_eq!(game.start.players, original.start.players);
+	assert!(game.frames.ports[0].leader.post.stored_charge.is_none());
+	_round_trip_bytes(widened);
+}
+
+#[test]
+fn v3_21() {
+	// No recorded v3.21 replay exists yet, so this widens the v3.18 one
+	let bytes = fs::read(get_path("v3.18")).unwrap();
+	let widened = widen_post_frames(&bytes, Version(3, 21, 0), |post| {
 		stored_state(i32::from_be_bytes(post[1..5].try_into().unwrap()), post[5])
 	});
 	let original = game("v3.18");
 	let game = slippi::read(Cursor::new(widened.as_slice()), None).unwrap();
-	assert_eq!(game.start.slippi.version, Version(3, 20, 0));
+	assert_eq!(game.start.slippi.version, Version(3, 21, 0));
 	assert!(original.frames.ports[0].leader.post.stored_charge.is_none());
 
 	let ids = game.frames.id.values();

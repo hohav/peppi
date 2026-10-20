@@ -373,7 +373,7 @@ impl Post {
 										self.last_hit_by_instance.as_ref().unwrap().value(i),
 									)?;
 									w.write_u16::<BE>(self.instance_id.as_ref().unwrap().value(i))?;
-									if version.gte(3, 20) {
+									if version.gte(3, 21) {
 										w.write_u8(self.stored_charge.as_ref().unwrap().value(i))?;
 										w.write_u8(self.spent_flags.as_ref().unwrap().value(i))?;
 										w.write_u8(
@@ -426,7 +426,7 @@ impl Post {
 								if version.gte(3, 16) {
 									size += size_of::<u16>();
 									size += size_of::<u16>();
-									if version.gte(3, 20) {
+									if version.gte(3, 21) {
 										size += size_of::<u8>();
 										size += size_of::<u8>();
 										size += size_of::<u8>();

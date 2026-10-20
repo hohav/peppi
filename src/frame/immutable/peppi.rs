@@ -745,7 +745,7 @@ impl StructArrayConvertible for Post {
 											DataType::UInt16,
 											false,
 										));
-										if version.gte(3, 20) {
+										if version.gte(3, 21) {
 											fields.push(Field::new(
 												"stored_charge",
 												DataType::UInt8,
@@ -815,7 +815,7 @@ impl StructArrayConvertible for Post {
 								if version.gte(3, 16) {
 									values.push(self.last_hit_by_instance.unwrap().boxed());
 									values.push(self.instance_id.unwrap().boxed());
-									if version.gte(3, 20) {
+									if version.gte(3, 21) {
 										values.push(self.stored_charge.unwrap().boxed());
 										values.push(self.spent_flags.unwrap().boxed());
 										values.push(self.wall_jumps_used.unwrap().boxed());
